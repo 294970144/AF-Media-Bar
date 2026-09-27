@@ -24,6 +24,7 @@ Reliability fixes: media-session self-healing, spectrum level calibration, and l
 - Lyrics not advancing when a player stops reporting playback progress (its timeline stays at the track start): lyric line selection now uses the same extrapolated position as the progress bar and is advanced by the existing 250 ms progress timer.
 - Lyrics stuck on title/artist after a track change: when the player's timeline for a new track stalls at zero and is never refreshed (measured with Ceru Music), the hidden "waiting for the first line" frame stopped the lyric frame timer, so nothing re-projected with the wall clock afterwards; the timer now keeps running whenever media is playing with lyrics loaded, so the first line shows up on time without a pause and resume.
 - The web spectrum kept running its infinite pulse animation while hidden in lyrics mode (animating `height`, which lays out every frame): the WebView renderer burned 16%–25% of a core continuously, and the animation now only runs in the spectrum scene.
+- The watchdog rebuilt the media catalog without bound while the OS reported sessions it could not read: with a fullscreen exclusive game blocking the query it kept rebuilding every few seconds (a real log held 14 rebuilds in 75 s); past three consecutive rebuilds it now falls back to a plain ForceUpdate and the counter resets on recovery.
 
 ### Improved
 
