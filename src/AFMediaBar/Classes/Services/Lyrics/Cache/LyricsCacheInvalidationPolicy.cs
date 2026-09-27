@@ -33,6 +33,7 @@ public static class LyricsCacheInvalidationPolicy
         }
 
         return propertyName is
+            nameof(AppSettings.AllowBrowserAndVideoLyrics) or
             nameof(AppSettings.LyricsSource) or
             nameof(AppSettings.LyricsDefaultBindings) or
             // 查询策略决定链路的执行模型本身，切换后旧结果不再属于当前配置。

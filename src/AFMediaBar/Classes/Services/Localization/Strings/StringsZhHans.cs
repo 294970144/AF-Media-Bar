@@ -486,6 +486,8 @@ internal static class StringsZhHans
         table.Add("Lyrics.Row.InfoLines.Title", "过滤署名行");
         table.Add("Lyrics.Row.MatchStrictness.Description", "按曲名搜索歌词时要求的匹配程度；越严格越不容易匹配到同名的现场版或翻唱");
         table.Add("Lyrics.Row.MatchStrictness.Title", "搜索匹配严格度");
+        table.Add("Lyrics.Row.BrowserVideo.Title", "浏览器及视频应用取词");
+        table.Add("Lyrics.Row.BrowserVideo.Description", "允许为浏览器及已识别的视频应用自动匹配歌词；默认关闭。关闭时仍显示媒体信息和播放控制");
         table.Add("Lyrics.Row.SecondLine.Description", "第二行显示当前句翻译、当前句音译或下一句歌词；顺序即优先级，缺失的来源自动跳过");
         table.Add("Lyrics.Row.SecondLine.Note", "顺序即优先级：排在上面的来源优先使用，没有内容时依次往下取");
         table.Add("Lyrics.Row.SecondLine.OrderRow.Description", "上移即提高优先级");

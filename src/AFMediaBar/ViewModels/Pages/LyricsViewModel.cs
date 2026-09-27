@@ -51,6 +51,7 @@ public partial class LyricsViewModel : ObservableObject
     }
 
     public bool LyricsEnabled { get => SettingsManager.Current.LyricsEnabled; set { SettingsManager.SetLyricsEnabled(value); RaiseAll(); } }
+    public bool AllowBrowserAndVideoLyrics { get => SettingsManager.Current.AllowBrowserAndVideoLyrics; set { SettingsManager.SetAllowBrowserAndVideoLyrics(value); OnPropertyChanged(); } }
     public bool TwoLineLyricsEnabled { get => SettingsManager.Current.TwoLineLyricsEnabled; set { SettingsManager.SetTwoLineLyricsEnabled(value); RaiseAll(); } }
     /// <summary>第二行顺序的可读描述（"下一句 → 翻译 → 音译"），与列表内容同步更新。/ A readable description of the second-line order ("next line, translation, romanization"), kept in step with the list.</summary>
     public string SecondaryLineOrderText => string.Join(
@@ -304,6 +305,7 @@ public partial class LyricsViewModel : ObservableObject
     private void RaiseAll()
     {
         OnPropertyChanged(nameof(LyricsEnabled)); OnPropertyChanged(nameof(TwoLineLyricsEnabled));
+        OnPropertyChanged(nameof(AllowBrowserAndVideoLyrics));
         OnPropertyChanged(nameof(TextAlignment));
         OnPropertyChanged(nameof(SyllableHighlightEnabled)); OnPropertyChanged(nameof(UnsungOpacityPercent));
         OnPropertyChanged(nameof(UnsungOpacityText)); OnPropertyChanged(nameof(InfoLineFilterEnabled));

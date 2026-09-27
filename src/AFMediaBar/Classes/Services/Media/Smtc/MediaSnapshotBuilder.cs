@@ -148,6 +148,8 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable
                     songInfo.Artist ?? string.Empty,
                     songInfo.AlbumTitle ?? string.Empty,
                     controlSession.SourceAppUserModelId ?? string.Empty,
+                    playbackInfo.PlaybackType == Windows.Media.MediaPlaybackType.Video ||
+                    songInfo.PlaybackType == Windows.Media.MediaPlaybackType.Video,
                     artwork,
                     artwork is null ? 0 : ArtworkLoader.CurrentThumbnailHash,
                     playbackInfo.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing,
@@ -182,7 +184,7 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable
         var title = read.Title;
         var artist = read.Artist;
         var lyricsKey = BuildLyricsKey(session.Id, title, artist);
-        var lyrics = GetLyrics(lyricsKey, sourceId, title, artist, read.Album, duration);
+        var lyrics = GetLyrics(lyricsKey, sourceId, read.IsVideo, title, artist, read.Album, duration);
 
         return new MediaSnapshot(
             true,
@@ -206,7 +208,7 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable
     }
 
     private sealed record SmtcMediaRead(
-        string Title, string Artist, string Album, string SourceId, System.Windows.Media.Imaging.BitmapImage? Artwork,
+        string Title, string Artist, string Album, string SourceId, bool IsVideo, System.Windows.Media.Imaging.BitmapImage? Artwork,
         int ArtworkHash, bool IsPlaying, bool CanPlayPause, bool CanSkipPrevious, bool CanSkipNext,
         bool CanSeek, bool CanChangeRepeat, MediaRepeatMode RepeatMode, double PlaybackRate,
         double TimelineStart, double Duration, double Position, DateTimeOffset TimelineUpdatedAt);
@@ -225,11 +227,17 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable
     private LyricsResult? GetLyrics(
         string key,
         string sourceId,
+        bool isVideo,
         string title,
         string artist,
         string album,
         double duration)
     {
+        if (!LyricsMediaEligibilityPolicy.ShouldFetch(sourceId, isVideo, SettingsManager.Current.AllowBrowserAndVideoLyrics))
+        {
+            return null;
+        }
+
         if (_lyricsCache.TryGetValue(key, out var cached))
         {
             return cached;
@@ -277,7 +285,8 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable
     /// <param name="durationSeconds">曲目时长（秒）；不可用时传 null。/ Track duration in seconds, or null when unavailable.</param>
     public void RequestOnlineLyrics(string sessionId, string sourceId, string title, string artist, double? durationSeconds)
     {
-        if (string.IsNullOrWhiteSpace(sessionId) || string.IsNullOrWhiteSpace(title))
+        if (string.IsNullOrWhiteSpace(sessionId) || string.IsNullOrWhiteSpace(title) ||
+            !LyricsMediaEligibilityPolicy.ShouldFetch(sourceId, false, SettingsManager.Current.AllowBrowserAndVideoLyrics))
         {
             return;
         }

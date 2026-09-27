@@ -486,6 +486,8 @@ internal static class StringsEn
         table.Add("Lyrics.Row.InfoLines.Title", "Filter credit lines");
         table.Add("Lyrics.Row.MatchStrictness.Description", "How closely a lyric search by title has to match; the stricter it is, the less likely a same-named live version or cover is accepted");
         table.Add("Lyrics.Row.MatchStrictness.Title", "Search match strictness");
+        table.Add("Lyrics.Row.BrowserVideo.Title", "Lyrics for browsers and video apps");
+        table.Add("Lyrics.Row.BrowserVideo.Description", "Allow automatic lyric matching for browsers and recognized video apps. Off by default; media details and playback controls still work");
         table.Add("Lyrics.Row.SecondLine.Description", "The second line shows the translation, the romanization, or the next lyric line; the order is the priority and a missing source is skipped");
         table.Add("Lyrics.Row.SecondLine.Note", "The order is the priority: the source listed first is used first, and an empty one falls through to the next");
         table.Add("Lyrics.Row.SecondLine.OrderRow.Description", "Moving a row up raises its priority");

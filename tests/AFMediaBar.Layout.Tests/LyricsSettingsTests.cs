@@ -33,6 +33,7 @@ public sealed class LyricsSettingsTests
     {
         var settings = new AppSettings();
 
+        Assert.IsFalse(settings.AllowBrowserAndVideoLyrics);
         Assert.IsTrue(settings.TwoLineLyricsEnabled);
         Assert.AreEqual(LyricsTextAlignment.Left, settings.LyricsTextAlignment);
         Assert.AreEqual(LyricsSecondaryLineMode.NextLine,
@@ -70,6 +71,32 @@ public sealed class LyricsSettingsTests
         // Lyric fields the file does carry survive untouched.
         Assert.IsFalse(SettingsManager.Current.LyricsEnabled);
         Assert.IsTrue(SettingsManager.Current.TwoLineLyricsEnabled);
+        Assert.IsFalse(SettingsManager.Current.AllowBrowserAndVideoLyrics);
+    }
+
+    [TestMethod]
+    public void BrowserAndVideoLyricsSettingSurvivesCloneAndLyricsReset()
+    {
+        SettingsManager.SetAllowBrowserAndVideoLyrics(true);
+        Assert.IsTrue(SettingsManager.Current.Clone().AllowBrowserAndVideoLyrics);
+
+        SettingsManager.ResetLyrics();
+        Assert.IsFalse(SettingsManager.Current.AllowBrowserAndVideoLyrics);
+    }
+
+    [TestMethod]
+    public void BrowserAndVideoSourcesAreSkippedUnlessExplicitlyEnabled()
+    {
+        foreach (var source in new[] { "chrome.exe", "MSEdge", "Firefox", "QQBrowser", "360se", "Bilibili", "Douyin", "YouTube", "PotPlayer" })
+        {
+            Assert.IsFalse(LyricsMediaEligibilityPolicy.ShouldFetch(source, false, false), source);
+            Assert.IsTrue(LyricsMediaEligibilityPolicy.ShouldFetch(source, false, true), source);
+        }
+
+        Assert.IsFalse(LyricsMediaEligibilityPolicy.ShouldFetch("unknown-video-app", true, false));
+        Assert.IsTrue(LyricsMediaEligibilityPolicy.ShouldFetch("unknown-video-app", true, true));
+        Assert.IsTrue(LyricsMediaEligibilityPolicy.ShouldFetch("QQMusic", false, false));
+        Assert.IsTrue(LyricsMediaEligibilityPolicy.ShouldFetch("Spotify", false, false));
     }
 
     [TestMethod]
@@ -364,6 +391,7 @@ public sealed class LyricsSettingsTests
     public void OnlyRetrievalSettingsClearTheLyricCache()
     {
         Assert.IsTrue(LyricsCacheInvalidationPolicy.ShouldClearCache(nameof(AppSettings.LyricsSource), null));
+        Assert.IsTrue(LyricsCacheInvalidationPolicy.ShouldClearCache(nameof(AppSettings.AllowBrowserAndVideoLyrics), null));
         Assert.IsTrue(LyricsCacheInvalidationPolicy.ShouldClearCache(nameof(AppSettings.LyricsMatchStrictness), null));
         Assert.IsTrue(LyricsCacheInvalidationPolicy.ShouldClearCache(nameof(AppSettings.LyricsInfoLineFilterEnabled), null));
         Assert.IsTrue(LyricsCacheInvalidationPolicy.ShouldClearCache(null, SettingsResetScope.Lyrics));

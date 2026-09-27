@@ -486,6 +486,8 @@ internal static class StringsZhHant
         table.Add("Lyrics.Row.InfoLines.Title", "過濾署名行");
         table.Add("Lyrics.Row.MatchStrictness.Description", "依曲名搜尋歌詞時要求的符合程度；越嚴格越不容易配到同名的現場版或翻唱");
         table.Add("Lyrics.Row.MatchStrictness.Title", "搜尋符合嚴格度");
+        table.Add("Lyrics.Row.BrowserVideo.Title", "瀏覽器及影片應用程式取詞");
+        table.Add("Lyrics.Row.BrowserVideo.Description", "允許為瀏覽器及已識別的影片應用程式自動比對歌詞；預設關閉。關閉時仍顯示媒體資訊與播放控制");
         table.Add("Lyrics.Row.SecondLine.Description", "第二行顯示目前句翻譯、目前句音譯或下一句歌詞；順序即優先順序，缺少的來源自動略過");
         table.Add("Lyrics.Row.SecondLine.Note", "順序即優先順序：排在上面的來源優先使用，沒有內容時往下取");
         table.Add("Lyrics.Row.SecondLine.OrderRow.Description", "上移即提高優先順序");

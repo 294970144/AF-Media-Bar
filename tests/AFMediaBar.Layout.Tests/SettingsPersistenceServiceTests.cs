@@ -121,7 +121,8 @@ public sealed class SettingsPersistenceServiceTests
                 LastCheckSucceeded: false),
             // 刻意取一个非默认的选项：默认值（跟随系统）即使序列化失败也会"看起来正确"。
             // A deliberately non-default option: the default (follow the system) would look correct even if serialization failed.
-            InterfaceLanguage = InterfaceLanguage.TraditionalChinese
+            InterfaceLanguage = InterfaceLanguage.TraditionalChinese,
+            AllowBrowserAndVideoLyrics = true
         };
         using (var writer = new SettingsPersistenceService(_directory)) { writer.Initialize(); SettingsManager.Replace(settings); writer.Flush(); }
         SettingsManager.ResetAll();
@@ -129,6 +130,7 @@ public sealed class SettingsPersistenceServiceTests
         reader.Initialize();
 
         Assert.AreEqual(TrayWheelBehavior.Disabled, SettingsManager.Current.TrayWheelBehavior);
+        Assert.IsTrue(SettingsManager.Current.AllowBrowserAndVideoLyrics);
         CollectionAssert.AreEqual(
             new[] { LyricsSecondaryLineMode.Romanization, LyricsSecondaryLineMode.Translation },
             SettingsManager.Current.LyricsSecondaryLine.Order!.ToArray());

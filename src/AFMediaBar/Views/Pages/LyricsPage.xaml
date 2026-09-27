@@ -367,6 +367,13 @@
                             Text="{DynamicResource Loc.Lyrics.Sources.Callout}" />
 
                         <components:SettingsRow
+                            Description="{DynamicResource Loc.Lyrics.Row.BrowserVideo.Description}"
+                            Icon="{ui:SymbolIcon Video24}"
+                            Title="{DynamicResource Loc.Lyrics.Row.BrowserVideo.Title}">
+                            <ui:ToggleSwitch IsChecked="{Binding ViewModel.AllowBrowserAndVideoLyrics, Mode=TwoWay}" />
+                        </components:SettingsRow>
+
+                        <components:SettingsRow
                             Description="{DynamicResource Loc.Lyrics.Row.MatchStrictness.Description}"
                             Icon="{ui:SymbolIcon Filter24}"
                             Title="{DynamicResource Loc.Lyrics.Row.MatchStrictness.Title}">
