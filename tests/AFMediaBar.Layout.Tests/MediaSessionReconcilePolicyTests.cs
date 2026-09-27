@@ -157,6 +157,21 @@ public sealed class MediaSessionReconcilePolicyTests
     }
 
     [TestMethod]
+    public void CatalogRebuildCanRetryAfterCooldownWithoutResettingTheFailureCount()
+    {
+        var failures = MediaSessionReconcilePolicy.CatalogRestartFailureThreshold;
+        var restarts = MediaSessionReconcilePolicy.CatalogRestartLimit;
+        Assert.AreEqual(
+            MediaSessionReconcileAction.ForceUpdate,
+            MediaSessionReconcilePolicy.DecideAction(1, failures, restarts,
+                MediaSessionReconcilePolicy.CatalogRestartCooldown - TimeSpan.FromMilliseconds(1)));
+        Assert.AreEqual(
+            MediaSessionReconcileAction.RestartCatalog,
+            MediaSessionReconcilePolicy.DecideAction(1, failures, restarts,
+                MediaSessionReconcilePolicy.CatalogRestartCooldown));
+    }
+
+    [TestMethod]
     public void SlowCallThresholdSeparatesStallsFromNormalCalls()
     {
         Assert.IsFalse(MediaSessionReconcilePolicy.IsSlowCall(

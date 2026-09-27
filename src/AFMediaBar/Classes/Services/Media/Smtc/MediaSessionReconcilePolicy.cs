@@ -87,17 +87,20 @@ public static class MediaSessionReconcilePolicy
     public const int CatalogRestartFailureThreshold = 2;
 
     /// <summary>
-    /// 连续重建整个目录的上限；超过后不再重造目录，退回轻量的 ForceUpdate。
+    /// 连续快速重建整个目录的上限；超过后在冷却期内退回轻量的 ForceUpdate。
     ///
     /// 系统查询被挡住的场合（例如全屏独占游戏运行期间）重建目录救不回来，而"有会话但读不到"的判定在游戏结束前一直成立，
     /// 没有这个上限时看门狗会每 5 秒重建一次目录、无限进行下去（真机日志里出现过 75 秒内 14 次）。
-    /// Maximum number of consecutive full catalog rebuilds; past it the watchdog falls back to plain ForceUpdate.
+    /// Maximum number of consecutive rapid full catalog rebuilds; past it the watchdog falls back to plain ForceUpdate during a cooldown.
     ///
     /// A catalog rebuild cannot help when the system query itself is blocked (for example while an exclusive-fullscreen game
     /// runs) and the "sessions exist but stay unreadable" verdict keeps holding until the game exits; without this limit the
     /// watchdog rebuilt the catalog every five seconds indefinitely (a real log held 14 rebuilds in 75 seconds).
     /// </summary>
     public const int CatalogRestartLimit = 3;
+
+    /// <summary>达到快速重建上限后，两次补救性重建之间的最短时间。/ Minimum time between later recovery rebuilds after the rapid limit.</summary>
+    public static readonly TimeSpan CatalogRestartCooldown = TimeSpan.FromMinutes(2);
 
     /// <summary>
     /// 这次 tick 是否到了探测时隙。只读门控信号，不做任何系统调用；返回 true 表示调用方应立即消耗该时隙（更新时间戳）并开始一次后台探测。
@@ -141,11 +144,13 @@ public static class MediaSessionReconcilePolicy
     /// </summary>
     /// <param name="osSessionCount">操作系统当前发布的会话数；0 为确实没有媒体，负值为查询失败。/ Sessions the OS publishes; zero is genuinely no media, negative is a failed query.</param>
     /// <param name="consecutiveFailedReconciles">连续"ForceUpdate 后仍断连且系统有会话"的次数。/ Consecutive reconciles that stayed disconnected while the OS had sessions.</param>
-    /// <param name="consecutiveCatalogRestarts">连续重建整个目录的次数；到达 <see cref="CatalogRestartLimit"/> 后退回 ForceUpdate。/ Consecutive full catalog rebuilds; at <see cref="CatalogRestartLimit"/> the action falls back to ForceUpdate.</param>
+    /// <param name="consecutiveCatalogRestarts">连续重建整个目录的次数。/ Consecutive full catalog rebuilds.</param>
+    /// <param name="sinceLastCatalogRestart">距上次重建的时间；到达快速上限后用于冷却。/ Time since the last rebuild, used for cooldown after the rapid limit.</param>
     public static MediaSessionReconcileAction DecideAction(
         int osSessionCount,
         int consecutiveFailedReconciles,
-        int consecutiveCatalogRestarts = 0)
+        int consecutiveCatalogRestarts = 0,
+        TimeSpan sinceLastCatalogRestart = default)
     {
         if (osSessionCount == 0)
         {
@@ -162,7 +167,7 @@ public static class MediaSessionReconcilePolicy
             return MediaSessionReconcileAction.ForceUpdate;
         }
 
-        return consecutiveCatalogRestarts >= CatalogRestartLimit
+        return consecutiveCatalogRestarts >= CatalogRestartLimit && sinceLastCatalogRestart < CatalogRestartCooldown
             ? MediaSessionReconcileAction.ForceUpdate
             : MediaSessionReconcileAction.RestartCatalog;
     }
