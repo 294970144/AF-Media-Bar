@@ -1,3 +1,4 @@
+using AFMediaBar.Classes.Services.Media.Smtc;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -21,6 +22,7 @@ namespace AFMediaBar.Classes.Services;
 /// </summary>
 public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanner
 {
+    private readonly MediaSourceRegistry _sources;
     private readonly MediaSessionCatalog _catalog;
     private readonly MediaSessionSelectionService _selection;
     private readonly MediaSnapshotBuilder _snapshotBuilder;
@@ -102,6 +104,7 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
     /// Creates the media coordinator and owns subscriptions to the catalog, selector, and source providers; disposal removes them in reverse ownership order.
     /// </summary>
     public MediaSessionService(
+        MediaSourceRegistry sources,
         MediaSessionCatalog catalog,
         MediaSessionSelectionService selection,
         MediaSnapshotBuilder snapshotBuilder,
@@ -109,6 +112,7 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
         MediaSourceActivationService sourceActivator,
         MemoryPruneCoordinator memoryPrune)
     {
+        _sources = sources;
         _catalog = catalog;
         _selection = selection;
         _snapshotBuilder = snapshotBuilder;
@@ -297,10 +301,10 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
 
         var selected = sessions.FirstOrDefault(session =>
             MediaSessionGuard.IsUsable(session) &&
-            MediaSourceFilterPolicy.IsAllowed(MediaSessionGuard.GetSourceId(session), SettingsManager.Current.SmtcSourceFilter) &&
+            _sources.IsAllowed(MediaSessionGuard.GetSourceId(session), SettingsManager.Current.SmtcSourceFilter) &&
             string.Equals(session.Id, _selectedSessionKey, StringComparison.Ordinal) &&
-            string.Equals(NetEaseSourcePolicy.NormalizeSourceId(MediaSessionGuard.GetSourceId(session)),
-                NetEaseSourcePolicy.NormalizeSourceId(_selection.SelectedSourceId ?? string.Empty), StringComparison.OrdinalIgnoreCase));
+            string.Equals(_sources.NormalizeSourceId(MediaSessionGuard.GetSourceId(session)),
+                _sources.NormalizeSourceId(_selection.SelectedSourceId ?? string.Empty), StringComparison.OrdinalIgnoreCase));
 
         // 会话可能刚被第三方库关闭；此处只取一次引用，后续命令交给该引用，避免读取过程中属性被置空。
         // The session may have just been closed by the third-party library; capture the reference once and issue commands
@@ -676,7 +680,7 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
             var snapshot = _snapshotBuilder.Build(session, _catalog.IsStarted);
             if (snapshot is null)
             {
-                if (selected?.Key != NetEaseSourcePolicy.SelectionKey)
+                if (!_sources.IsIndependentSelection(selected?.Key))
                     return;
                 snapshot = MediaSnapshot.Disconnected;
             }
@@ -723,24 +727,14 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
         SessionsChanged?.Invoke(options);
     }
 
-    private MediaSnapshot? NetEaseSnapshot => _sourceSnapshots
-        .Where(pair => pair.Key.CanHandle(NetEaseSourcePolicy.SourceId))
-        .Select(pair => pair.Value).FirstOrDefault();
-
     private IReadOnlyList<MediaSourceCandidate> BuildCandidates() =>
-        NetEaseSourcePolicy.Combine(_smtcCandidates, NetEaseSnapshot)
-            .Where(source => MediaSourceFilterPolicy.IsAllowed(source.SourceId, SettingsManager.Current.SmtcSourceFilter))
+        _sources.BuildCandidates(_smtcCandidates, _sourceSnapshots)
+            .Where(source => _sources.IsAllowed(source.SourceId, SettingsManager.Current.SmtcSourceFilter))
             .ToArray();
 
     private void PublishDiscoveredSources(IReadOnlyList<MediaSession> sessions)
     {
-        var sources = sessions
-            .Select(session => NetEaseSourcePolicy.NormalizeSourceId(MediaSessionGuard.GetSourceId(session)))
-            // 已知内存来源即使被隐藏也必须可配置，否则关闭读取后将无法重新发现它。
-            // Keep the known memory source configurable even while its reader is disabled.
-            .Append(NetEaseSourcePolicy.SourceId)
-            .Where(sourceId => !string.IsNullOrWhiteSpace(sourceId))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
+        var sources = _sources.DiscoverSourceIds(sessions.Select(MediaSessionGuard.GetSourceId))
             .Select(_sourceActivator.Describe)
             .OrderBy(source => source.DisplayName, StringComparer.CurrentCultureIgnoreCase)
             .ToArray();
@@ -772,18 +766,16 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
 
     private MediaSnapshot ResolveSnapshot(MediaSnapshot snapshot)
     {
-        if (_selection.SelectedKey == NetEaseSourcePolicy.SelectionKey)
-        {
-            return MediaSourceFilterPolicy.IsAllowed(NetEaseSourcePolicy.SourceId, SettingsManager.Current.SmtcSourceFilter)
-                ? NetEaseSourcePolicy.Merge(NetEaseSnapshot, snapshot)
-                : MediaSnapshot.Disconnected;
-        }
-        if (snapshot.IsConnected && !MediaSourceFilterPolicy.IsAllowed(
+        var independent = _sources.ResolveSnapshot(
+            _selection.SelectedKey, snapshot, _sourceSnapshots, SettingsManager.Current.SmtcSourceFilter);
+        if (independent is not null)
+            return independent;
+        if (snapshot.IsConnected && !_sources.IsAllowed(
                 snapshot.SourceId, SettingsManager.Current.SmtcSourceFilter))
             return MediaSnapshot.Disconnected;
 
-        // 其他提供器仍只补全选中 SMTC 来源；网易云必须经过统一来源选择，不能抢占手选来源。
-        // Other providers enrich only their selected SMTC source. NetEase goes through source selection.
+        // 普通提供器只补全选中的 SMTC 来源；独立来源已通过统一来源选择。
+        // Ordinary providers enrich only their selected SMTC source; independent sources resolve through selection.
         var provider = snapshot.IsConnected
             ? _sourceProviders.FirstOrDefault(candidate => candidate.CanHandle(snapshot.SourceId))
             : null;

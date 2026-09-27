@@ -13,6 +13,7 @@ namespace AFMediaBar.ViewModels.Pages;
 /// <summary>额外功能页的来源、快捷启动、频谱、性能和通知设置。 / Settings for sources, launchers, spectrum, metrics, and notifications.</summary>
 public partial class ExtraFeaturesViewModel : ObservableObject
 {
+    private readonly MediaSourceRegistry _sources;
     private readonly MediaSessionService _mediaSessions;
     private readonly IDisplayMonitorService _displayMonitorService;
     private readonly LocalizationService _localization;
@@ -45,10 +46,12 @@ public partial class ExtraFeaturesViewModel : ObservableObject
     public string StatusText => _statusKey is null ? string.Empty : Translations.Get(_statusKey);
 
     public ExtraFeaturesViewModel(
+        MediaSourceRegistry sources,
         MediaSessionService mediaSessions,
         IDisplayMonitorService displayMonitorService,
         LocalizationService localization)
     {
+        _sources = sources;
         _mediaSessions = mediaSessions;
         _displayMonitorService = displayMonitorService;
         _localization = localization;
@@ -422,7 +425,7 @@ public partial class ExtraFeaturesViewModel : ObservableObject
     private void RefreshSources()
     {
         var allowed = (SettingsManager.Current.SmtcSourceFilter.AllowedSourceIds ?? [])
-            .Select(NetEaseSourcePolicy.NormalizeSourceId).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            .Select(_sources.NormalizeSourceId).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var descriptors = _mediaSessions.CurrentDiscoveredSources.ToDictionary(source => source.SourceId, StringComparer.OrdinalIgnoreCase);
         foreach (var sourceId in allowed)
             descriptors.TryAdd(sourceId, new MediaSourceDescriptor(sourceId, MediaSourceNameFormatter.GetDisplayName(sourceId, sourceId), null, null));

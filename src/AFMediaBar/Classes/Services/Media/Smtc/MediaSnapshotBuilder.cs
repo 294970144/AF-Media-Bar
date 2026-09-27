@@ -1,3 +1,4 @@
+// Converts SMTC sessions and owns their enrichment caches; lyrics retrieval is delegated to LyricsService.
 using System.Runtime.InteropServices;
 using System.Windows.Media;
 using AFMediaBar.Classes.Abstractions;
@@ -10,7 +11,7 @@ using Windows.Media.Control;
 using WindowsMediaController;
 using static WindowsMediaController.MediaManager;
 
-namespace AFMediaBar.Classes.Services;
+namespace AFMediaBar.Classes.Services.Media.Smtc;
 
 /// <summary>
 /// 从选中的 SMTC 会话构建统一媒体快照，并异步补充歌词。

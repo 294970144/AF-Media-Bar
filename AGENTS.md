@@ -17,6 +17,12 @@
 - 修改必须落在拥有该职责、状态和资源的文件中；保持高内聚、低耦合，不因“现有文件方便访问”就加入跨领域逻辑。确有独立职责或生命周期时，在对应目录新增文件或提取纯策略；不要仅因文件较长就拆分，也不要为一处简单逻辑新建抽象。
 - 新文件开头用一两句注释写明文件职责与边界；涉及外部资源时同时说明所有权或释放方式。注释解释原因和约束，不逐行复述实现；新增公开类型仍按项目约定写 XML 文档。
 
+## 媒体来源与适配器
+
+- `Classes/Services/Media/` 放通用协调、来源目录、选择与过滤；`Media/Smtc/` 放共享 SMTC 通道的会话目录、快照构建和恢复策略；`Media/Sources/<来源>/` 集中该来源的 Provider、纯策略、读取器及私有解析。歌词获取仍归 `Services/Lyrics/`。移动实现时同步命名空间和引用。
+- 新增或修改媒体适配器、来源身份或双通道仲裁前，先阅读 [媒体适配器接入规则](docs/media-adapters.md)，按现有契约接入。通用协调、过滤和设置页通过 `MediaSourceRegistry` 使用来源身份及仲裁规则，不直接依赖具体来源实现。
+- 仅补全已选 SMTC 快照时实现 `IMediaSourceProvider`；无 SMTC 也需参与发现和选择时实现 `IIndependentMediaSourceProvider` 并提供 `IMediaSourcePolicy`。在 `App.xaml.cs` 注册 Provider，目录自动发现独立来源能力；共享契约和快照分别放 `Abstractions/` 与 `Models/`。
+
 ## 架构与运行时
 
 - `App.xaml.cs` 是依赖注入的组合根。普通代码使用构造函数注入，不新增 `App.Services` 查找或手动创建有依赖的服务；不要把服务生命周期交给 `MainWindow`。

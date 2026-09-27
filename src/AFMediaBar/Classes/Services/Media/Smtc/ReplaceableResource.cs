@@ -1,4 +1,4 @@
-namespace AFMediaBar.Classes.Services;
+namespace AFMediaBar.Classes.Services.Media.Smtc;
 
 /// <summary>
 /// 为可替换的外部资源提供短时租约；替换或关闭后，旧资源要等最后一个使用者退出才会交给回收回调。

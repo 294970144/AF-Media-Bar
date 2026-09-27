@@ -3,7 +3,7 @@ using System.Diagnostics;
 using AFMediaBar.Classes.Interop;
 using AFMediaBar.Classes.Models;
 
-namespace AFMediaBar.Classes.Services.Players;
+namespace AFMediaBar.Classes.Services.Media.Sources.NetEase;
 
 /// <summary>一次网易云进程读取，允许独立测试取消和资源释放而不访问真实进程。</summary>
 internal interface INetEaseMemoryReader : IDisposable

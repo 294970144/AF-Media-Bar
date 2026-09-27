@@ -1,10 +1,11 @@
+// Owns the SMTC manager, subscriptions and retirement leases; disposal retires active resources.
 using System.Diagnostics;
 using System.Threading;
 using Windows.Media.Control;
 using WindowsMediaController;
 using static WindowsMediaController.MediaManager;
 
-namespace AFMediaBar.Classes.Services;
+namespace AFMediaBar.Classes.Services.Media.Smtc;
 
 /// <summary>
 /// 管理 SMTC 媒体会话生命周期，并将第三方动态集合复制为稳定快照。

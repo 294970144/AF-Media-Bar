@@ -1,7 +1,7 @@
 // 在 UI 线程维护网易云内存快照的短暂失败缓冲；不拥有读取器，进程退出或停用时立即清空。
 using AFMediaBar.Classes.Models;
 
-namespace AFMediaBar.Classes.Services;
+namespace AFMediaBar.Classes.Services.Media.Sources.NetEase;
 
 /// <summary>内存读取临时失败时冻结最多三秒，避免瞬间丢失来源或无限保留旧歌。 / Holds a failed read for at most three seconds without advancing its timeline.</summary>
 public sealed class NetEaseMemoryContinuity

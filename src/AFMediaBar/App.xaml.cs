@@ -1,3 +1,6 @@
+using AFMediaBar.Classes.Services.Media.Sources.KuGou;
+using AFMediaBar.Classes.Services.Media.Sources.NetEase;
+using AFMediaBar.Classes.Services.Media.Smtc;
 using AFMediaBar.Classes.Services;
 using AFMediaBar.Classes.Abstractions;
 using AFMediaBar.Classes.Services.Credits;
@@ -101,6 +104,7 @@ namespace AFMediaBar
                 // The provider order is the priority: exact sources first, fuzzy searches last. Every extra source only adds
                 // one attempt after the earlier ones miss.
                 services.AddSingleton<LyricsService>(_ => LyricsProviderFactory.CreateDefaultService());
+                services.AddSingleton<MediaSourceRegistry>();
                 services.AddSingleton<MediaSessionCatalog>();
                 services.AddSingleton<MediaSessionSelectionService>();
                 services.AddSingleton<MediaSnapshotBuilder>();

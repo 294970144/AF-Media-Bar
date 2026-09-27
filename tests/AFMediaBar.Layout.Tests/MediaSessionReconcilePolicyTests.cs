@@ -1,3 +1,4 @@
+using AFMediaBar.Classes.Services.Media.Smtc;
 using AFMediaBar.Classes.Abstractions;
 using AFMediaBar.Classes.Services;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
