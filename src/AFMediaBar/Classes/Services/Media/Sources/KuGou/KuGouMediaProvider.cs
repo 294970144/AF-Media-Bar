@@ -33,9 +33,12 @@ public sealed class KuGouMediaProvider : IMediaSourceProvider, IMemoryPrunable
 
     private readonly Dispatcher _dispatcher;
     private CancellationTokenSource? _cancellation;
+    private Task _pollTask = Task.CompletedTask;
+    // 读取器只由串行的后台轮询任务访问和释放，UI 线程只管理取消与 SMTC 基线。
+    // Only the serialized background poll accesses and disposes the reader; the UI thread manages cancellation and the SMTC baseline.
     private KuGou? _memoryPlayer;
     private MediaSnapshot _sessionSnapshot = MediaSnapshot.Disconnected;
-    private bool _isDisposed;
+    private volatile bool _isDisposed;
 
     /// <summary>
     /// 轮询周期。剪枝会改写它，而轮询线程在另一个线程上读取，因此这是一个 volatile 字段而不是配置常量。
@@ -61,7 +64,7 @@ public sealed class KuGouMediaProvider : IMediaSourceProvider, IMemoryPrunable
     /// Updates the SMTC baseline snapshot; this provider reads no metadata from memory, so the baseline is the merge base.
     /// </summary>
     public void UpdateSessionSnapshot(MediaSnapshot snapshot)
-        => _sessionSnapshot = snapshot;
+        => Volatile.Write(ref _sessionSnapshot, snapshot);
 
     /// <summary>
     /// 幂等启动来源轮询；重复调用不会创建额外计时器。
@@ -76,12 +79,44 @@ public sealed class KuGouMediaProvider : IMediaSourceProvider, IMemoryPrunable
 
         var cancellation = new CancellationTokenSource();
         _cancellation = cancellation;
-        _ = PollAsync(cancellation, cancellation.Token);
+        var previousPoll = _pollTask;
+        // Task.Run prevents the first process/module scan from running on the caller's Dispatcher.
+        // Awaiting the previous task prevents a stop/restart from using the same process reader concurrently.
+        _pollTask = Task.Run(async () =>
+        {
+            try
+            {
+                await previousPoll.ConfigureAwait(false);
+                if (!cancellation.IsCancellationRequested)
+                {
+                    await PollAsync(cancellation, cancellation.Token).ConfigureAwait(false);
+                }
+            }
+            catch (Exception exception)
+            {
+                AppLogService.Current?.Error("Media", "酷狗内存轮询意外停止 / KuGou memory polling stopped unexpectedly", exception);
+            }
+            finally
+            {
+                ResetMemoryPlayer();
+                cancellation.Dispose();
+                if (!_dispatcher.HasShutdownStarted)
+                {
+                    _ = _dispatcher.BeginInvoke(() =>
+                    {
+                        if (ReferenceEquals(_cancellation, cancellation))
+                        {
+                            _cancellation = null;
+                        }
+                    }, DispatcherPriority.Background);
+                }
+            }
+        });
     }
 
     /// <summary>
-    /// 停止轮询并释放内存读取器，阻止释放后继续发布快照。
-    /// Stops polling and disposes the active memory reader so no snapshots are published after disposal.
+    /// 取消轮询；后台任务完成当前读取后释放内存读取器，释放后不再发布快照。
+    /// Cancels polling; the worker releases the reader after its current read and publishes nothing after disposal.
     /// </summary>
     public void Dispose()
     {
@@ -91,9 +126,7 @@ public sealed class KuGouMediaProvider : IMediaSourceProvider, IMemoryPrunable
         }
 
         _isDisposed = true;
-        _cancellation?.Cancel();
-        _memoryPlayer?.Dispose();
-        _memoryPlayer = null;
+        StopPolling();
     }
 
     /// <summary>参与者名称，只用于诊断。/ Participant name, used for diagnostics only.</summary>
@@ -128,15 +161,21 @@ public sealed class KuGouMediaProvider : IMediaSourceProvider, IMemoryPrunable
     }
 
     /// <summary>
-    /// 停止轮询并释放内存读取器，保留提供器本身可再次启动。
-    /// Stops polling and releases the memory reader while keeping the provider restartable.
+    /// 取消轮询，由后台任务释放读取器；保留提供器本身可再次启动。
+    /// Cancels polling and lets the worker release the reader while keeping the provider restartable.
     /// </summary>
     private void StopPolling()
     {
         var cancellation = _cancellation;
         _cancellation = null;
-        cancellation?.Cancel();
-        ResetMemoryPlayer();
+        try
+        {
+            cancellation?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // An unexpectedly completed worker may have disposed its token before its queued UI cleanup runs.
+        }
     }
 
     private async Task PollAsync(CancellationTokenSource cancellation, CancellationToken token)
@@ -145,7 +184,7 @@ public sealed class KuGouMediaProvider : IMediaSourceProvider, IMemoryPrunable
         {
             while (!token.IsCancellationRequested)
             {
-                var baseline = _sessionSnapshot;
+                var baseline = Volatile.Read(ref _sessionSnapshot);
                 MediaSnapshot? merged = null;
                 if (baseline.IsConnected && CanHandle(baseline.SourceId))
                 {
@@ -166,26 +205,17 @@ public sealed class KuGouMediaProvider : IMediaSourceProvider, IMemoryPrunable
                     ResetMemoryPlayer();
                 }
 
-                if (_isDisposed)
+                if (_isDisposed || token.IsCancellationRequested)
                 {
                     return;
                 }
 
-                Publish(merged);
+                Publish(merged, baseline, cancellation, token);
                 await Task.Delay(_pollIntervalMilliseconds, token);
             }
         }
         catch (OperationCanceledException)
         {
-        }
-        finally
-        {
-            if (ReferenceEquals(_cancellation, cancellation))
-            {
-                _cancellation = null;
-            }
-
-            cancellation.Dispose();
         }
     }
 
@@ -230,15 +260,24 @@ public sealed class KuGouMediaProvider : IMediaSourceProvider, IMemoryPrunable
         };
     }
 
-    private void Publish(MediaSnapshot? snapshot)
+    private void Publish(MediaSnapshot? snapshot, MediaSnapshot baseline, CancellationTokenSource cancellation, CancellationToken token)
     {
-        if (_isDisposed || _dispatcher.HasShutdownStarted)
+        if (_isDisposed || token.IsCancellationRequested || _dispatcher.HasShutdownStarted)
         {
             return;
         }
 
         _dispatcher.BeginInvoke(
-            () => SnapshotChanged?.Invoke(this, snapshot),
+            () =>
+            {
+                // A queued result from a stopped poll or an older track must not replace the current SMTC snapshot.
+                if (!_isDisposed && !token.IsCancellationRequested &&
+                    ReferenceEquals(_cancellation, cancellation) &&
+                    ReferenceEquals(_sessionSnapshot, baseline))
+                {
+                    SnapshotChanged?.Invoke(this, snapshot);
+                }
+            },
             DispatcherPriority.Background);
     }
 
