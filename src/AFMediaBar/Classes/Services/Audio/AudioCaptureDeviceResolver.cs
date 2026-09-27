@@ -30,6 +30,7 @@ public sealed class AudioCaptureDeviceResolver : IDisposable, IMemoryPrunable
 
     private readonly CancellationTokenSource _cancellation = new();
     private readonly SemaphoreSlim _scanRequested = new(0, 1);
+    private int _scanWakePending;
     private long _lastDemandTick = long.MinValue;
     private volatile string? _targetDeviceId;
     private volatile MemoryPruneLevel _pruneLevel;
@@ -74,14 +75,11 @@ public sealed class AudioCaptureDeviceResolver : IDisposable, IMemoryPrunable
             return;
         }
 
-        try
-        {
-            _scanRequested.Release();
-        }
-        catch (SemaphoreFullException)
-        {
-            // Multiple taskbar hosts can request the same scan; one pending wake-up is enough.
-        }
+        // Several taskbar hosts can resume together; coalesce their wake-ups before
+        // Release so the normal full-semaphore case never throws a first-chance exception.
+        if (Interlocked.Exchange(ref _scanWakePending, 1) != 0)
+            return;
+        try { _scanRequested.Release(); }
         catch (ObjectDisposedException)
         {
             // A final UI tick can race with application shutdown.
@@ -111,16 +109,19 @@ public sealed class AudioCaptureDeviceResolver : IDisposable, IMemoryPrunable
         try
         {
             await _scanRequested.WaitAsync(token).ConfigureAwait(false);
+            Interlocked.Exchange(ref _scanWakePending, 0);
             while (!token.IsCancellationRequested)
             {
                 if (!HasRecentDemand())
                 {
                     await _scanRequested.WaitAsync(token).ConfigureAwait(false);
+                    Interlocked.Exchange(ref _scanWakePending, 0);
                 }
 
                 ResolveOnce(token);
-                await _scanRequested.WaitAsync(AudioCaptureDevicePolicy.ResolveScanInterval(_pruneLevel), token)
-                    .ConfigureAwait(false);
+                if (await _scanRequested.WaitAsync(AudioCaptureDevicePolicy.ResolveScanInterval(_pruneLevel), token)
+                        .ConfigureAwait(false))
+                    Interlocked.Exchange(ref _scanWakePending, 0);
             }
         }
         catch (OperationCanceledException)

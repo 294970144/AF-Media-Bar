@@ -20,6 +20,7 @@ public sealed class AudioMonitorService : BackgroundService, IMemoryPrunable
     private readonly AudioCaptureDeviceResolver _deviceResolver;
     private readonly object _gate = new();
     private readonly SemaphoreSlim _demand = new(0, 1);
+    private int _wakePending;
     private long _lastDemandTick = long.MinValue;
     private int _captureVersion;
     private bool _disposed;
@@ -158,6 +159,7 @@ public sealed class AudioMonitorService : BackgroundService, IMemoryPrunable
                 if (!HasDemand(version))
                 {
                     await _demand.WaitAsync(stoppingToken).ConfigureAwait(false);
+                    Interlocked.Exchange(ref _wakePending, 0);
                     continue;
                 }
                 try
@@ -260,8 +262,11 @@ public sealed class AudioMonitorService : BackgroundService, IMemoryPrunable
 
     private void WakeWorker()
     {
+        // Capture requests can arrive every frame. One queued wake-up is sufficient;
+        // coalescing before Release avoids a caught first-chance exception on every frame.
+        if (Interlocked.Exchange(ref _wakePending, 1) != 0)
+            return;
         try { _demand.Release(); }
-        catch (SemaphoreFullException) { }
         catch (ObjectDisposedException) { }
     }
 

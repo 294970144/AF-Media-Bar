@@ -28,6 +28,7 @@ public sealed class TaskbarOccupiedAreaProbe : ITaskbarOccupiedAreaProbe
     /// </summary>
     private static readonly object OverlaySignatureGate = new();
     private static readonly Dictionary<IntPtr, string> LastOverlaySignatures = [];
+    private static readonly Dictionary<IntPtr, DateTime> LastMissingTaskbarWarnings = [];
 
     /// <inheritdoc />
     public void Start(
@@ -73,7 +74,7 @@ public sealed class TaskbarOccupiedAreaProbe : ITaskbarOccupiedAreaProbe
         Action<IReadOnlyList<TaskbarPrimaryRange>> succeeded,
         Action failed)
     {
-        IReadOnlyList<TaskbarPrimaryRange> ranges;
+        IReadOnlyList<TaskbarPrimaryRange>? ranges;
         try
         {
             ranges = ProbeSafePrimaryRanges(taskbarHandle, taskbarRect, orientation, dpiScale, edgePaddingPixels);
@@ -83,10 +84,15 @@ public sealed class TaskbarOccupiedAreaProbe : ITaskbarOccupiedAreaProbe
             failed();
             return;
         }
+        if (ranges is null)
+        {
+            failed();
+            return;
+        }
         succeeded(ranges);
     }
 
-    private static IReadOnlyList<TaskbarPrimaryRange> ProbeSafePrimaryRanges(
+    private static IReadOnlyList<TaskbarPrimaryRange>? ProbeSafePrimaryRanges(
         IntPtr taskbarHandle,
         RECT taskbarRect,
         LayoutOrientation orientation,
@@ -114,7 +120,8 @@ public sealed class TaskbarOccupiedAreaProbe : ITaskbarOccupiedAreaProbe
         // 别的进程叠在任务栏上的窗口（Windows 10 的搜索框与任务视图）既枚举不到也躲不开，只能按"盖在任务栏上"识别。
         // Windows over the taskbar from other processes (the Windows 10 search box and Task View) are neither descendants nor
         // avoidable any other way, so they are identified by covering the taskbar.
-        AddOverlayRanges(taskbarHandle, taskbarRect, orientation, primaryLength, occupied);
+        if (!AddOverlayRanges(taskbarHandle, taskbarRect, orientation, primaryLength, occupied))
+            return null;
 
         var gap = Math.Max(8, (int)Math.Round(8 * Math.Max(1, dpiScale)));
         return TaskbarFreeRangeCalculator.Calculate(primaryLength, occupied, Math.Max(0, edgePaddingPixels), gap);
@@ -142,7 +149,7 @@ public sealed class TaskbarOccupiedAreaProbe : ITaskbarOccupiedAreaProbe
     /// Both apply the class, process, and geometry filters, and **rejected candidates are logged in the same line**: a reporting
     /// machine runs a Release build with no debug output, and that line is the only evidence for why the bar ended up where it did.
     /// </summary>
-    private static void AddOverlayRanges(
+    private static bool AddOverlayRanges(
         IntPtr taskbarHandle,
         RECT taskbarRect,
         LayoutOrientation orientation,
@@ -199,11 +206,14 @@ public sealed class TaskbarOccupiedAreaProbe : ITaskbarOccupiedAreaProbe
                 rejected.Add((candidate, rejection));
         }
 
-        CollectWindowsAboveTaskbar(taskbarHandle, Consider);
+        // A taskbar HWND can disappear while Explorer or the quick-settings flyout changes
+        // the shell's window tree. Do not publish partially collected occupied ranges.
+        if (!CollectWindowsAboveTaskbar(taskbarHandle, Consider))
+            return false;
         CollectHitTestWindows(taskbarHandle, taskbarRect, orientation, primaryLength, ownProcessId, Consider);
 
         if (accepted.Count == 0 && rejected.Count == 0)
-            return;
+            return true;
 
         var description = string.Join(
             "; ",
@@ -221,19 +231,20 @@ public sealed class TaskbarOccupiedAreaProbe : ITaskbarOccupiedAreaProbe
             if (LastOverlaySignatures.TryGetValue(taskbarHandle, out var previous) &&
                 string.Equals(previous, description, StringComparison.Ordinal))
             {
-                return;
+                return true;
             }
 
             LastOverlaySignatures[taskbarHandle] = description;
         }
         AppLogService.Current?.Info("Taskbar", $"任务栏上的外部窗口 / foreign windows over the taskbar: {description}");
+        return true;
     }
 
     /// <summary>
     /// 按 Z 序枚举任务栏**之上**的顶层窗口（`EnumWindows` 从最上面开始，遇到任务栏即停止）。
     /// Enumerates the top-level windows **above** the taskbar in Z-order (`EnumWindows` starts at the top and stops at the taskbar).
     /// </summary>
-    private static void CollectWindowsAboveTaskbar(IntPtr taskbarHandle, Action<IntPtr> consider)
+    private static bool CollectWindowsAboveTaskbar(IntPtr taskbarHandle, Action<IntPtr> consider)
     {
         var reachedTaskbar = false;
         _ = EnumWindows((handle, _) =>
@@ -248,12 +259,35 @@ public sealed class TaskbarOccupiedAreaProbe : ITaskbarOccupiedAreaProbe
             return true;
         }, IntPtr.Zero);
 
+        // Missing/stale HWNDs are an expected transient shell state, not an exception.
+        // Keep one throttled diagnostic so a persistent mismatch can be distinguished
+        // from a temporarily replaced Explorer HWND on the reporting machine.
         if (!reachedTaskbar)
         {
-            // 任务栏不在枚举序列里（极少见）：此时不发布这一轮结果，交给下一次探测。
-            // The taskbar was not in the enumeration (very rare): publish nothing this round and let the next probe try again.
-            throw new InvalidOperationException("taskbar not reachable in Z-order enumeration");
+            var shouldLog = false;
+            lock (OverlaySignatureGate)
+            {
+                var now = DateTime.UtcNow;
+                if (!LastMissingTaskbarWarnings.TryGetValue(taskbarHandle, out var previous) ||
+                    now - previous >= TimeSpan.FromMinutes(1))
+                {
+                    LastMissingTaskbarWarnings[taskbarHandle] = now;
+                    if (LastMissingTaskbarWarnings.Count > 16)
+                    {
+                        var oldest = LastMissingTaskbarWarnings.MinBy(pair => pair.Value).Key;
+                        LastMissingTaskbarWarnings.Remove(oldest);
+                    }
+                    shouldLog = true;
+                }
+            }
+            if (shouldLog)
+            {
+                var root = GetAncestor(taskbarHandle, GA_ROOT);
+                AppLogService.Current?.Warn("Taskbar",
+                    $"任务栏不在 Z 序枚举中 / taskbar missing from Z-order: hwnd=0x{taskbarHandle.ToInt64():X} root=0x{root.ToInt64():X} {DescribeWindow(taskbarHandle)}");
+            }
         }
+        return reachedTaskbar;
     }
 
     /// <summary>沿任务栏中线取样，把命中的顶层窗口交给同一个判定。/ Samples the taskbar's centre line and hands the hit top-level windows to the same decision.</summary>

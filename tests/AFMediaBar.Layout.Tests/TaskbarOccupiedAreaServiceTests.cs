@@ -139,17 +139,32 @@ public sealed class TaskbarOccupiedAreaServiceTests
     }
 
     [TestMethod]
-    public void FailedProbeAllowsLaterRetry()
+    public void FailedProbeWaitsBeforeRetryingOnlyThatTaskbar()
     {
         var probe = new FakeTaskbarOccupiedAreaProbe();
-        var service = new TaskbarOccupiedAreaService(probe);
+        var now = new DateTime(2026, 9, 27, 12, 0, 0, DateTimeKind.Utc);
+        var service = new TaskbarOccupiedAreaService(probe, () => now);
         var rect = CreateRect(0, 0, 1000, 48);
 
         service.GetSafePrimaryRanges((IntPtr)1, rect, LayoutOrientation.Horizontal, 1, 20);
         probe.FailNext();
         service.GetSafePrimaryRanges((IntPtr)1, rect, LayoutOrientation.Horizontal, 1, 20);
+        service.GetSafePrimaryRanges((IntPtr)2, rect, LayoutOrientation.Horizontal, 1, 20);
 
-        Assert.AreEqual(2, probe.StartCount);
+        Assert.AreEqual(2, probe.StartCount, "A different taskbar must not share the failed probe cooldown.");
+        service.InvalidateCache();
+        now = now.AddMilliseconds(1999);
+        service.GetSafePrimaryRanges((IntPtr)1, rect, LayoutOrientation.Horizontal, 1, 20);
+        Assert.AreEqual(2, probe.StartCount, "Cache invalidation must not bypass a failed probe's cooldown.");
+        now = now.AddMilliseconds(1);
+        service.GetSafePrimaryRanges((IntPtr)1, rect, LayoutOrientation.Horizontal, 1, 20);
+
+        Assert.AreEqual(3, probe.StartCount);
+        probe.SucceedNext([new TaskbarPrimaryRange(10, 900)]); // the other taskbar
+        probe.SucceedNext([new TaskbarPrimaryRange(100, 800)]);
+        var recovered = service.GetSafePrimaryRanges((IntPtr)1, rect, LayoutOrientation.Horizontal, 1, 20);
+        Assert.AreEqual(new TaskbarPrimaryRange(100, 800), recovered.Single());
+        Assert.AreEqual(3, probe.StartCount);
     }
 
     [TestMethod]

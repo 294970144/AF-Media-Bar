@@ -15,7 +15,9 @@ public sealed class TaskbarOccupiedAreaService
 {
     private static readonly TimeSpan ProbeCacheDuration = TimeSpan.FromMilliseconds(250);
     private static readonly TimeSpan ProbeResultTimeout = TimeSpan.FromMilliseconds(1500);
+    private static readonly TimeSpan FailedProbeCooldown = TimeSpan.FromSeconds(2);
     private readonly ITaskbarOccupiedAreaProbe _probe;
+    private readonly Func<DateTime> _utcNow;
     private readonly object _cacheGate = new();
     private readonly Dictionary<ProbeCacheKey, CacheEntry> _cache = [];
     private readonly Dictionary<ProbeCacheKey, ActiveProbe> _activeProbes = [];
@@ -33,9 +35,14 @@ public sealed class TaskbarOccupiedAreaService
     /// Creates the taskbar occupancy service with the specified background platform probe.
     /// </summary>
     /// <param name="probe">后台任务栏平台探测器 / Background taskbar platform probe.</param>
-    public TaskbarOccupiedAreaService(ITaskbarOccupiedAreaProbe probe)
+    public TaskbarOccupiedAreaService(ITaskbarOccupiedAreaProbe probe) : this(probe, () => DateTime.UtcNow)
+    {
+    }
+
+    internal TaskbarOccupiedAreaService(ITaskbarOccupiedAreaProbe probe, Func<DateTime> utcNow)
     {
         _probe = probe ?? throw new ArgumentNullException(nameof(probe));
+        _utcNow = utcNow ?? throw new ArgumentNullException(nameof(utcNow));
     }
 
     /// <summary>
@@ -68,7 +75,7 @@ public sealed class TaskbarOccupiedAreaService
         var probeStartedAtUtc = default(DateTime);
         lock (_cacheGate)
         {
-            var now = DateTime.UtcNow;
+            var now = _utcNow();
             if (_cache.TryGetValue(key, out var entry))
             {
                 if (now - entry.CachedAtUtc < ProbeCacheDuration)
@@ -78,10 +85,11 @@ public sealed class TaskbarOccupiedAreaService
             }
 
             if (_activeProbes.TryGetValue(key, out var activeProbe) &&
-                (activeProbe.Generation != _cacheGeneration || now - activeProbe.StartedAtUtc > ProbeResultTimeout))
+                (activeProbe.IsFailed
+                    ? now - activeProbe.StartedAtUtc >= FailedProbeCooldown
+                    : activeProbe.Generation != _cacheGeneration || now - activeProbe.StartedAtUtc > ProbeResultTimeout))
             {
-                // UIA 偶尔会永久卡在失效的 Explorer 树上；只释放这个任务栏的槽位，旧回调靠 probeId 淘汰。
-                // UIA can remain stuck on a stale Explorer tree. Release only this taskbar's slot and discard its old callback by probeId.
+                // Failed scans wait briefly before retrying; expired UIA scans still release only this taskbar's slot.
                 _activeProbes.Remove(key);
                 availableCache = [];
             }
@@ -162,7 +170,7 @@ public sealed class TaskbarOccupiedAreaService
         TaskbarSafeRangesUpdatedEventArgs? updated = null;
         lock (_cacheGate)
         {
-            var completedAtUtc = DateTime.UtcNow;
+            var completedAtUtc = _utcNow();
             if (_activeProbes.TryGetValue(key, out var activeProbe) &&
                 probeId == activeProbe.Id &&
                 probeGeneration == _cacheGeneration &&
@@ -193,7 +201,18 @@ public sealed class TaskbarOccupiedAreaService
         lock (_cacheGate)
         {
             if (_activeProbes.TryGetValue(key, out var activeProbe) && probeId == activeProbe.Id)
-                _activeProbes.Remove(key);
+            {
+                // A missing taskbar HWND may persist while a shell flyout is open. Retain a
+                // failed slot briefly instead of launching another MTA thread every UI tick.
+                _activeProbes[key] = activeProbe with { StartedAtUtc = _utcNow(), IsFailed = true };
+                var staleFailures = _activeProbes.Where(pair => pair.Value.IsFailed)
+                    .OrderBy(pair => pair.Value.StartedAtUtc)
+                    .Take(Math.Max(0, _activeProbes.Count(pair => pair.Value.IsFailed) - 16))
+                    .Select(pair => pair.Key)
+                    .ToArray();
+                foreach (var staleKey in staleFailures)
+                    _activeProbes.Remove(staleKey);
+            }
         }
     }
 
@@ -237,7 +256,7 @@ public sealed class TaskbarOccupiedAreaService
         double DpiScale,
         int EdgePaddingPixels);
 
-    private readonly record struct ActiveProbe(long Generation, long Id, DateTime StartedAtUtc);
+    private readonly record struct ActiveProbe(long Generation, long Id, DateTime StartedAtUtc, bool IsFailed = false);
 
     private sealed record CacheEntry(DateTime CachedAtUtc, IReadOnlyList<TaskbarPrimaryRange> Ranges);
 }
