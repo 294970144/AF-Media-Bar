@@ -39,6 +39,7 @@ public partial class TaskBarMediaControl
     /// <summary>重建预算用尽后置位：停用 Web 歌词、退回元数据，避免同一缺陷反复击穿应用。
     /// Set once the rebuild budget is spent: the web lyrics stay off and the bar falls back to metadata so the same defect cannot take the app down again.</summary>
     private bool _webLyricsGraphicsDisabled;
+    private bool _lyricsGraphicsRecoveryQueued;
 
     private void InitializeWebLyrics()
     {
@@ -108,7 +109,7 @@ public partial class TaskBarMediaControl
         // Note it reads the snapshot's playback state instead of _lyricsFrame.IsPlaying: a hidden frame is the same
         // Hidden singleton whose IsPlaying is always false, so judging by it would keep the timer from ever starting
         // while waiting for the first line.
-        var shouldRun = LyricsPresentationRefreshPolicy.ShouldRunTimer(
+        var shouldRun = !_webLyricsGraphicsDisabled && LyricsPresentationRefreshPolicy.ShouldRunTimer(
             IsLoaded,
             IsAdvancePruned,
             _lyricsFrame.IsVisible,
@@ -232,12 +233,18 @@ public partial class TaskBarMediaControl
     /// dispatcher frame so the visual tree is never mutated inside the unwinding exception stack.</summary>
     private void OnWebLyricsGraphicsRecoveryRequested()
     {
-        if (_webLyricsGraphicsDisabled)
+        if (_webLyricsGraphicsDisabled || _lyricsGraphicsRecoveryQueued || _lyricsWebRenderer is null)
         {
             return;
         }
 
-        Dispatcher.BeginInvoke(RecoverWebLyricsGraphics);
+        _lyricsGraphicsRecoveryQueued = true;
+        Dispatcher.BeginInvoke(() =>
+        {
+            _lyricsGraphicsRecoveryQueued = false;
+            if (_lyricsWebRenderer is not null && !_webLyricsGraphicsDisabled)
+                RecoverWebLyricsGraphics();
+        });
     }
 
     /// <summary>
@@ -255,7 +262,11 @@ public partial class TaskBarMediaControl
         if (!WebView2GraphicsFaultPolicy.CanRecover(_lyricsGraphicsRecoveries))
         {
             _webLyricsGraphicsDisabled = true;
+            // A transparent WebView still participates in WPF layout and may throw the same
+            // graphics fault again. Detach it before disposing the renderer.
+            SongLyricsPanel.Children.Remove(LyricsWebView);
             StopWebLyrics();
+            SongLyricsPanel.Visibility = Visibility.Collapsed;
             ApplyWebLyricsStyle();
             UpdateWebLyricsPresentation(allowTransition: false);
             RaiseDesiredSizeChanged(isForcedRefresh: true);
