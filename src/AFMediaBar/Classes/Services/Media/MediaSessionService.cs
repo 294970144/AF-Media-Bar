@@ -33,6 +33,10 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
     private MediaSnapshot _sessionSnapshot = MediaSnapshot.Disconnected;
     private readonly Dictionary<IMediaSourceProvider, MediaSnapshot?> _sourceSnapshots = new();
     private MediaSnapshot _lastSnapshot = MediaSnapshot.Disconnected;
+    private IReadOnlyList<MediaSession> _lastSessions = Array.Empty<MediaSession>();
+    private IReadOnlyList<MediaSourceCandidate> _smtcCandidates = Array.Empty<MediaSourceCandidate>();
+    private IReadOnlyList<MediaSourceCandidate> _candidates = Array.Empty<MediaSourceCandidate>();
+    private string? _selectedSessionKey;
     // 释放标记与 generation 会被后台流程读取（取消/过期判定），因此声明为 volatile：写入在 UI 线程，读取在后台线程。
     // The disposal flag and the generation are read by the background flow (cancellation and staleness checks), so both are volatile:
     // written on the UI thread and read on the background thread.
@@ -166,19 +170,17 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
     /// </summary>
     public void SelectSession(string key)
     {
-        if (string.IsNullOrEmpty(key) || !_catalog.TryGetSnapshot(out var sessions))
+        if (_isDisposed || string.IsNullOrEmpty(key))
         {
             return;
         }
 
-        var eligible = FilterSessions(sessions);
-        if (!_selection.Select(key, eligible))
+        if (!_selection.Select(key, _candidates))
         {
             return;
         }
 
-        PublishSessions(eligible);
-        RefreshSnapshot(eligible);
+        RefreshSnapshot();
     }
 
     /// <summary>
@@ -293,8 +295,12 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
             return;
         }
 
-        var selected = FilterSessions(sessions).FirstOrDefault(session =>
-            string.Equals(session.Id, _selection.SelectedKey, StringComparison.Ordinal));
+        var selected = sessions.FirstOrDefault(session =>
+            MediaSessionGuard.IsUsable(session) &&
+            MediaSourceFilterPolicy.IsAllowed(MediaSessionGuard.GetSourceId(session), SettingsManager.Current.SmtcSourceFilter) &&
+            string.Equals(session.Id, _selectedSessionKey, StringComparison.Ordinal) &&
+            string.Equals(NetEaseSourcePolicy.NormalizeSourceId(MediaSessionGuard.GetSourceId(session)),
+                NetEaseSourcePolicy.NormalizeSourceId(_selection.SelectedSourceId ?? string.Empty), StringComparison.OrdinalIgnoreCase));
 
         // 会话可能刚被第三方库关闭；此处只取一次引用，后续命令交给该引用，避免读取过程中属性被置空。
         // The session may have just been closed by the third-party library; capture the reference once and issue commands
@@ -537,8 +543,13 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
 
     private void OnSourceSnapshotChanged(IMediaSourceProvider provider, MediaSnapshot? snapshot)
     {
+        if (_isDisposed)
+            return;
         _sourceSnapshots[provider] = snapshot;
-        PublishResolved(ResolveSnapshot(_sessionSnapshot));
+        if (!_candidates.SequenceEqual(BuildCandidates()))
+            RefreshSnapshot(_lastSessions);
+        else
+            PublishResolved(ResolveSnapshot(_sessionSnapshot));
 
         // 提供器报"没有可读的媒体"时，它是每 233 毫秒报一次，因此这里必须用"同一个键只请求一次"挡住重复兜底取词。
         // When a provider reports "no readable media" it does so every 233 ms, so a repeated fallback retrieval is blocked here by
@@ -588,7 +599,7 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
         // 会话标识必须是选中的那一个：歌词缓存键由它构成，兜底取回的结果要靠同一个键才会被下一次 Build 认领。
         // The session identifier has to be the selected one: it makes up the lyric cache key, and only the same key lets the next Build
         // claim the result the fallback fetched.
-        var sessionKey = _selection.SelectedKey;
+        var sessionKey = _selectedSessionKey;
         if (string.IsNullOrEmpty(sessionKey))
         {
             return;
@@ -623,86 +634,54 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
         _dispatcher.BeginInvoke(RefreshSessionList, DispatcherPriority.Normal);
     }
 
-    private void RefreshSessionList()
-    {
-        if (_isDisposed || !_catalog.TryGetSnapshot(out var sessions))
-        {
-            return;
-        }
-
-        try
-        {
-            PublishDiscoveredSources(sessions);
-            var eligible = FilterSessions(sessions);
-            if (eligible.Count == 0)
-            {
-                // 浏览器可能是唯一的 SMTC 会话；其重建期间空数组也必须启动恢复缓冲。
-                // The browser may be the only SMTC session; an empty array must also start the recovery grace period.
-                if (sessions.Length == 0 && _selection.TryHoldMissingSession())
-                {
-                    return;
-                }
-
-                _selection.ClearSelection();
-                PublishSessions(eligible);
-                Publish(MediaSnapshot.Disconnected);
-                return;
-            }
-
-            var selected = _selection.Resolve(eligible);
-            if (selected is null && _selection.IsMissingSessionGraceActive)
-            {
-                return;
-            }
-
-            PublishSessions(eligible);
-            RefreshSnapshot(eligible);
-        }
-        catch (Exception ex)
-        {
-            // 本方法是 Dispatcher 回调：第三方会话状态在刷新过程中被改写时只记录并等待下一次刷新，不得让异常终止应用。
-            // This method is a Dispatcher callback: a third-party session changing state mid-refresh is logged and left to
-            // the next refresh instead of tearing down the application.
-            Debug.WriteLine($"[MediaSessionService] Failed to refresh session list: {ex}");
-        }
-    }
+    private void RefreshSessionList() => RefreshSnapshot();
 
     private void RefreshSnapshot()
     {
-        if (_catalog.TryGetSnapshot(out var sessions))
+        if (_isDisposed)
+            return;
+        // SMTC 暂时不可用不能阻断独立内存来源；旧会话仍需通过有效性检查。
+        // An unavailable SMTC catalog must not block the independent memory source.
+        try
         {
+            var sessions = _catalog.TryGetSnapshot(out var current) ? current : _lastSessions;
             PublishDiscoveredSources(sessions);
-            RefreshSnapshot(FilterSessions(sessions));
+            RefreshSnapshot(sessions);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MediaSessionService] Failed to refresh source catalog: {ex}");
         }
     }
 
     private void RefreshSnapshot(IReadOnlyList<MediaSession> sessions)
     {
         if (_isDisposed)
-        {
             return;
-        }
-
         try
         {
-            var selected = _selection.Resolve(sessions);
+            _lastSessions = sessions.Where(MediaSessionGuard.IsUsable).ToArray();
+            _smtcCandidates = _lastSessions.Select(session => new MediaSourceCandidate(
+                session.Id, MediaSessionGuard.GetSourceId(session), IsPlaying(session), session.Id)).ToArray();
+            _candidates = BuildCandidates();
+            var selected = _selection.Resolve(_candidates);
             if (selected is null && _selection.IsMissingSessionGraceActive)
-            {
                 return;
-            }
 
-            if (_selection.TryAutoSwitchToPlaying(sessions))
-            {
-                selected = sessions.FirstOrDefault(session =>
-                    string.Equals(session.Id, _selection.SelectedKey, StringComparison.Ordinal));
-            }
+            if (_selection.TryAutoSwitchToPlaying(_candidates))
+                selected = _candidates.FirstOrDefault(source => source.Key == _selection.SelectedKey);
 
-            var snapshot = _snapshotBuilder.Build(selected, _catalog.IsStarted);
+            _selectedSessionKey = selected?.SessionKey;
+            var session = _lastSessions.FirstOrDefault(item => item.Id == _selectedSessionKey);
+            var snapshot = _snapshotBuilder.Build(session, _catalog.IsStarted);
             if (snapshot is null)
             {
-                return;
+                if (selected?.Key != NetEaseSourcePolicy.SelectionKey)
+                    return;
+                snapshot = MediaSnapshot.Disconnected;
             }
 
+            PublishSessions(_candidates);
             Publish(snapshot);
             TryRequestFallbackLyrics();
         }
@@ -712,12 +691,12 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
         }
     }
 
-    private void PublishSessions(IReadOnlyList<MediaSession> sessions)
+    private void PublishSessions(IReadOnlyList<MediaSourceCandidate> sessions)
     {
         var occurrences = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var options = sessions.Select(session =>
         {
-            var sourceId = MediaSessionGuard.GetSourceId(session);
+            var sourceId = session.SourceId;
             occurrences.TryGetValue(sourceId, out var occurrence);
             occurrence++;
             occurrences[sourceId] = occurrence;
@@ -728,11 +707,11 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
             }
 
             return new MediaSessionOption(
-                session.Id,
+                session.Key,
                 sourceId,
                 displayName,
-                IsPlaying(session),
-                string.Equals(session.Id, _selection.SelectedKey, StringComparison.Ordinal));
+                session.IsPlaying,
+                string.Equals(session.Key, _selection.SelectedKey, StringComparison.Ordinal));
         }).ToArray();
 
         if (options.SequenceEqual(_lastSessionOptions))
@@ -744,26 +723,22 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
         SessionsChanged?.Invoke(options);
     }
 
-    private IReadOnlyList<MediaSession> FilterSessions(IReadOnlyList<MediaSession> sessions)
-    {
-        // 会话列表的唯一消费入口：第三方库可能在目录拷贝之后关闭会话，这里再次剔除已失效实例，
-        // 使选择、快照、菜单和命令只面对仍可读取的会话。
-        // The single consumption point for the session list: the third-party library can close a session after the catalog
-        // copied it, so unusable instances are dropped here and selection, snapshots, menus, and commands only ever see
-        // readable sessions.
-        var usable = sessions.Where(MediaSessionGuard.IsUsable);
-        var settings = SettingsManager.Current.SmtcSourceFilter;
-        if (!settings.Enabled)
-            return usable.ToArray();
-        return usable.Where(session => MediaSourceFilterPolicy.IsAllowed(
-            MediaSessionGuard.GetSourceId(session),
-            settings)).ToArray();
-    }
+    private MediaSnapshot? NetEaseSnapshot => _sourceSnapshots
+        .Where(pair => pair.Key.CanHandle(NetEaseSourcePolicy.SourceId))
+        .Select(pair => pair.Value).FirstOrDefault();
+
+    private IReadOnlyList<MediaSourceCandidate> BuildCandidates() =>
+        NetEaseSourcePolicy.Combine(_smtcCandidates, NetEaseSnapshot)
+            .Where(source => MediaSourceFilterPolicy.IsAllowed(source.SourceId, SettingsManager.Current.SmtcSourceFilter))
+            .ToArray();
 
     private void PublishDiscoveredSources(IReadOnlyList<MediaSession> sessions)
     {
         var sources = sessions
-            .Select(MediaSessionGuard.GetSourceId)
+            .Select(session => NetEaseSourcePolicy.NormalizeSourceId(MediaSessionGuard.GetSourceId(session)))
+            // 已知内存来源即使被隐藏也必须可配置，否则关闭读取后将无法重新发现它。
+            // Keep the known memory source configurable even while its reader is disabled.
+            .Append(NetEaseSourcePolicy.SourceId)
             .Where(sourceId => !string.IsNullOrWhiteSpace(sourceId))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Select(_sourceActivator.Describe)
@@ -797,34 +772,24 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
 
     private MediaSnapshot ResolveSnapshot(MediaSnapshot snapshot)
     {
+        if (_selection.SelectedKey == NetEaseSourcePolicy.SelectionKey)
+        {
+            return MediaSourceFilterPolicy.IsAllowed(NetEaseSourcePolicy.SourceId, SettingsManager.Current.SmtcSourceFilter)
+                ? NetEaseSourcePolicy.Merge(NetEaseSnapshot, snapshot)
+                : MediaSnapshot.Disconnected;
+        }
         if (snapshot.IsConnected && !MediaSourceFilterPolicy.IsAllowed(
-                snapshot.SourceId,
-                SettingsManager.Current.SmtcSourceFilter))
+                snapshot.SourceId, SettingsManager.Current.SmtcSourceFilter))
             return MediaSnapshot.Disconnected;
 
-        MediaSnapshot? providerSnapshot;
-        if (snapshot.IsConnected)
-        {
-            var provider = _sourceProviders.FirstOrDefault(candidate => candidate.CanHandle(snapshot.SourceId));
-            providerSnapshot = provider is not null && _sourceSnapshots.TryGetValue(provider, out var matched)
-                ? matched
-                : null;
-        }
-        else
-        {
-            providerSnapshot = _sourceProviders
-                .Select(provider => _sourceSnapshots.GetValueOrDefault(provider))
-                .Where(candidate => candidate is not null && MediaSourceFilterPolicy.IsAllowed(
-                    candidate.SourceId,
-                    SettingsManager.Current.SmtcSourceFilter))
-                .OrderByDescending(candidate => candidate!.IsPlaying)
-                .FirstOrDefault();
-        }
-
+        // 其他提供器仍只补全选中 SMTC 来源；网易云必须经过统一来源选择，不能抢占手选来源。
+        // Other providers enrich only their selected SMTC source. NetEase goes through source selection.
+        var provider = snapshot.IsConnected
+            ? _sourceProviders.FirstOrDefault(candidate => candidate.CanHandle(snapshot.SourceId))
+            : null;
+        var providerSnapshot = provider is not null ? _sourceSnapshots.GetValueOrDefault(provider) : null;
         if (providerSnapshot is null)
-        {
             return snapshot;
-        }
 
         return providerSnapshot with
         {

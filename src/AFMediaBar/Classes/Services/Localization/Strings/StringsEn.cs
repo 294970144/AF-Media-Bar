@@ -588,8 +588,8 @@ internal static class StringsEn
         table.Add("Media.SourceList.AddToQuickLaunch", "Add to quick launch");
         table.Add("Media.SourceList.AddToQuickLaunch.ToolTip", "Only players whose launch method can be located automatically can be added; when none is found, use \"Browse for an application or shortcut\".");
         table.Add("Media.SourceList.Allow", "Allow");
-        table.Add("Media.SourceList.Description", "A player appears here only after it has been run once");
-        table.Add("Media.SourceList.Title", "Detected sources");
+        table.Add("Media.SourceList.Description", "NetEase Cloud Music can be configured directly; other players appear after running. Hiding NetEase with filtering enabled stops reading its playback information.");
+        table.Add("Media.SourceList.Title", "Available sources");
         table.Add("Media.Spectrum.BandCount.Description", "Number of spectrum bars (9–24); the bar width is fixed, so more bars make the spectrum wider");
         table.Add("Media.Spectrum.BandCount.Title", "Bar count");
         table.Add("Media.Spectrum.BandCount.Value", "{0} bars");

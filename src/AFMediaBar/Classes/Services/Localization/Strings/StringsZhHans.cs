@@ -588,8 +588,8 @@ internal static class StringsZhHans
         table.Add("Media.SourceList.AddToQuickLaunch", "加入快速启动");
         table.Add("Media.SourceList.AddToQuickLaunch.ToolTip", "只有能自动找到启动方式的播放器才能加入；找不到时请用「浏览程序或快捷方式」。");
         table.Add("Media.SourceList.Allow", "允许");
-        table.Add("Media.SourceList.Description", "先运行一次播放器，它才会出现在这里");
-        table.Add("Media.SourceList.Title", "已检测来源");
+        table.Add("Media.SourceList.Description", "网易云音乐可直接配置；其他播放器运行后显示。启用过滤并隐藏网易云后，会停止读取其播放信息。");
+        table.Add("Media.SourceList.Title", "可用来源");
         table.Add("Media.Spectrum.BandCount.Description", "频谱柱的数量（9–24）；柱宽固定，柱数越多频谱越宽");
         table.Add("Media.Spectrum.BandCount.Title", "柱数");
         table.Add("Media.Spectrum.BandCount.Value", "{0} 根");

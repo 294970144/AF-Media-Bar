@@ -18,8 +18,8 @@ namespace AFMediaBar.Classes.Models;
 /// After MediaSessionService builds the session list, it publishes via SessionsChanged event to TaskbarWindow,
 /// which rebuilds the "Switch Media Source" submenu items accordingly.
 /// </summary>
-/// <param name="Key">会话唯一标识（SMTC Session ID）Unique session identifier (SMTC Session ID)</param>
-/// <param name="SourceId">来源标识（AppUserModelId）Source identifier (AppUserModelId)</param>
+/// <param name="Key">来源选择键；独立内存来源无需 SMTC Session ID。 / Selection key; memory sources need no SMTC session.</param>
+/// <param name="SourceId">应用来源标识。 / Application source identifier.</param>
 /// <param name="DisplayName">显示名称（含重复来源编号）Display name (with duplicate source numbering)</param>
 /// <param name="IsPlaying">是否正在播放 Whether currently playing</param>
 /// <param name="IsSelected">是否为当前选中会话 Whether this is the currently selected session</param>

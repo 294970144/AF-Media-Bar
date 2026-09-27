@@ -48,6 +48,9 @@ public sealed record MediaSnapshot(
     double PlaybackRate,
     DateTimeOffset TimelineUpdatedAt)
 {
+    /// <summary>临时读取失败期间保留的快照；冻结进度并等待恢复，不应据此自动切源。</summary>
+    public bool IsStale { get; init; }
+
     /// <summary>
     /// 断开状态的快照：表示没有可用的媒体会话。
     /// Disconnected snapshot: indicates no available media session.

@@ -1,8 +1,8 @@
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
-using AFMediaBar.Classes.Interop;
 using AFMediaBar.Classes.Abstractions;
 using AFMediaBar.Classes.Models;
 using AFMediaBar.Classes.Services.Lyrics;
@@ -19,8 +19,7 @@ namespace AFMediaBar.Classes.Services;
 /// </summary>
 public sealed class NetEaseMediaProvider : IMediaSourceProvider, IMemoryPrunable
 {
-    private const string MemoryPlayerSourceId = "cloudmusic";
-    private const string NetEaseWindowClass = "OrpheusBrowserHost";
+    private const string MemoryPlayerSourceId = NetEaseSourcePolicy.SourceId;
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(233);
 
     /// <summary>
@@ -49,6 +48,7 @@ public sealed class NetEaseMediaProvider : IMediaSourceProvider, IMemoryPrunable
     private const int ArtworkCacheCapacity = 8;
 
     private readonly Dispatcher _dispatcher;
+    private readonly Func<INetEaseMemoryReader> _createReader;
     private readonly LyricsService _lyricsService;
     private readonly LruCache<string, BitmapImage?> _artworkCache = new(ArtworkCacheCapacity);
     private readonly HashSet<string> _pendingArtwork = new(StringComparer.OrdinalIgnoreCase);
@@ -60,12 +60,18 @@ public sealed class NetEaseMediaProvider : IMediaSourceProvider, IMemoryPrunable
 
     /// <summary>缓存代次：取词设置变化时自增，让仍在飞行中的结果写不回来。/ Cache generation: incremented when retrieval settings change, so an in-flight result cannot be written back.</summary>
     private int _lyricsCacheGeneration;
+    private readonly object _pollGate = new();
     private CancellationTokenSource? _cancellation;
-    private NetEase? _memoryPlayer;
+    // 每次运行独占读取器；取消后在后台释放，再允许下一次运行进入。
+    // A run exclusively owns its reader and releases it off-thread before the next run enters.
+    private readonly SemaphoreSlim _readerGate = new(1, 1);
+    private readonly NetEaseMemoryContinuity _continuity = new();
+    private MemoryPruneLevel _pruneLevel;
+    private int _currentProcessId;
     private PlayerInfo? _currentInfo;
     private MediaSnapshot _sessionSnapshot = MediaSnapshot.Disconnected;
     private int _version;
-    private bool _isDisposed;
+    private volatile bool _isDisposed;
 
     /// <summary>
     /// 轮询周期。剪枝会改写它，而轮询线程在另一个线程上读取，因此这是一个 volatile 字段而不是配置常量。
@@ -80,8 +86,14 @@ public sealed class NetEaseMediaProvider : IMediaSourceProvider, IMemoryPrunable
     /// Creates the NetEase source provider; process reading begins only after explicit start and is owned by this instance.
     /// </summary>
     public NetEaseMediaProvider(LyricsService lyricsService)
+        : this(lyricsService, Application.Current.Dispatcher, () => new NetEaseMemoryReader())
     {
-        _dispatcher = Application.Current.Dispatcher;
+    }
+
+    internal NetEaseMediaProvider(LyricsService lyricsService, Dispatcher dispatcher, Func<INetEaseMemoryReader> createReader)
+    {
+        _dispatcher = dispatcher;
+        _createReader = createReader;
         _lyricsService = lyricsService;
         SettingsManager.SettingsChanged += OnSettingsChanged;
     }
@@ -93,6 +105,14 @@ public sealed class NetEaseMediaProvider : IMediaSourceProvider, IMemoryPrunable
     /// </summary>
     private void OnSettingsChanged(object? sender, SettingsChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(AppSettings.SmtcSourceFilter) ||
+            e.ResetScope is SettingsResetScope.ExtraFeatures or SettingsResetScope.All)
+        {
+            if (IsAllowed)
+                Start();
+            else
+                StopPolling();
+        }
         if (!LyricsCacheInvalidationPolicy.ShouldClearCache(e.PropertyName, e.ResetScope))
         {
             return;
@@ -106,10 +126,10 @@ public sealed class NetEaseMediaProvider : IMediaSourceProvider, IMemoryPrunable
     /// 判断来源标识是否属于网易云音乐。
     /// Determines whether the source identifier belongs to NetEase Cloud Music.
     /// </summary>
-    public bool CanHandle(string sourceId) =>
-        sourceId.Contains("cloudmusic", StringComparison.OrdinalIgnoreCase) ||
-        sourceId.Contains("netease", StringComparison.OrdinalIgnoreCase) ||
-        sourceId.Contains("163music", StringComparison.OrdinalIgnoreCase);
+    public bool CanHandle(string sourceId) => NetEaseSourcePolicy.Matches(sourceId);
+
+    private static bool IsAllowed => MediaSourceFilterPolicy.IsAllowed(
+        MemoryPlayerSourceId, SettingsManager.Current.SmtcSourceFilter);
 
     /// <summary>
     /// 更新 SMTC 基线快照，供来源专用数据合并时保持媒体身份一致。
@@ -117,7 +137,8 @@ public sealed class NetEaseMediaProvider : IMediaSourceProvider, IMemoryPrunable
     /// </summary>
     public void UpdateSessionSnapshot(MediaSnapshot snapshot)
     {
-        _sessionSnapshot = snapshot;
+        Volatile.Write(ref _sessionSnapshot, snapshot.IsConnected && CanHandle(snapshot.SourceId)
+            ? snapshot : MediaSnapshot.Disconnected);
     }
 
     /// <summary>
@@ -126,14 +147,14 @@ public sealed class NetEaseMediaProvider : IMediaSourceProvider, IMemoryPrunable
     /// </summary>
     public void Start()
     {
-        if (_isDisposed || _cancellation is not null)
+        lock (_pollGate)
         {
-            return;
+            if (_isDisposed || _cancellation is not null || !IsAllowed || _pruneLevel >= MemoryPruneLevel.DisplayOff)
+                return;
+            var cancellation = new CancellationTokenSource();
+            _cancellation = cancellation;
+            _ = PollAsync(cancellation, cancellation.Token);
         }
-
-        var cancellation = new CancellationTokenSource();
-        _cancellation = cancellation;
-        _ = PollAsync(cancellation, cancellation.Token);
     }
 
     /// <summary>
@@ -148,9 +169,8 @@ public sealed class NetEaseMediaProvider : IMediaSourceProvider, IMemoryPrunable
         }
 
         _isDisposed = true;
-        _cancellation?.Cancel();
-        _memoryPlayer?.Dispose();
-        _memoryPlayer = null;
+        SettingsManager.SettingsChanged -= OnSettingsChanged;
+        StopPolling();
     }
 
     /// <summary>参与者名称，只用于诊断。/ Participant name, used for diagnostics only.</summary>
@@ -174,6 +194,7 @@ public sealed class NetEaseMediaProvider : IMediaSourceProvider, IMemoryPrunable
             return;
         }
 
+        _pruneLevel = level;
         if (level >= MemoryPruneLevel.Idle)
         {
             // 缓存清掉不会让界面变空：正在显示的那张封面由快照自己持有，这里丢掉的只是"下次再要时不用重新下载"的那一份。
@@ -205,110 +226,101 @@ public sealed class NetEaseMediaProvider : IMediaSourceProvider, IMemoryPrunable
     /// </summary>
     private void StopPolling()
     {
-        var cancellation = _cancellation;
-        _cancellation = null;
-        cancellation?.Cancel();
-        ResetMemoryPlayer();
+        lock (_pollGate)
+        {
+            var cancellation = _cancellation;
+            _cancellation = null;
+            cancellation?.Cancel();
+        }
+        _currentInfo = null;
+        _currentProcessId = 0;
+        _version++;
+        _continuity.Clear();
+        _pendingArtwork.Clear();
+        _pendingLyrics.Clear();
+        if (!_isDisposed)
+            SnapshotChanged?.Invoke(this, null);
     }
 
     private async Task PollAsync(CancellationTokenSource cancellation, CancellationToken token)
     {
+        INetEaseMemoryReader? reader = null;
+        var entered = false;
         try
         {
+            await _readerGate.WaitAsync(token).ConfigureAwait(false);
+            entered = true;
             while (!token.IsCancellationRequested)
             {
-                PlayerInfo? playerInfo = null;
-                try
+                var baseline = Volatile.Read(ref _sessionSnapshot);
+                var title = baseline.IsConnected ? baseline.Title : null;
+                var result = await Task.Run(() =>
                 {
-                    playerInfo = ReadMemoryPlayerInfo();
-                }
-                catch
+                    reader ??= _createReader();
+                    return reader.Read(title);
+                }, token).ConfigureAwait(false);
+                token.ThrowIfCancellationRequested();
+                await _dispatcher.InvokeAsync(() =>
                 {
-                    ResetMemoryPlayer();
-                }
-
-                if (_isDisposed)
-                {
-                    return;
-                }
-
-                if (playerInfo is { } info && ShouldUseMemoryPlayerInfo(info))
-                {
-                    PublishPlayerInfo(info, token);
-                }
-                else
-                {
-                    PublishSnapshot(null);
-                }
-
-                await Task.Delay(_pollIntervalMilliseconds, token);
+                    if (_isDisposed || token.IsCancellationRequested || !ReferenceEquals(_cancellation, cancellation))
+                        return;
+                    if (result.ProcessId != _currentProcessId)
+                    {
+                        _currentProcessId = result.ProcessId;
+                        _currentInfo = null;
+                        _version++;
+                        _continuity.Clear();
+                    }
+                    if (result.Info is { } info)
+                        PublishPlayerInfo(info, token);
+                    else
+                    {
+                        // 迟到的同曲封面/歌词不能覆盖失败缓冲或已退出的进程。
+                        // Late artwork/lyrics cannot resurrect a failed or exited source.
+                        _currentInfo = null;
+                        _version++;
+                        PublishSnapshot(_continuity.Update(null, result.ProcessId > 0, DateTimeOffset.UtcNow), token);
+                    }
+                }, DispatcherPriority.Background, token).Task.ConfigureAwait(false);
+                await Task.Delay(_pollIntervalMilliseconds, token).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException)
         {
         }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[NetEaseMediaProvider] Poll failed: {ex}");
+        }
         finally
         {
-            if (ReferenceEquals(_cancellation, cancellation))
+            // 即使因异常或 Dispatcher 关闭退出，也撤销本轮尚在途中的补全结果。
+            // Revoke enrichment from this run even when an exception or dispatcher shutdown ended it.
+            lock (_pollGate)
             {
-                _cancellation = null;
+                cancellation.Cancel();
+                if (ReferenceEquals(_cancellation, cancellation))
+                    _cancellation = null;
             }
-
-            cancellation.Dispose();
+            try
+            {
+                if (reader is not null)
+                    await Task.Run(reader.Dispose).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[NetEaseMediaProvider] Reader disposal failed: {ex}");
+            }
+            finally
+            {
+                if (entered)
+                    _readerGate.Release();
+                lock (_pollGate)
+                {
+                    cancellation.Dispose();
+                }
+            }
         }
-    }
-
-    private PlayerInfo? ReadMemoryPlayerInfo()
-    {
-        var hwnd = NativeMethods.FindWindow(NetEaseWindowClass, null);
-        if (hwnd == IntPtr.Zero)
-        {
-            ResetMemoryPlayer();
-            return null;
-        }
-
-        NativeMethods.GetWindowThreadProcessId(hwnd, out var processId);
-        if (processId <= 0)
-        {
-            ResetMemoryPlayer();
-            return null;
-        }
-
-        if (_memoryPlayer is null || !_memoryPlayer.Validate(processId))
-        {
-            _memoryPlayer?.Dispose();
-            _memoryPlayer = new NetEase(processId);
-        }
-
-        // SMTC 报出的曲名随基线快照一起传进去：私人FM 的 fmPlay 队列在按 id 查不到当前曲目时只按 currentIndex
-        // 兜底，而队列可能是上一次私人FM 会话留下的，因此那一条 MUST 与 SMTC 的曲名对得上才会被采纳。
-        // The title SMTC reports travels with the baseline snapshot: the private-FM fmPlay queue falls back to currentIndex when the
-        // current track cannot be found by id, and that queue may be left over from a previous FM session, so such an entry is
-        // accepted only when its title matches the one SMTC reports.
-        return _memoryPlayer.GetPlayerInfo(_sessionSnapshot.IsConnected ? _sessionSnapshot.Title : null);
-    }
-
-    private void ResetMemoryPlayer()
-    {
-        _memoryPlayer?.Dispose();
-        _memoryPlayer = null;
-        _currentInfo = null;
-        _version++;
-    }
-
-    private bool ShouldUseMemoryPlayerInfo(PlayerInfo playerInfo)
-    {
-        if (!playerInfo.Pause)
-        {
-            return true;
-        }
-
-        return !_sessionSnapshot.IsConnected ||
-            CanHandle(_sessionSnapshot.SourceId) ||
-            string.Equals(
-                _sessionSnapshot.SourceName,
-                MediaSourceNameFormatter.GetDisplayName(MemoryPlayerSourceId, Translations.Get("Service.MediaSource.Unknown")),
-                StringComparison.OrdinalIgnoreCase);
     }
 
     private void PublishPlayerInfo(PlayerInfo info, CancellationToken token)
@@ -332,7 +344,7 @@ public sealed class NetEaseMediaProvider : IMediaSourceProvider, IMemoryPrunable
 
         var hasCachedLyrics = _lyricsCache.TryGetValue(info.Identity, out var lyrics);
         var shouldLoadLyrics = !hasCachedLyrics && _pendingLyrics.Add(info.Identity);
-        PublishSnapshot(CreateSnapshot(info, artwork, lyrics));
+        PublishSnapshot(_continuity.Update(CreateSnapshot(info, artwork, lyrics), true, DateTimeOffset.UtcNow), token);
         if (shouldLoadLyrics)
         {
             _ = LoadLyricsAsync(info, token);
@@ -360,16 +372,13 @@ public sealed class NetEaseMediaProvider : IMediaSourceProvider, IMemoryPrunable
             1,
             DateTimeOffset.UtcNow);
 
-    private void PublishSnapshot(MediaSnapshot? snapshot)
+    private void PublishSnapshot(MediaSnapshot? snapshot, CancellationToken token)
     {
-        if (_isDisposed || _dispatcher.HasShutdownStarted)
-        {
+        // 所有发布与缓存写入都在 UI 线程；检查取消以阻止停止前启动的异步结果回流。
+        // Publishing and cache writes stay on the UI thread; cancellation rejects results from a stopped run.
+        if (_isDisposed || token.IsCancellationRequested || _dispatcher.HasShutdownStarted)
             return;
-        }
-
-        _dispatcher.BeginInvoke(
-            () => SnapshotChanged?.Invoke(this, snapshot),
-            DispatcherPriority.Background);
+        SnapshotChanged?.Invoke(this, snapshot);
     }
 
     private async Task LoadArtworkAsync(string coverUrl, int version, CancellationToken token)
@@ -377,12 +386,14 @@ public sealed class NetEaseMediaProvider : IMediaSourceProvider, IMemoryPrunable
         try
         {
             var artwork = await ArtworkLoader.GetImageFromUrlAsync(coverUrl, token);
+            if (token.IsCancellationRequested || _isDisposed)
+                return;
             _artworkCache.Set(coverUrl, artwork);
             if (artwork is not null && !_isDisposed && version == _version &&
                 _currentInfo is { } info && string.Equals(info.Cover, coverUrl, StringComparison.OrdinalIgnoreCase))
             {
                 _lyricsCache.TryGetValue(info.Identity, out var lyrics);
-                PublishSnapshot(CreateSnapshot(info, artwork, lyrics));
+                PublishSnapshot(_continuity.Update(CreateSnapshot(info, artwork, lyrics), true, DateTimeOffset.UtcNow), token);
             }
         }
         catch (OperationCanceledException)
@@ -390,21 +401,27 @@ public sealed class NetEaseMediaProvider : IMediaSourceProvider, IMemoryPrunable
         }
         catch
         {
-            _artworkCache.Set(coverUrl, null);
+            if (!token.IsCancellationRequested && !_isDisposed)
+                _artworkCache.Set(coverUrl, null);
         }
         finally
         {
-            _pendingArtwork.Remove(coverUrl);
+            if (!token.IsCancellationRequested)
+                _pendingArtwork.Remove(coverUrl);
         }
     }
 
     private async Task LoadLyricsAsync(PlayerInfo info, CancellationToken token)
     {
         var generation = _lyricsCacheGeneration;
+        var version = _version;
         try
         {
             var request = new LyricsRequest(info.Title, info.Artists, info.Album, info.Duration, info.Identity);
             var result = await _lyricsService.GetLyricsAsync(request, token);
+
+            if (token.IsCancellationRequested || _isDisposed || generation != _lyricsCacheGeneration)
+                return;
 
             // 取词过程中设置若被改过，这次结果已经不属于当前配置，写入只会让用户以为设置没生效。
             // If the settings changed while this retrieval ran, the result no longer belongs to the current configuration and
@@ -414,11 +431,11 @@ public sealed class NetEaseMediaProvider : IMediaSourceProvider, IMemoryPrunable
                 _lyricsCache.Set(info.Identity, result);
             }
 
-            if (!_isDisposed && _currentInfo is { } current &&
+            if (!_isDisposed && version == _version && _currentInfo is { } current &&
                 string.Equals(current.Identity, info.Identity, StringComparison.Ordinal))
             {
                 _artworkCache.TryGetValue(current.Cover, out var artwork);
-                PublishSnapshot(CreateSnapshot(current, artwork, result));
+                PublishSnapshot(_continuity.Update(CreateSnapshot(current, artwork, result), true, DateTimeOffset.UtcNow), token);
             }
         }
         catch (OperationCanceledException)
@@ -426,14 +443,15 @@ public sealed class NetEaseMediaProvider : IMediaSourceProvider, IMemoryPrunable
         }
         catch
         {
-            if (generation == _lyricsCacheGeneration)
+            if (!token.IsCancellationRequested && !_isDisposed && generation == _lyricsCacheGeneration)
             {
                 _lyricsCache.Set(info.Identity, null);
             }
         }
         finally
         {
-            _pendingLyrics.Remove(info.Identity);
+            if (!token.IsCancellationRequested)
+                _pendingLyrics.Remove(info.Identity);
         }
     }
 
