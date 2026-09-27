@@ -29,7 +29,7 @@ public enum AppLogLevel
 /// - **只有一个文件**：`%LOCALAPPDATA%\AFMediaBar\logs\app.log`。用户只会在"感觉哪里不对"时来翻日志，
 ///   因此不需要按天切分、保留多份或导出第二份文本——多出来的入口只会让人不知道该发哪个文件。
 /// - **只留最近 <see cref="MaximumLines"/> 条**：日志在内存里维护一个环形窗口，落盘时整份重写。
-///   这样文件永远有界（约 120 KB），而且**旧会话的尾部会保留**：崩溃发生在退出路径或上一次运行时也能看到现场。
+    ///   这样文件永远有界，而且**旧会话的尾部会保留**：崩溃发生在退出路径或上一次运行时也能看到现场。
 /// - **不阻塞界面**：界面上只入队，写入在专用后台线程；普通行按 <see cref="RewriteInterval"/> 合并重写，
 ///   错误行立刻重写（崩溃现场不能被合并窗口拖掉）。
 /// - **细节不落盘**：<see cref="AppLogLevel.Verbose"/> 只进调试输出（`Debug.WriteLine`，Release 下编译期移除），
@@ -40,7 +40,7 @@ public enum AppLogLevel
 /// - **Exactly one file**: `%LOCALAPPDATA%\AFMediaBar\logs\app.log`. A user opens the log only when something feels wrong, so daily files,
 ///   several retained copies, and a second exported text file would only raise the question of which one to send.
 /// - **Only the newest <see cref="MaximumLines"/> entries**: the log keeps a ring window in memory and rewrites the whole file, which stays
-///   bounded (about 120 KB) and *keeps the tail of earlier sessions*, so a crash on the exit path or in a previous run is still visible.
+    ///   bounded and *keeps the tail of earlier sessions*, so a crash on the exit path or in a previous run is still visible.
 /// - **It never blocks the interface**: the UI thread only enqueues while a dedicated background thread writes; ordinary lines are coalesced
 ///   into one rewrite per <see cref="RewriteInterval"/>, and an error line rewrites immediately so a crash site is never stuck behind that window.
 /// - **Detail stays out of the file**: <see cref="AppLogLevel.Verbose"/> goes to the debug output only (`Debug.WriteLine`, compiled out in
@@ -57,13 +57,10 @@ public sealed class AppLogService : IDisposable
     public static AppLogService? Current { get; private set; }
 
     /// <summary>
-    /// 文件里保留的最大行数。1000 行按正常使用的频率（切歌、取词、设置变更各一两行）大约覆盖几小时到一天，
-    /// 足以包含"刚发现问题"之前的上下文；而文件本身约 120 KB，任何聊天窗口都能直接发出去。
-    /// Maximum lines kept in the file. At normal activity — a couple of lines per track change, lyric lookup, or settings change — a thousand
-    /// lines covers several hours to a day, which is more than the context around "I just noticed something wrong", while the file itself stays
-    /// around 120 KB and can be sent through any chat window.
+    /// 文件里保留的最大日志条数；普通事件与异常都共享这个有界窗口，延长问题发生前后的可追溯范围。
+    /// Maximum retained log entries. Ordinary events and exceptions share this bounded window for a longer diagnostic history.
     /// </summary>
-    public const int MaximumLines = 1000;
+    public const int MaximumLines = 2000;
 
     /// <summary>普通行合并重写文件的间隔；错误行不受它影响，会立刻重写。/ Interval that coalesces ordinary lines into one file rewrite; error lines ignore it and rewrite immediately.</summary>
     public static readonly TimeSpan RewriteInterval = TimeSpan.FromSeconds(3);
