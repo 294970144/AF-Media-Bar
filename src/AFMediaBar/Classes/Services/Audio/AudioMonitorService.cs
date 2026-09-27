@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using AFMediaBar.Classes.Abstractions;
 using AFMediaBar.Classes.Settings;
@@ -42,6 +43,10 @@ public sealed class AudioMonitorService : IDisposable, IMemoryPrunable
     /// never enumerate.
     /// </summary>
     private readonly AudioCaptureDeviceResolver _deviceResolver;
+    // WASAPI COM objects and FFT buffers are owned by one MTA worker, never by the UI dispatcher.
+    private readonly BlockingCollection<Action> _workQueue = new();
+    private readonly object _queueGate = new();
+    private readonly Thread _captureThread;
 
     // FFT 相关缓冲区随采样率确定点数后再分配（96 kHz 至少要 4096 点才能把 45–206 Hz 的前几段分开），
     // 因此它们不是 readonly 的固定数组；ConfigureFft 在拿到混音格式后统一重建。
@@ -82,7 +87,7 @@ public sealed class AudioMonitorService : IDisposable, IMemoryPrunable
     private double _spectrumReference;
     private long _lastSpectrumTick;
     private string? _capturedDeviceId;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     /// <summary>
     /// 创建频谱采集服务；目标端点来自后台解析器，本服务不在 UI 路径上做任何枚举。
@@ -93,6 +98,46 @@ public sealed class AudioMonitorService : IDisposable, IMemoryPrunable
     public AudioMonitorService(AudioCaptureDeviceResolver deviceResolver)
     {
         _deviceResolver = deviceResolver;
+        _captureThread = new Thread(() =>
+        {
+            foreach (var work in _workQueue.GetConsumingEnumerable())
+            {
+                try { work(); }
+                catch (Exception exception)
+                {
+                    AppLogService.Current?.Warn("Audio", $"频谱采集任务失败 / spectrum worker failed: {exception.Message}");
+                }
+            }
+            _workQueue.Dispose();
+        })
+        {
+            IsBackground = true,
+            Name = "AFMediaBar audio spectrum"
+        };
+        _captureThread.SetApartmentState(ApartmentState.MTA);
+        _captureThread.Start();
+    }
+
+    /// <summary>在采集线程读取频谱，完成后由调用方在 UI 线程呈现结果。 / Reads the spectrum on the capture thread; the caller presents the result on the UI thread.</summary>
+    public Task<bool> GetSpectrumAsync(float[] bands, int bandCount)
+    {
+        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_queueGate)
+        {
+            if (_disposed)
+            {
+                completion.SetResult(false);
+                return completion.Task;
+            }
+
+            _workQueue.Add(() =>
+            {
+                try { completion.SetResult(GetSpectrum(bands, bandCount)); }
+                catch (Exception exception) { completion.SetException(exception); }
+            });
+        }
+
+        return completion.Task;
     }
 
     /// <summary>
@@ -103,7 +148,7 @@ public sealed class AudioMonitorService : IDisposable, IMemoryPrunable
     /// <param name="bands">接收归一化频段值的缓冲区（0–1）。/ Buffer receiving normalized band values, 0–1.</param>
     /// <param name="bandCount">本次要计算的频段数量；越界时被夹取到持久化区间。/ Number of bands to compute; clamped to the persisted range.</param>
     /// <returns>采集可用并已写入频段时为真；无采集或发生异常时为假。/ True when capture was available and the bands were written; false without capture or after a failure.</returns>
-    public bool GetSpectrum(float[] bands, int bandCount)
+    private bool GetSpectrum(float[] bands, int bandCount)
     {
         var count = SpectrumBandPolicy.ClampBandCount(bandCount);
         if (bands.Length < count)
@@ -170,15 +215,17 @@ public sealed class AudioMonitorService : IDisposable, IMemoryPrunable
 
     public void ResetAfterEnvironmentChange()
     {
-        if (_disposed)
+        lock (_queueGate)
         {
-            return;
+            if (_disposed) return;
+            _workQueue.Add(() =>
+            {
+                ReleaseCapture();
+                ReleaseComObject(ref _deviceEnumerator);
+                _captureFailureCount = 0;
+                _nextCaptureAttemptTick = 0;
+            });
         }
-
-        ReleaseCapture();
-        ReleaseComObject(ref _deviceEnumerator);
-        _captureFailureCount = 0;
-        _nextCaptureAttemptTick = 0;
     }
 
     /// <summary>参与者名称，只用于诊断。/ Participant name, used for diagnostics only.</summary>
@@ -203,7 +250,11 @@ public sealed class AudioMonitorService : IDisposable, IMemoryPrunable
             return;
         }
 
-        ReleaseCapture();
+        lock (_queueGate)
+        {
+            if (!_disposed)
+                _workQueue.Add(ReleaseCapture);
+        }
     }
 
     public void Dispose()
@@ -215,9 +266,17 @@ public sealed class AudioMonitorService : IDisposable, IMemoryPrunable
 
         // Stop 必须先于 COM 释放，否则音频引擎仍可能访问 capture client。
         // Stop before releasing COM so the audio engine no longer uses the capture client.
-        _disposed = true;
-        ReleaseCapture();
-        ReleaseComObject(ref _deviceEnumerator);
+        lock (_queueGate)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _workQueue.Add(() =>
+            {
+                ReleaseCapture();
+                ReleaseComObject(ref _deviceEnumerator);
+            });
+            _workQueue.CompleteAdding();
+        }
         GC.SuppressFinalize(this);
     }
 

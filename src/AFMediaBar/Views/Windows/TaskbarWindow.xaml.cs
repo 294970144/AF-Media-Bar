@@ -55,6 +55,7 @@ public partial class TaskbarWindow : Window
     private readonly DispatcherTimer _taskbarMotionSettleTimer;
     private readonly DispatcherTimer _taskbarHiddenTrimTimer;
     private bool _spectrumActive;
+    private bool _spectrumRequestInFlight;
     private readonly GlobalInteractionRouter _interactionRouter;
     private readonly AudioInteractionService _audioInteractionService;
     private readonly MediaSourceActivationService _sourceActivationService;
@@ -105,6 +106,7 @@ public partial class TaskbarWindow : Window
     private readonly NativeMouseInputMonitor _mouseInputMonitor;
     private readonly AdaptiveForegroundSamplingSession _foregroundSamplingSession;
     private readonly float[] _spectrumBands = new float[SpectrumComponentSettings.MaximumBandCount];
+    private readonly float[] _spectrumWorkerBands = new float[SpectrumComponentSettings.MaximumBandCount];
     private MediaSnapshot _lastSnapshot = MediaSnapshot.Disconnected;
     private IReadOnlyList<AudioDeviceOption> _outputDevices = Array.Empty<AudioDeviceOption>();
     private AudioDeviceOption? _pendingOutputDevice;
@@ -224,32 +226,7 @@ public partial class TaskbarWindow : Window
         _sizeAnimationTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
         _sizeAnimationTimer.Tick += (_, _) => AdvanceSizeAnimation();
         _spectrumTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
-        _spectrumTimer.Tick += (_, _) =>
-        {
-            var bandCount = SettingsManager.Current.SpectrumComponent.Normalize().BandCount;
-            // 采集的是"当前输出设备的全部声音"（WASAPI 回环），因此判据里没有"前台 SMTC 会话是否在播"这一项：
-            // 游戏、没有 SMTC 的播放器、浏览器里没有元数据的页面都会让频谱动起来，只要频谱组件当前可见。
-            // 组件不可见时连采集都不做——静置层显隐的唯一判据在 TaskbarRestLayoutPolicy 里，宿主只读控件算好的结论。
-            // What is captured is everything the current output device plays (WASAPI loopback), so the condition has no "is the foreground SMTC
-            // session playing" term: a game, a player without SMTC, or a browser page without metadata all move the spectrum, as long as the
-            // spectrum component is visible right now. While it is not visible nothing is captured at all — the only authority on rest-layer
-            // visibility is TaskbarRestLayoutPolicy, and the host merely reads the verdict the control computed.
-            if (!_isClosing && !IsTaskbarPresentationSuspended && _appliedOrientation == LayoutOrientation.Horizontal &&
-                MediaControl.IsSpectrumComponentVisible &&
-                _audioMonitorService.GetSpectrum(_spectrumBands, bandCount))
-            {
-                _spectrumActive = true;
-                MediaControl.ApplySpectrum(_spectrumBands.AsSpan(0, bandCount));
-                return;
-            }
-
-            if (_spectrumActive)
-            {
-                Array.Clear(_spectrumBands, 0, _spectrumBands.Length);
-                MediaControl.ApplySpectrum(_spectrumBands.AsSpan(0, bandCount));
-                _spectrumActive = false;
-            }
-        };
+        _spectrumTimer.Tick += OnSpectrumTimerTick;
         _spectrumTimer.Start();
 
         // 窗口也可能在档位已经生效时被创建（屏幕关闭期间 Explorer 重建了任务栏）：那时不能等下一次档位变化，
@@ -536,6 +513,55 @@ public partial class TaskbarWindow : Window
         }
 
         return IntPtr.Zero;
+    }
+
+    private async void OnSpectrumTimerTick(object? sender, EventArgs e)
+    {
+        if (_spectrumRequestInFlight) return;
+
+        var bandCount = SettingsManager.Current.SpectrumComponent.Normalize().BandCount;
+        // Only the visible spectrum samples audio. Its COM calls and FFT run on AudioMonitorService's worker;
+        // this dispatcher callback only presents the completed frame, and never queues overlapping reads.
+        if (_isClosing || IsTaskbarPresentationSuspended || _appliedOrientation != LayoutOrientation.Horizontal ||
+            !MediaControl.IsSpectrumComponentVisible)
+        {
+            ClearSpectrum(bandCount);
+            return;
+        }
+
+        _spectrumRequestInFlight = true;
+        try
+        {
+            var available = await _audioMonitorService.GetSpectrumAsync(_spectrumWorkerBands, bandCount);
+            if (!_isClosing && !IsTaskbarPresentationSuspended && _appliedOrientation == LayoutOrientation.Horizontal &&
+                MediaControl.IsSpectrumComponentVisible && available)
+            {
+                Array.Copy(_spectrumWorkerBands, _spectrumBands, bandCount);
+                _spectrumActive = true;
+                MediaControl.ApplySpectrum(_spectrumBands.AsSpan(0, bandCount));
+            }
+            else if (!_isClosing)
+            {
+                ClearSpectrum(bandCount);
+            }
+        }
+        catch (Exception exception)
+        {
+            AppLogService.Current?.Warn("Audio", $"频谱采样失败 / spectrum sampling failed: {exception.Message}");
+            if (!_isClosing) ClearSpectrum(bandCount);
+        }
+        finally
+        {
+            _spectrumRequestInFlight = false;
+        }
+    }
+
+    private void ClearSpectrum(int bandCount)
+    {
+        if (!_spectrumActive) return;
+        Array.Clear(_spectrumBands);
+        MediaControl.ApplySpectrum(_spectrumBands.AsSpan(0, bandCount));
+        _spectrumActive = false;
     }
 
     private void PositionTimer_Tick(object? sender, EventArgs e)
