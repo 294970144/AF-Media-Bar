@@ -85,12 +85,18 @@
                 <Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <StackPanel>
                     <TextBlock Text="{DynamicResource Loc.Common.OutputDevice}" FontSize="11" Opacity="0.62"/>
-                    <ComboBox x:Name="DeviceCombo" MinHeight="32" Margin="0,3,0,0"
-                              MaxDropDownHeight="240" DisplayMemberPath="DisplayName"
+                    <ComboBox x:Name="DeviceCombo"
+                              DisplayMemberPath="DisplayName"
                               ToolTip="{Binding RelativeSource={RelativeSource Self}, Path=SelectedItem.DisplayName}"
                               DropDownOpened="DeviceCombo_DropDownOpened"
                               SelectionChanged="DeviceCombo_SelectionChanged"
-                              PreviewMouseWheel="DeviceCombo_PreviewMouseWheel"/>
+                              PreviewMouseWheel="DeviceCombo_PreviewMouseWheel">
+                        <ComboBox.Style>
+                            <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+                                <Setter Property="Popup.Placement" Value="Top" />
+                            </Style>
+                        </ComboBox.Style>
+                    </ComboBox>
                 </StackPanel>
                 <StackPanel Grid.Column="2">
                     <Grid><TextBlock Text="{DynamicResource Loc.Panel.Volume.CurrentAppVolume}" FontSize="11" Opacity="0.62"/>

@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 Reliability fixes: media-session self-healing, spectrum level calibration, and lyric advancement.
 
+### Changed
+
+- Replaced custom device enumeration, application-volume access, capture-endpoint discovery and loopback capture with NAudio.Wasapi 3.1.0, removing duplicated Core Audio COM declarations and manual PCM decoding. Spectrum capture runs on demand in a hosted worker and is released during host shutdown. Default-device switching retains a minimal PolicyConfig adapter; spatial audio continues to use Windows APIs.
+
 ### Added
 
 - Lyric spacing: the lyrics page gains a "line gap" and a "character spacing" setting. The line gap adds extra spacing on top of the existing two-row layout (0–24% of the font size in two-percent steps, default 0 meaning the look is unchanged); it scales with the font, tightens automatically when space runs short, and never clips or shrinks the text. The character spacing widens the gap between characters as a percentage of the font size (0–20% in one-percent steps, default 0), scales with the font, applies to CJK and Latin alike, and never breaks words apart. Both are native CSS layout inside the web lyrics view, so they are continuous and take effect immediately.

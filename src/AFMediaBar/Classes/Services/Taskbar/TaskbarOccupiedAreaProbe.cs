@@ -12,22 +12,39 @@ namespace AFMediaBar.Classes.Services;
 /// 使用 UI Automation 和 Shell 子窗口回退探测任务栏占用区域。
 /// Probes taskbar occupancy with UI Automation and Shell child-window fallbacks.
 ///
-/// 每次探测在单独的 MTA 后台线程运行，避免持有 Explorer 子 HWND 的 WPF 线程同步等待 Explorer。
-/// Each probe runs on a dedicated MTA background thread so the WPF thread owning an Explorer child HWND never waits on Explorer.
+/// 复用一个 MTA 后台线程串行探测；DI 容器释放本单例时停止接收请求，不等待可能卡住的 Explorer。
+/// Reuses one MTA worker. DI disposal stops requests without waiting for potentially stuck Explorer calls.
 /// </summary>
-public sealed class TaskbarOccupiedAreaProbe : ITaskbarOccupiedAreaProbe
+public sealed class TaskbarOccupiedAreaProbe : ITaskbarOccupiedAreaProbe, IDisposable
 {
     private const int MinimumElementPrimaryPixels = 8;
     private const int MaximumElementPrimaryPixels = 260;
 
     /// <summary>
     /// 每个任务栏上一次写进日志的外部窗口描述：探测会重复运行，内容不变时不重复写。
-    /// 多显示器会并发探测不同任务栏，因此签名按 HWND 隔离并在锁内更新。
+    /// 日志签名按 HWND 隔离，并保护多个探测器实例之间的访问。
     /// Last overlay description written to the log for each taskbar; repeated probes do not log unchanged content.
-    /// Different taskbars are probed concurrently on multi-monitor systems, so signatures are isolated by HWND and updated under a lock.
+    /// Signatures are isolated by HWND and protected across probe instances.
     /// </summary>
     private static readonly object OverlaySignatureGate = new();
     private static readonly Dictionary<IntPtr, string> LastOverlaySignatures = [];
+
+    private readonly object _workerGate = new();
+    private readonly List<ProbeRequest> _pending = [];
+    private readonly Func<ProbeRequest, IReadOnlyList<TaskbarPrimaryRange>> _scan;
+    private Thread? _worker;
+    private bool _disposed;
+
+    /// <summary>创建由 DI 容器持有并释放的单线程探测器。 / Creates a worker owned and disposed by DI.</summary>
+    public TaskbarOccupiedAreaProbe() : this(request => ProbeSafePrimaryRanges(
+        request.TaskbarHandle, request.TaskbarRect, request.Orientation, request.DpiScale, request.EdgePaddingPixels))
+    {
+    }
+
+    internal TaskbarOccupiedAreaProbe(Func<ProbeRequest, IReadOnlyList<TaskbarPrimaryRange>> scan)
+    {
+        _scan = scan;
+    }
 
     /// <inheritdoc />
     public void Start(
@@ -41,59 +58,113 @@ public sealed class TaskbarOccupiedAreaProbe : ITaskbarOccupiedAreaProbe
     {
         ArgumentNullException.ThrowIfNull(succeeded);
         ArgumentNullException.ThrowIfNull(failed);
-
-        try
+        lock (_workerGate)
         {
-            var thread = new Thread(() => Probe(
-                taskbarHandle,
-                taskbarRect,
-                orientation,
-                dpiScale,
-                edgePaddingPixels,
-                succeeded,
-                failed))
+            if (_disposed)
+                return;
+
+            // 每个任务栏只保留最新请求；限制失效 HWND 的积累，即使 UIA 永久卡住也不会无限排队。
+            // Keep the latest request per taskbar and bound stale HWND accumulation even if UIA never returns.
+            var replacedIndex = _pending.FindIndex(request => request.TaskbarHandle == taskbarHandle);
+            if (replacedIndex >= 0)
             {
-                IsBackground = true,
-                Name = "AFMediaBar.TaskbarUiaProbe"
-            };
-            thread.SetApartmentState(ApartmentState.MTA);
-            thread.Start();
-        }
-        catch (Exception)
-        {
-            failed();
+                var replaced = _pending[replacedIndex];
+                _pending.RemoveAt(replacedIndex);
+                Notify(replaced.Failed);
+            }
+            if (_pending.Count >= 16)
+            {
+                var oldest = _pending[0];
+                _pending.RemoveAt(0);
+                Notify(oldest.Failed);
+            }
+            var request = new ProbeRequest(taskbarHandle, taskbarRect, orientation,
+                dpiScale, edgePaddingPixels, succeeded, failed);
+            _pending.Add(request);
+            try
+            {
+                if (_worker is null)
+                {
+                    var worker = new Thread(Run)
+                    {
+                        IsBackground = true,
+                        Name = "AFMediaBar.TaskbarUiaProbe"
+                    };
+                    worker.SetApartmentState(ApartmentState.MTA);
+                    worker.Start();
+                    _worker = worker;
+                }
+                Monitor.Pulse(_workerGate);
+            }
+            catch (Exception)
+            {
+                _pending.Remove(request);
+                Notify(failed);
+            }
         }
     }
 
-    private static void Probe(
-        IntPtr taskbarHandle,
-        RECT taskbarRect,
-        LayoutOrientation orientation,
-        double dpiScale,
-        int edgePaddingPixels,
-        Action<IReadOnlyList<TaskbarPrimaryRange>> succeeded,
-        Action failed)
+    private void Run()
     {
-        IReadOnlyList<TaskbarPrimaryRange> ranges;
-        try
+        while (true)
         {
-            ranges = ProbeSafePrimaryRanges(
-                taskbarHandle,
-                taskbarRect,
-                orientation,
-                dpiScale,
-                edgePaddingPixels);
-        }
-        catch (Exception)
-        {
-            // Explorer 可能正在重启或替换 UI Automation 树；外层服务不会发布本次结果。
-            // Explorer may be restarting or replacing its UI Automation tree; the outer service will not publish this result.
-            failed();
-            return;
-        }
+            ProbeRequest request;
+            lock (_workerGate)
+            {
+                while (!_disposed && _pending.Count == 0)
+                    Monitor.Wait(_workerGate);
+                if (_disposed)
+                    return;
+                request = _pending[0];
+                _pending.RemoveAt(0);
+            }
 
-        succeeded(ranges);
+            IReadOnlyList<TaskbarPrimaryRange>? ranges = null;
+            try
+            {
+                ranges = _scan(request);
+            }
+            catch (Exception)
+            {
+                // Explorer 重建时允许下一次请求重试，工作线程继续存活。
+                // An Explorer failure must not terminate the reusable worker.
+            }
+
+            lock (_workerGate)
+            {
+                if (_disposed)
+                    return;
+                // 与 Dispose 串行化发布，保证释放后不再回调宿主。
+                // Serialize publication with Dispose so no callbacks run after disposal.
+                Notify(ranges is null ? request.Failed : () => request.Succeeded(ranges));
+            }
+        }
     }
+
+    private static void Notify(Action callback)
+    {
+        try { callback(); }
+        catch (Exception) { /* A stale subscriber must not terminate the worker. */ }
+    }
+
+    /// <summary>
+    /// 停止排队并唤醒空闲线程；不阻塞等待不可取消的 UIA，迟到结果直接丢弃。
+    /// Stops scheduling and wakes the idle worker; never waits for uncancellable UIA and discards late results.
+    /// </summary>
+    public void Dispose()
+    {
+        lock (_workerGate)
+        {
+            _disposed = true;
+            _pending.Clear();
+            Monitor.Pulse(_workerGate);
+        }
+    }
+
+    internal sealed record ProbeRequest(
+        IntPtr TaskbarHandle, RECT TaskbarRect, LayoutOrientation Orientation,
+        double DpiScale, int EdgePaddingPixels,
+        Action<IReadOnlyList<TaskbarPrimaryRange>> Succeeded, Action Failed);
 
     private static IReadOnlyList<TaskbarPrimaryRange> ProbeSafePrimaryRanges(
         IntPtr taskbarHandle,
