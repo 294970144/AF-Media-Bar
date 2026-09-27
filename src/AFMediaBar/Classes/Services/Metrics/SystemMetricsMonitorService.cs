@@ -18,7 +18,10 @@ public sealed class SystemMetricsMonitorService : IDisposable, IMemoryPrunable
     private readonly SystemMetricsService _sampler;
     private readonly DispatcherTimer _timer = new();
     private readonly List<Subscription> _subscriptions = [];
+    private readonly object _samplerGate = new();
     private double _intervalScale = 1d;
+    private bool _sampleInFlight;
+    private bool _paused;
     private bool _disposed;
 
     public SystemMetricsMonitorService(SystemMetricsService sampler)
@@ -49,11 +52,13 @@ public sealed class SystemMetricsMonitorService : IDisposable, IMemoryPrunable
 
         if (level >= MemoryPruneLevel.DisplayOff)
         {
+            _paused = true;
             _timer.Stop();
-            _sampler.ReleaseGpu();
+            ReleaseGpuInBackground();
             return;
         }
 
+        _paused = false;
         _intervalScale = level == MemoryPruneLevel.Idle ? IdleIntervalScale : 1d;
         ReconfigureTimer();
     }
@@ -73,12 +78,42 @@ public sealed class SystemMetricsMonitorService : IDisposable, IMemoryPrunable
 
     private void SampleDue(Subscription? force = null)
     {
-        if (_disposed || _subscriptions.Count == 0) return;
+        if (_disposed || _paused || _sampleInFlight || _subscriptions.Count == 0) return;
         var now = DateTime.UtcNow;
         var due = _subscriptions.Where(item => ReferenceEquals(item, force) || item.NextDueUtc <= now).ToArray();
         if (due.Length == 0) return;
         var includeGpu = _subscriptions.Any(item => !item.IsDisposed && item.Metrics.Contains(MetricKind.SystemGpu));
-        var snapshot = _sampler.Sample(includeGpu);
+        _sampleInFlight = true;
+        _ = Task.Run(() =>
+        {
+            SystemMetricsSnapshot? snapshot = null;
+            Exception? failure = null;
+            try
+            {
+                lock (_samplerGate)
+                    snapshot = _sampler.Sample(includeGpu);
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+
+            _timer.Dispatcher.BeginInvoke(() => CompleteSample(due, snapshot, failure));
+        });
+    }
+
+    private void CompleteSample(Subscription[] due, SystemMetricsSnapshot? snapshot, Exception? failure)
+    {
+        _sampleInFlight = false;
+        if (_disposed || _paused) return;
+        if (failure is not null)
+        {
+            AppLogService.Current?.Warn("Metrics", $"性能采样失败 / metrics sampling failed: {failure.Message}");
+            return;
+        }
+
+        if (snapshot is null) return;
+        var now = DateTime.UtcNow;
         foreach (var item in due)
         {
             // 前一个回调可能同步关闭另一个显示器宿主；快照里的已释放订阅绝不能再回调旧控件。
@@ -89,7 +124,7 @@ public sealed class SystemMetricsMonitorService : IDisposable, IMemoryPrunable
             item.NextDueUtc = now + item.Interval;
             try
             {
-                item.Callback(snapshot);
+                item.Callback(snapshot.Value);
             }
             catch (Exception exception)
             {
@@ -107,8 +142,14 @@ public sealed class SystemMetricsMonitorService : IDisposable, IMemoryPrunable
         _subscriptions.Remove(subscription);
         ReconfigureTimer();
         if (_subscriptions.All(item => !item.Metrics.Contains(MetricKind.SystemGpu)))
-            _sampler.ReleaseGpu();
+            ReleaseGpuInBackground();
     }
+
+    private void ReleaseGpuInBackground() => _ = Task.Run(() =>
+    {
+        lock (_samplerGate)
+            _sampler.ReleaseGpu();
+    });
 
     private void ReconfigureTimer()
     {
@@ -126,7 +167,7 @@ public sealed class SystemMetricsMonitorService : IDisposable, IMemoryPrunable
         _timer.Stop();
         _timer.Tick -= OnTick;
         _subscriptions.Clear();
-        _sampler.ReleaseGpu();
+        ReleaseGpuInBackground();
     }
 
     private sealed class Subscription(
