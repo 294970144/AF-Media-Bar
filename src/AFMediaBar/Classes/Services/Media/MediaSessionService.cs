@@ -39,6 +39,11 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
     private IReadOnlyList<MediaSourceCandidate> _smtcCandidates = Array.Empty<MediaSourceCandidate>();
     private IReadOnlyList<MediaSourceCandidate> _candidates = Array.Empty<MediaSourceCandidate>();
     private string? _selectedSessionKey;
+    private bool _snapshotBuildInFlight;
+    private bool _snapshotBuildPending;
+    private readonly CancellationTokenSource _snapshotBuildCancellation = new();
+    private int _mediaRevision;
+    private (int OsSessionCount, TimeSpan Elapsed)? _pendingReconcileStatus;
     // 释放标记与 generation 会被后台流程读取（取消/过期判定），因此声明为 volatile：写入在 UI 线程，读取在后台线程。
     // The disposal flag and the generation are read by the background flow (cancellation and staleness checks), so both are volatile:
     // written on the UI thread and read on the background thread.
@@ -265,6 +270,8 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
         }
 
         _isDisposed = true;
+        _snapshotBuildCancellation.Cancel();
+        _snapshotBuildCancellation.Dispose();
         _reconcileWatchdog.Stop();
         _reconcileWatchdog.Tick -= OnReconcileWatchdogTick;
         // 取消在飞的后台流程并让 generation 失效：库调用本身无法中止，但它完成后不会再发布任何东西。
@@ -327,16 +334,25 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
 
     private void OnAnyMediaPropertyChanged(
         MediaSession session,
-        GlobalSystemMediaTransportControlsSessionMediaProperties properties) => ScheduleRefresh();
+        GlobalSystemMediaTransportControlsSessionMediaProperties properties)
+    {
+        Interlocked.Increment(ref _mediaRevision);
+        ScheduleRefresh();
+    }
 
     private void OnAnyPlaybackStateChanged(
         MediaSession session,
         GlobalSystemMediaTransportControlsSessionPlaybackInfo playbackInfo) => ScheduleSessionsRefresh();
 
-    private void OnAnySessionOpened(MediaSession session) => ScheduleSessionsRefresh();
+    private void OnAnySessionOpened(MediaSession session)
+    {
+        Interlocked.Increment(ref _mediaRevision);
+        ScheduleSessionsRefresh();
+    }
 
     private void OnAnySessionClosed(MediaSession session)
     {
+        Interlocked.Increment(ref _mediaRevision);
         // 会话关闭是"换歌重建会话"的信号，也正是第三方库漏事件的高发点：武装快速窗口，让看门狗用 1 秒的节奏把新会话捞回来。
         // A session closing signals a track change and is exactly where the third-party library loses events: arm the fast window so the
         // watchdog catches the recreated session on a one-second cadence.
@@ -509,13 +525,25 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
         try
         {
             RefreshSessionList();
-            RefreshSnapshot();
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[MediaSessionService] Failed to publish reconcile result: {ex}");
         }
 
+        // The snapshot now finishes asynchronously. Counting a failure against the previous snapshot here would
+        // spuriously escalate to a catalog restart while the recovered session is still being read.
+        if (_snapshotBuildInFlight)
+        {
+            _pendingReconcileStatus = (osSessionCount, elapsed);
+            return;
+        }
+
+        FinalizeReconcileStatus(osSessionCount, elapsed);
+    }
+
+    private void FinalizeReconcileStatus(int osSessionCount, TimeSpan elapsed)
+    {
         if (_sessionSnapshot.IsConnected)
         {
             _consecutiveFailedReconciles = 0;
@@ -677,21 +705,65 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
 
             _selectedSessionKey = selected?.SessionKey;
             var session = _lastSessions.FirstOrDefault(item => item.Id == _selectedSessionKey);
-            var snapshot = _snapshotBuilder.Build(session, _catalog.IsStarted);
-            if (snapshot is null)
+            PublishSessions(_candidates);
+            if (session is null || !_catalog.IsStarted)
             {
-                if (!_sources.IsIndependentSelection(selected?.Key))
-                    return;
-                snapshot = MediaSnapshot.Disconnected;
+                Publish(MediaSnapshot.Disconnected);
+                TryRequestFallbackLyrics();
+                return;
             }
 
-            PublishSessions(_candidates);
-            Publish(snapshot);
-            TryRequestFallbackLyrics();
+            if (_snapshotBuildInFlight)
+            {
+                _snapshotBuildPending = true;
+                return;
+            }
+
+            _snapshotBuildInFlight = true;
+            _ = BuildAndPublishSnapshotAsync(session, session.Id, Volatile.Read(ref _mediaRevision));
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[MediaSessionService] Failed to refresh snapshot: {ex}");
+        }
+    }
+
+    private async Task BuildAndPublishSnapshotAsync(MediaSession session, string sessionKey, int mediaRevision)
+    {
+        try
+        {
+            var snapshot = await _snapshotBuilder.BuildAsync(session, isStarted: true, _snapshotBuildCancellation.Token);
+            if (_isDisposed || mediaRevision != Volatile.Read(ref _mediaRevision) ||
+                !string.Equals(sessionKey, _selectedSessionKey, StringComparison.Ordinal))
+                return;
+
+            if (snapshot is not null)
+            {
+                Publish(snapshot);
+                TryRequestFallbackLyrics();
+            }
+        }
+        catch (OperationCanceledException) when (_isDisposed)
+        {
+            // Shutdown superseded the pending player read.
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"[MediaSessionService] Failed to build snapshot: {exception}");
+        }
+        finally
+        {
+            _snapshotBuildInFlight = false;
+            if (!_isDisposed && _snapshotBuildPending)
+            {
+                _snapshotBuildPending = false;
+                RefreshSnapshot(_lastSessions);
+            }
+            if (!_isDisposed && !_snapshotBuildInFlight && _pendingReconcileStatus is { } status)
+            {
+                _pendingReconcileStatus = null;
+                FinalizeReconcileStatus(status.OsSessionCount, status.Elapsed);
+            }
         }
     }
 

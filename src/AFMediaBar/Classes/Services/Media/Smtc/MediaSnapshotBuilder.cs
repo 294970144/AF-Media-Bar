@@ -114,7 +114,7 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable
     /// 从一个稳定会话读取不可变媒体快照；异步封面或歌词结果通过补全事件另行发布。
     /// Builds an immutable media snapshot from a stable session; asynchronous artwork or lyrics results are published separately.
     /// </summary>
-    public MediaSnapshot? Build(MediaSession? session, bool isStarted)
+    public async Task<MediaSnapshot?> BuildAsync(MediaSession? session, bool isStarted, CancellationToken cancellationToken = default)
     {
         if (session is null || !isStarted)
         {
@@ -131,45 +131,85 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable
             return null;
         }
 
-        var songInfo = TryGetMediaProperties(controlSession);
-        if (songInfo is null)
+        SmtcMediaRead? read;
+        try
+        {
+            // WinRT calls, stream hashing and WPF bitmap decoding can all wait on an external player or disk.
+            // Frozen artwork can safely cross back to the UI thread; color brushes and lyric caches stay UI-owned.
+            read = await Task.Run(async () =>
+            {
+                var songInfo = await controlSession.TryGetMediaPropertiesAsync();
+                if (songInfo is null) return null;
+                var playbackInfo = controlSession.GetPlaybackInfo();
+                var timeline = controlSession.GetTimelineProperties();
+                var artwork = ArtworkLoader.GetThumbnail(songInfo.Thumbnail);
+                return new SmtcMediaRead(
+                    songInfo.Title ?? string.Empty,
+                    songInfo.Artist ?? string.Empty,
+                    songInfo.AlbumTitle ?? string.Empty,
+                    controlSession.SourceAppUserModelId ?? string.Empty,
+                    artwork,
+                    artwork is null ? 0 : ArtworkLoader.CurrentThumbnailHash,
+                    playbackInfo.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing,
+                    playbackInfo.Controls?.IsPlayPauseToggleEnabled ?? false,
+                    playbackInfo.Controls?.IsPreviousEnabled ?? false,
+                    playbackInfo.Controls?.IsNextEnabled ?? false,
+                    playbackInfo.Controls?.IsPlaybackPositionEnabled ?? false,
+                    playbackInfo.Controls?.IsRepeatEnabled ?? false,
+                    MapRepeatMode(playbackInfo.AutoRepeatMode),
+                    playbackInfo.PlaybackRate is > 0 ? playbackInfo.PlaybackRate.Value : 1,
+                    timeline.StartTime.TotalSeconds,
+                    (timeline.EndTime - timeline.StartTime).TotalSeconds,
+                    timeline.Position.TotalSeconds,
+                    timeline.LastUpdatedTime);
+            }, cancellationToken);
+        }
+        catch (Exception exception) when (exception is COMException or InvalidOperationException or ObjectDisposedException)
         {
             return null;
         }
 
-        var playbackInfo = controlSession.GetPlaybackInfo();
-        var timelineProperties = controlSession.GetTimelineProperties();
-        var timelineStart = timelineProperties.StartTime.TotalSeconds;
-        var duration = Math.Max(0, (timelineProperties.EndTime - timelineProperties.StartTime).TotalSeconds);
-        var position = Math.Clamp(timelineProperties.Position.TotalSeconds - timelineStart, 0, duration > 0 ? duration : double.MaxValue);
-        var artwork = ArtworkLoader.GetThumbnail(songInfo.Thumbnail);
-        BitmapHelper.GetDominantColors(1);
-        var sourceId = controlSession.SourceAppUserModelId ?? string.Empty;
-        var title = songInfo.Title ?? string.Empty;
-        var artist = songInfo.Artist ?? string.Empty;
+        cancellationToken.ThrowIfCancellationRequested();
+        if (read is null)
+        {
+            return null;
+        }
+
+        var duration = Math.Max(0, read.Duration);
+        var position = Math.Clamp(read.Position - read.TimelineStart, 0, duration > 0 ? duration : double.MaxValue);
+        BitmapHelper.GetDominantColors(1, read.ArtworkHash);
+        var sourceId = read.SourceId;
+        var title = read.Title;
+        var artist = read.Artist;
         var lyricsKey = BuildLyricsKey(session.Id, title, artist);
-        var lyrics = GetLyrics(lyricsKey, sourceId, title, artist, songInfo, timelineProperties);
+        var lyrics = GetLyrics(lyricsKey, sourceId, title, artist, read.Album, duration);
 
         return new MediaSnapshot(
             true,
-            playbackInfo.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing,
-            playbackInfo.Controls?.IsPlayPauseToggleEnabled ?? false,
-            playbackInfo.Controls?.IsPreviousEnabled ?? false,
-            playbackInfo.Controls?.IsNextEnabled ?? false,
+            read.IsPlaying,
+            read.CanPlayPause,
+            read.CanSkipPrevious,
+            read.CanSkipNext,
             title,
             artist,
             sourceId,
             MediaSourceNameFormatter.GetDisplayName(sourceId, UnknownSourceName),
-            artwork,
+            read.Artwork,
             lyrics,
             position,
             duration,
-            duration > 0 && (playbackInfo.Controls?.IsPlaybackPositionEnabled ?? false),
-            playbackInfo.Controls?.IsRepeatEnabled ?? false,
-            MapRepeatMode(playbackInfo.AutoRepeatMode),
-            playbackInfo.PlaybackRate is > 0 ? playbackInfo.PlaybackRate.Value : 1,
-            timelineProperties.LastUpdatedTime);
+            duration > 0 && read.CanSeek,
+            read.CanChangeRepeat,
+            read.RepeatMode,
+            read.PlaybackRate,
+            read.TimelineUpdatedAt);
     }
+
+    private sealed record SmtcMediaRead(
+        string Title, string Artist, string Album, string SourceId, System.Windows.Media.Imaging.BitmapImage? Artwork,
+        int ArtworkHash, bool IsPlaying, bool CanPlayPause, bool CanSkipPrevious, bool CanSkipNext,
+        bool CanSeek, bool CanChangeRepeat, MediaRepeatMode RepeatMode, double PlaybackRate,
+        double TimelineStart, double Duration, double Position, DateTimeOffset TimelineUpdatedAt);
 
     private static MediaRepeatMode MapRepeatMode(Windows.Media.MediaPlaybackAutoRepeatMode? mode) => mode switch
     {
@@ -187,8 +227,8 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable
         string sourceId,
         string title,
         string artist,
-        GlobalSystemMediaTransportControlsSessionMediaProperties songInfo,
-        GlobalSystemMediaTransportControlsSessionTimelineProperties timelineProperties)
+        string album,
+        double duration)
     {
         if (_lyricsCache.TryGetValue(key, out var cached))
         {
@@ -202,8 +242,7 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable
         }
 
         _pendingLyrics.Add(key);
-        var duration = (timelineProperties.EndTime - timelineProperties.StartTime).TotalSeconds;
-        _ = LoadLyricsAsync(key, sourceId, title, artist, songInfo.AlbumTitle ?? string.Empty, duration > 0 ? duration : null);
+        _ = LoadLyricsAsync(key, sourceId, title, artist, album, duration > 0 ? duration : null);
         return null;
     }
 
@@ -300,16 +339,4 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable
         }
     }
 
-    private static GlobalSystemMediaTransportControlsSessionMediaProperties? TryGetMediaProperties(
-        GlobalSystemMediaTransportControlsSession controlSession)
-    {
-        try
-        {
-            return controlSession.TryGetMediaPropertiesAsync().GetAwaiter().GetResult();
-        }
-        catch (COMException)
-        {
-            return null;
-        }
-    }
 }

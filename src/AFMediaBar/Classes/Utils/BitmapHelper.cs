@@ -60,9 +60,8 @@ internal static class BitmapHelper
     /// <param name="colorCount">需要的颜色数量。/ Number of colors needed.</param>
     /// <param name="maxIterations">K-means 最大迭代次数。/ Maximum K-means iterations.</param>
     /// <returns>缓存位图对应的主色画刷列表。/ Dominant-color brushes for the cached bitmap.</returns>
-    public static List<SolidColorBrush> GetDominantColors(int colorCount, int maxIterations = 15)
+    public static List<SolidColorBrush> GetDominantColors(int colorCount, int hashCode, int maxIterations = 15)
     {
-        int hashCode = ArtworkLoader.CurrentThumbnailHash;
         if (!UseAlbumArtAsAccentColor || hashCode == 0)
         {
             // 强调色回退统一取自应用调色板；取不到时退回系统高亮色，绝不会是空画刷。
