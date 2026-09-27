@@ -17,8 +17,13 @@ namespace AFMediaBar.Classes.Services;
 /// 读取网易云客户端内存并提供更精确的进度、歌曲标识、封面和歌词。
 /// Reads NetEase client memory and provides precise progress, song identity, artwork, and lyrics.
 /// </summary>
-public sealed class NetEaseMediaProvider : IMediaSourceProvider, IMemoryPrunable
+public sealed class NetEaseMediaProvider : IIndependentMediaSourceProvider, IMemoryPrunable
 {
+    private readonly NetEaseSourcePolicy _sourcePolicy = new();
+
+    /// <summary>独立来源身份与仲裁规则，不持有读取器资源。</summary>
+    public IMediaSourcePolicy SourcePolicy => _sourcePolicy;
+
     private const string MemoryPlayerSourceId = NetEaseSourcePolicy.SourceId;
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(233);
 
@@ -126,10 +131,10 @@ public sealed class NetEaseMediaProvider : IMediaSourceProvider, IMemoryPrunable
     /// 判断来源标识是否属于网易云音乐。
     /// Determines whether the source identifier belongs to NetEase Cloud Music.
     /// </summary>
-    public bool CanHandle(string sourceId) => NetEaseSourcePolicy.Matches(sourceId);
+    public bool CanHandle(string sourceId) => _sourcePolicy.Matches(sourceId);
 
-    private static bool IsAllowed => MediaSourceFilterPolicy.IsAllowed(
-        MemoryPlayerSourceId, SettingsManager.Current.SmtcSourceFilter);
+    private bool IsAllowed => MediaSourceFilterPolicy.IsAllowed(
+        MemoryPlayerSourceId, SettingsManager.Current.SmtcSourceFilter, _sourcePolicy.NormalizeSourceId);
 
     /// <summary>
     /// 更新 SMTC 基线快照，供来源专用数据合并时保持媒体身份一致。

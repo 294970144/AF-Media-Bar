@@ -1,27 +1,31 @@
 // 统一网易云两条通道的来源身份、候选与快照；纯策略，不读取进程或调用 SMTC。
 using AFMediaBar.Classes.Models;
+using AFMediaBar.Classes.Abstractions;
 
 namespace AFMediaBar.Classes.Services;
 
 /// <summary>网易云以一个来源承接内存信息和 SMTC 控制。 / One NetEase source combines memory information and SMTC controls.</summary>
-public static class NetEaseSourcePolicy
+public sealed class NetEaseSourcePolicy : IMediaSourcePolicy
 {
     /// <summary>沿用已有内存快照的来源标识。</summary>
     public const string SourceId = "cloudmusic";
     /// <summary>跨 SMTC 重建和通道切换保持稳定的选择键。</summary>
     public const string SelectionKey = "source:cloudmusic";
 
+    string IMediaSourcePolicy.SourceId => SourceId;
+    string IMediaSourcePolicy.SelectionKey => SelectionKey;
+
     /// <summary>识别项目已支持的网易云来源标识。</summary>
-    public static bool Matches(string? sourceId) => sourceId is not null &&
+    public bool Matches(string? sourceId) => sourceId is not null &&
         (sourceId.Contains("cloudmusic", StringComparison.OrdinalIgnoreCase) ||
          sourceId.Contains("netease", StringComparison.OrdinalIgnoreCase) ||
          sourceId.Contains("163music", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>将既有网易云 SMTC 标识映射到同一来源；不改变其他应用标识。</summary>
-    public static string NormalizeSourceId(string sourceId) => Matches(sourceId) ? SourceId : sourceId;
+    public string NormalizeSourceId(string sourceId) => Matches(sourceId) ? SourceId : sourceId;
 
     /// <summary>合并网易云候选，保留其他播放器的独立会话。</summary>
-    public static IReadOnlyList<MediaSourceCandidate> Combine(
+    public IReadOnlyList<MediaSourceCandidate> Combine(
         IReadOnlyList<MediaSourceCandidate> sessions, MediaSnapshot? memory)
     {
         var result = sessions.Where(source => !Matches(source.SourceId)).ToList();
@@ -37,7 +41,7 @@ public static class NetEaseSourcePolicy
     }
 
     /// <summary>内存数据优先；仅从同来源 SMTC 补充控制及同曲目信息。</summary>
-    public static MediaSnapshot Merge(MediaSnapshot? memory, MediaSnapshot smtc)
+    public MediaSnapshot Merge(MediaSnapshot? memory, MediaSnapshot smtc)
     {
         var baseline = smtc.IsConnected && Matches(smtc.SourceId) ? smtc : MediaSnapshot.Disconnected;
         if (memory is not { IsConnected: true } || (memory.IsStale && baseline.IsConnected))

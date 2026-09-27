@@ -2,18 +2,19 @@ using AFMediaBar.Classes.Settings;
 
 namespace AFMediaBar.Classes.Services;
 
-/// <summary>按应用来源执行既有允许列表判断，两条网易云通道共用允许状态。 / Applies the existing source allow-list, sharing NetEase permission across both channels.</summary>
+/// <summary>按应用来源执行既有允许列表判断，来源别名由调用方提供。 / Applies the existing source allow-list, using the supplied source identity rules.</summary>
 public static class MediaSourceFilterPolicy
 {
-    public static bool IsAllowed(string? sourceId, SmtcSourceFilterSettings settings)
+    public static bool IsAllowed(string? sourceId, SmtcSourceFilterSettings settings, Func<string, string>? normalizeSourceId = null)
     {
         settings = settings.Normalize();
         if (!settings.Enabled)
             return true;
         if (string.IsNullOrWhiteSpace(sourceId))
             return false;
-        var normalized = NetEaseSourcePolicy.NormalizeSourceId(sourceId.Trim());
+        normalizeSourceId ??= static id => id;
+        var normalized = normalizeSourceId(sourceId.Trim());
         return settings.AllowedSourceIds!.Any(allowed => string.Equals(
-            NetEaseSourcePolicy.NormalizeSourceId(allowed), normalized, StringComparison.OrdinalIgnoreCase));
+            normalizeSourceId(allowed), normalized, StringComparison.OrdinalIgnoreCase));
     }
 }
