@@ -588,8 +588,8 @@ internal static class StringsZhHant
         table.Add("Media.SourceList.AddToQuickLaunch", "加入快速啟動");
         table.Add("Media.SourceList.AddToQuickLaunch.ToolTip", "只有能自動找到啟動方式的播放器才能加入；找不到時請用「瀏覽程式或捷徑」。");
         table.Add("Media.SourceList.Allow", "允許");
-        table.Add("Media.SourceList.Description", "先執行一次播放器，它才會出現在這裡");
-        table.Add("Media.SourceList.Title", "已偵測來源");
+        table.Add("Media.SourceList.Description", "網易雲音樂可直接設定；其他播放器執行後顯示。啟用篩選並隱藏網易雲後，會停止讀取其播放資訊。");
+        table.Add("Media.SourceList.Title", "可用來源");
         table.Add("Media.Spectrum.BandCount.Description", "頻譜柱的數量（9–24）；柱寬固定，柱數越多頻譜越寬");
         table.Add("Media.Spectrum.BandCount.Title", "柱數");
         table.Add("Media.Spectrum.BandCount.Value", "{0} 根");

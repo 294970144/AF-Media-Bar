@@ -421,7 +421,8 @@ public partial class ExtraFeaturesViewModel : ObservableObject
 
     private void RefreshSources()
     {
-        var allowed = SettingsManager.Current.SmtcSourceFilter.AllowedSourceIds ?? [];
+        var allowed = (SettingsManager.Current.SmtcSourceFilter.AllowedSourceIds ?? [])
+            .Select(NetEaseSourcePolicy.NormalizeSourceId).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var descriptors = _mediaSessions.CurrentDiscoveredSources.ToDictionary(source => source.SourceId, StringComparer.OrdinalIgnoreCase);
         foreach (var sourceId in allowed)
             descriptors.TryAdd(sourceId, new MediaSourceDescriptor(sourceId, MediaSourceNameFormatter.GetDisplayName(sourceId, sourceId), null, null));

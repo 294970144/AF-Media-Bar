@@ -32,14 +32,11 @@ public sealed class NetEase : IDisposable
     private string _cachedAlbum = string.Empty;
     private string _cachedCover = string.Empty;
 
-    /// <summary>
-    /// 已经判定为"不是当前曲目"的 id。私人FM 的 fmPlay 队列在按 id 查不到当前曲目时只作为兜底，一旦那条兜底被
-    /// 曲名校验拒绝，就没有必要在 233 毫秒后的下一次轮询里再解析一遍同一份队列文件。
-    /// Identity already judged not to be the current track. The private-FM queue in fmPlay only serves as a fallback when the current track
-    /// cannot be found by id, and once the title check rejects it there is no point parsing the same queue file again on the next poll (233 ms
-    /// later).
-    /// </summary>
+    // 元数据文件可能晚于内存曲目更新；失败只短暂退避，不能永久拒绝同一首歌。
+    // Metadata files can lag behind memory; retry a missing track after a bounded backoff.
     private string? _rejectedIdentity;
+    private string? _rejectedTitle;
+    private long _rejectedAt;
 
     private const string AudioPlayerPattern
         = "48 8D 0D ? ? ? ? E8 ? ? ? ? 48 8D 0D ? ? ? ? E8 ? ? ? ? 90 48 8D 0D ? ? ? ? E8 ? ? ? ? 48 8D 05 ? ? ? ? 48 8D A5 ? ? ? ? 5F 5D C3 CC CC CC CC CC 48 89 4C 24 ? 55 57 48 81 EC ? ? ? ? 48 8D 6C 24 ? 48 8D 7C 24";
@@ -60,49 +57,56 @@ public sealed class NetEase : IDisposable
 
         using var p = Process.GetProcessById(pid);
 
-        foreach (ProcessModule module in p.Modules)
+        try
         {
-            if (!"cloudmusic.dll".Equals(module.ModuleName))
+            foreach (ProcessModule module in p.Modules)
             {
-                continue;
+                if (!"cloudmusic.dll".Equals(module.ModuleName))
+                {
+                    continue;
+                }
+
+                var process = new ProcessMemory(pid);
+                _process = process;
+                var address = module.BaseAddress;
+
+                if (Memory.FindPattern(AudioPlayerPattern, pid, address, out var app))
+                {
+                    var textAddress = nint.Add(app, 3);
+                    var displacement = process.ReadInt32(textAddress);
+
+                    _audioPlayerPointer = textAddress + displacement + sizeof(int);
+                }
+
+                if (Memory.FindPattern(AudioSchedulePattern, pid, address, out var asp))
+                {
+                    var textAddress = nint.Add(asp, 4);
+                    var displacement = process.ReadInt32(textAddress);
+                    _schedulePointer = textAddress + displacement + sizeof(int);
+                }
+
+                break;
             }
 
-            var process = new ProcessMemory(pid);
-            var address = module.BaseAddress;
-
-            if (Memory.FindPattern(AudioPlayerPattern, pid, address, out var app))
+            if (_audioPlayerPointer == nint.Zero)
             {
-                var textAddress = nint.Add(app, 3);
-                var displacement = process.ReadInt32(textAddress);
-
-                _audioPlayerPointer = textAddress + displacement + sizeof(int);
+                throw new EntryPointNotFoundException("Failed to find AudioPlayer");
             }
 
-            if (Memory.FindPattern(AudioSchedulePattern, pid, address, out var asp))
+            if (_schedulePointer == nint.Zero)
             {
-                var textAddress = nint.Add(asp, 4);
-                var displacement = process.ReadInt32(textAddress);
-                _schedulePointer = textAddress + displacement + sizeof(int);
+                throw new EntryPointNotFoundException("Failed to find Scheduler");
             }
 
-            _process = process;
-
-            break;
+            if (_process is null)
+            {
+                throw new EntryPointNotFoundException("Failed to find process");
+            }
         }
-
-        if (_audioPlayerPointer == nint.Zero)
+        catch
         {
-            throw new EntryPointNotFoundException("Failed to find AudioPlayer");
-        }
-
-        if (_schedulePointer == nint.Zero)
-        {
-            throw new EntryPointNotFoundException("Failed to find Scheduler");
-        }
-
-        if (_process is null)
-        {
-            throw new EntryPointNotFoundException("Failed to find process");
+            _process?.Dispose();
+            throw;
         }
     }
 
@@ -116,9 +120,9 @@ public sealed class NetEase : IDisposable
     /// Reads the current track; metadata comes from the playing list first and falls back to the private-FM queue.
     /// </summary>
     /// <param name="expectedTitle">
-    /// SMTC 报出的曲名，仅用于校验"按 currentIndex 取出的私人FM 曲目"确实是当前曲目；为空时不做该校验。
+    /// SMTC 报出的曲名，仅用于校验"按 currentIndex 取出的私人FM 曲目"确实是当前曲目；为空时拒绝按索引兜底。
     /// The title SMTC reports, used only to verify that a private-FM track taken by <c>currentIndex</c> really is the current one; an empty value
-    /// skips the check.
+    /// rejects the index fallback.
     /// </param>
     public PlayerInfo? GetPlayerInfo(string? expectedTitle = null)
     {
@@ -137,7 +141,9 @@ public sealed class NetEase : IDisposable
         }
 
         if (!string.Equals(identity, _cachedIdentity, StringComparison.Ordinal) &&
-            (string.Equals(identity, _rejectedIdentity, StringComparison.Ordinal) ||
+            ((string.Equals(identity, _rejectedIdentity, StringComparison.Ordinal) &&
+              string.Equals(expectedTitle, _rejectedTitle, StringComparison.Ordinal) &&
+              Stopwatch.GetElapsedTime(_rejectedAt) < TimeSpan.FromSeconds(1)) ||
              !TryLoadTrackMetadata(identity, expectedTitle)))
         {
             // the player rewrites playingList asynchronously, so right after a song
@@ -170,7 +176,7 @@ public sealed class NetEase : IDisposable
     /// the files and fills the cache.
     /// </summary>
     /// <param name="identity">内存里读到的曲目 id。/ Track id read from memory.</param>
-    /// <param name="expectedTitle">SMTC 报出的曲名，用于校验回退结果；为空时不做校验。/ Title SMTC reports, used to verify the fallback result; empty skips it.</param>
+    /// <param name="expectedTitle">SMTC 报出的曲名，用于校验回退结果；为空时拒绝按索引兜底。/ Title SMTC reports, used to verify the fallback result; empty rejects index fallback.</param>
     /// <returns>是否取到元数据。/ Whether metadata was resolved.</returns>
     private bool TryLoadTrackMetadata(string identity, string? expectedTitle)
     {
@@ -185,6 +191,8 @@ public sealed class NetEase : IDisposable
         }
 
         _rejectedIdentity = identity;
+        _rejectedTitle = expectedTitle;
+        _rejectedAt = Stopwatch.GetTimestamp();
         return false;
     }
 
@@ -223,7 +231,7 @@ public sealed class NetEase : IDisposable
     /// the only place that knows the current track.
     /// </summary>
     /// <param name="identity">内存里读到的曲目 id。/ Track id read from memory.</param>
-    /// <param name="expectedTitle">SMTC 报出的曲名；为空时不做校验。/ Title SMTC reports; empty skips the check.</param>
+    /// <param name="expectedTitle">SMTC 报出的曲名；为空时拒绝按索引兜底。/ Title SMTC reports; empty rejects the index fallback.</param>
     /// <returns>是否命中。/ Whether metadata was resolved.</returns>
     private bool TryLoadFromFmQueue(string identity, string? expectedTitle)
     {

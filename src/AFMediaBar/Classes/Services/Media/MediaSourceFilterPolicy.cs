@@ -2,7 +2,7 @@ using AFMediaBar.Classes.Settings;
 
 namespace AFMediaBar.Classes.Services;
 
-/// <summary>针对稳定应用来源标识执行 SMTC 允许列表判断。 / Applies the SMTC allow-list to stable application source identifiers.</summary>
+/// <summary>按应用来源执行既有允许列表判断，两条网易云通道共用允许状态。 / Applies the existing source allow-list, sharing NetEase permission across both channels.</summary>
 public static class MediaSourceFilterPolicy
 {
     public static bool IsAllowed(string? sourceId, SmtcSourceFilterSettings settings)
@@ -12,6 +12,8 @@ public static class MediaSourceFilterPolicy
             return true;
         if (string.IsNullOrWhiteSpace(sourceId))
             return false;
-        return settings.AllowedSourceIds!.Contains(sourceId.Trim(), StringComparer.OrdinalIgnoreCase);
+        var normalized = NetEaseSourcePolicy.NormalizeSourceId(sourceId.Trim());
+        return settings.AllowedSourceIds!.Any(allowed => string.Equals(
+            NetEaseSourcePolicy.NormalizeSourceId(allowed), normalized, StringComparison.OrdinalIgnoreCase));
     }
 }

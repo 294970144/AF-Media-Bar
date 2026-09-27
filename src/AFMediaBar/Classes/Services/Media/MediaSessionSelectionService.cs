@@ -2,8 +2,7 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Threading;
 using AFMediaBar.Classes.Abstractions;
-using WindowsMediaController;
-using static WindowsMediaController.MediaManager;
+using AFMediaBar.Classes.Models;
 
 namespace AFMediaBar.Classes.Services;
 
@@ -24,7 +23,7 @@ public sealed class MediaSessionSelectionService : IDisposable, IMemoryPrunable
     /// <summary>剪枝后的刷新周期：宽限期是按时间戳判定的，放慢只是让恢复得晚一点，不会漏掉切换。
     /// The refresh period while pruned: the grace periods are decided from timestamps, so slowing down only delays the resolution instead of losing it.</summary>
     private static readonly TimeSpan PrunedRefreshInterval = TimeSpan.FromSeconds(1);
-    private readonly MediaSessionCatalog _catalog;
+    private readonly Func<string?> _getFocusedSessionKey;
     private readonly DispatcherTimer _timer;
     private string? _pendingAutoSwitchKey;
     private DateTime _pendingAutoSwitchSinceUtc;
@@ -54,9 +53,14 @@ public sealed class MediaSessionSelectionService : IDisposable, IMemoryPrunable
     /// Creates the session-selection state machine using the shared catalog for focused sessions and refresh signals.
     /// </summary>
     public MediaSessionSelectionService(MediaSessionCatalog catalog)
+        : this(() => catalog.GetFocusedSession()?.Id, Application.Current.Dispatcher)
     {
-        _catalog = catalog;
-        _timer = new DispatcherTimer(DispatcherPriority.Background, Application.Current.Dispatcher)
+    }
+
+    internal MediaSessionSelectionService(Func<string?> getFocusedSessionKey, Dispatcher dispatcher)
+    {
+        _getFocusedSessionKey = getFocusedSessionKey;
+        _timer = new DispatcherTimer(DispatcherPriority.Background, dispatcher)
         {
             Interval = RefreshInterval
         };
@@ -67,11 +71,10 @@ public sealed class MediaSessionSelectionService : IDisposable, IMemoryPrunable
     /// 在给定稳定会话集合中建立手动选择；键不存在时不改变当前状态。
     /// Establishes a manual selection within the supplied stable session set without changing state for an unknown key.
     /// </summary>
-    public bool Select(string key, IReadOnlyList<MediaSession> sessions)
+    public bool Select(string key, IReadOnlyList<MediaSourceCandidate> sessions)
     {
         var selected = sessions.FirstOrDefault(session =>
-            MediaSessionGuard.IsUsable(session) &&
-            string.Equals(session.Id, key, StringComparison.Ordinal));
+            string.Equals(session.Key, key, StringComparison.Ordinal));
         if (selected is null)
         {
             return false;
@@ -79,8 +82,8 @@ public sealed class MediaSessionSelectionService : IDisposable, IMemoryPrunable
 
         ClearPendingAutoSwitch();
         ClearMissingSession();
-        SelectedKey = selected.Id;
-        SelectedSourceId = MediaSessionGuard.GetSourceId(selected);
+        SelectedKey = selected.Key;
+        SelectedSourceId = selected.SourceId;
         IsManualSelection = true;
         return true;
     }
@@ -90,11 +93,10 @@ public sealed class MediaSessionSelectionService : IDisposable, IMemoryPrunable
     /// Resolves the current session using manual selection, grace-period, and system-focus precedence, returning only a
     /// still-readable session and null when every session has been closed.
     /// </summary>
-    public MediaSession? Resolve(IReadOnlyList<MediaSession> sessions)
+    public MediaSourceCandidate? Resolve(IReadOnlyList<MediaSourceCandidate> sessions)
     {
         var selected = sessions.FirstOrDefault(session =>
-            MediaSessionGuard.IsUsable(session) &&
-            string.Equals(session.Id, SelectedKey, StringComparison.Ordinal));
+            string.Equals(session.Key, SelectedKey, StringComparison.Ordinal));
         if (selected is not null)
         {
             if (_missingSessionSinceUtc != default)
@@ -102,7 +104,7 @@ public sealed class MediaSessionSelectionService : IDisposable, IMemoryPrunable
                 Debug.WriteLine($"[MediaSessionSelection] Browser source recovered: {SelectedSourceId}");
             }
 
-            SelectedSourceId = MediaSessionGuard.GetSourceId(selected);
+            SelectedSourceId = selected.SourceId;
             ClearMissingSession();
             return selected;
         }
@@ -110,8 +112,8 @@ public sealed class MediaSessionSelectionService : IDisposable, IMemoryPrunable
         var restored = FindRestoredSession(sessions);
         if (restored is not null)
         {
-            SelectedKey = restored.Id;
-            SelectedSourceId = MediaSessionGuard.GetSourceId(restored);
+            SelectedKey = restored.Key;
+            SelectedSourceId = restored.SourceId;
             Debug.WriteLine($"[MediaSessionSelection] Browser source recreated: {SelectedSourceId}");
             ClearMissingSession();
             return restored;
@@ -124,15 +126,13 @@ public sealed class MediaSessionSelectionService : IDisposable, IMemoryPrunable
 
         ClearPendingAutoSwitch();
         ClearMissingSession();
-        var focused = _catalog.GetFocusedSession();
+        var focused = _getFocusedSessionKey();
         selected = focused is not null
             ? sessions.FirstOrDefault(session =>
-                MediaSessionGuard.IsUsable(session) &&
-                string.Equals(session.Id, focused.Id, StringComparison.Ordinal))
+                string.Equals(session.SessionKey, focused, StringComparison.Ordinal))
             : null;
-        selected ??= sessions.FirstOrDefault(session =>
-            MediaSessionGuard.IsUsable(session) && IsPlaying(session));
-        selected ??= sessions.FirstOrDefault(MediaSessionGuard.IsUsable);
+        selected ??= sessions.FirstOrDefault(session => session.IsPlaying);
+        selected ??= sessions.FirstOrDefault();
         if (selected is null)
         {
             SelectedKey = null;
@@ -141,8 +141,8 @@ public sealed class MediaSessionSelectionService : IDisposable, IMemoryPrunable
             return null;
         }
 
-        SelectedKey = selected.Id;
-        SelectedSourceId = MediaSessionGuard.GetSourceId(selected);
+        SelectedKey = selected.Key;
+        SelectedSourceId = selected.SourceId;
 
         // 走到这里说明当前选择已经不存在，这一份是**自动**挑的，因此自动跟随可以继续接管它。
         // Reaching this point means the previous selection no longer exists and this one was picked **automatically**, so auto-follow may keep managing it.
@@ -159,35 +159,39 @@ public sealed class MediaSessionSelectionService : IDisposable, IMemoryPrunable
     /// The decision itself lives in <see cref="MediaAutoSwitchPolicy"/> so that it can be unit-tested; this method only maps state into signals and then starts
     /// the timer or changes the selection according to the decision.
     /// </summary>
-    public bool TryAutoSwitchToPlaying(IReadOnlyList<MediaSession> sessions)
+    public bool TryAutoSwitchToPlaying(IReadOnlyList<MediaSourceCandidate> sessions)
     {
         var current = sessions.FirstOrDefault(session =>
-            MediaSessionGuard.IsUsable(session) &&
-            string.Equals(session.Id, SelectedKey, StringComparison.Ordinal));
+            string.Equals(session.Key, SelectedKey, StringComparison.Ordinal));
+
+        if (current is { IsRecovering: true })
+        {
+            ClearPendingAutoSwitch();
+            return false;
+        }
 
         var replacement = current is null
             ? null
             : sessions.FirstOrDefault(candidate =>
-                MediaSessionGuard.IsUsable(candidate) &&
-                !ReferenceEquals(candidate, current) && IsPlaying(candidate));
+                !candidate.IsRecovering && candidate.Key != current.Key && candidate.IsPlaying);
 
         var decision = MediaAutoSwitchPolicy.Resolve(new MediaAutoSwitchSignals(
             CurrentExists: current is not null,
-            CurrentIsPlaying: current is not null && IsPlaying(current),
-            CurrentIsBrowserSource: current is not null && IsBrowserSource(MediaSessionGuard.GetSourceId(current)),
+            CurrentIsPlaying: current is not null && current.IsPlaying,
+            CurrentIsBrowserSource: current is not null && IsBrowserSource(current.SourceId),
             IsManualSelection: IsManualSelection,
             HasPlayingReplacement: replacement is not null,
             ReplacementMatchesPending: replacement is not null &&
-                                       string.Equals(_pendingAutoSwitchKey, replacement.Id, StringComparison.Ordinal),
+                                       string.Equals(_pendingAutoSwitchKey, replacement.Key, StringComparison.Ordinal),
             SincePending: DateTime.UtcNow - _pendingAutoSwitchSinceUtc,
             GracePeriod: AutoSwitchGracePeriod));
 
         switch (decision)
         {
             case MediaAutoSwitchDecision.WaitForGrace:
-                if (!string.Equals(_pendingAutoSwitchKey, replacement!.Id, StringComparison.Ordinal))
+                if (!string.Equals(_pendingAutoSwitchKey, replacement!.Key, StringComparison.Ordinal))
                 {
-                    _pendingAutoSwitchKey = replacement.Id;
+                    _pendingAutoSwitchKey = replacement.Key;
                     _pendingAutoSwitchSinceUtc = DateTime.UtcNow;
                 }
 
@@ -196,8 +200,8 @@ public sealed class MediaSessionSelectionService : IDisposable, IMemoryPrunable
 
             case MediaAutoSwitchDecision.Switch:
                 ClearPendingAutoSwitch();
-                SelectedKey = replacement!.Id;
-                SelectedSourceId = MediaSessionGuard.GetSourceId(replacement);
+                SelectedKey = replacement!.Key;
+                SelectedSourceId = replacement.SourceId;
 
                 // 切换之后这一份是自动挑的：用户没有参与，自动跟随继续对它负责。
                 // After a switch this selection is automatic: the user took no part in it, so auto-follow keeps managing it.
@@ -307,10 +311,10 @@ public sealed class MediaSessionSelectionService : IDisposable, IMemoryPrunable
         _timer.Tick -= OnTimerTick;
     }
 
-    private MediaSession? FindRestoredSession(IReadOnlyList<MediaSession> sessions) =>
+    private MediaSourceCandidate? FindRestoredSession(IReadOnlyList<MediaSourceCandidate> sessions) =>
         IsMissingSessionGraceActive
             ? sessions.FirstOrDefault(session => IsSameBrowserSource(
-                MediaSessionGuard.GetSourceId(session),
+                session.SourceId,
                 SelectedSourceId ?? string.Empty))
             : null;
 
@@ -342,26 +346,6 @@ public sealed class MediaSessionSelectionService : IDisposable, IMemoryPrunable
         }
 
         RefreshRequested?.Invoke();
-    }
-
-    private static bool IsPlaying(MediaSession session)
-    {
-        // 会话可能在本方法执行期间被第三方库关闭，读取失败一律按“未播放”处理。
-        // The third-party library may close the session while this method runs, so every read failure means "not playing".
-        if (!MediaSessionGuard.IsUsable(session))
-        {
-            return false;
-        }
-
-        try
-        {
-            return session.ControlSession.GetPlaybackInfo().PlaybackStatus ==
-                Windows.Media.Control.GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
-        }
-        catch
-        {
-            return false;
-        }
     }
 
     private static bool IsBrowserSource(string sourceId) =>
