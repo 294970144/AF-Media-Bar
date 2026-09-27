@@ -1,3 +1,4 @@
+using AFMediaBar.Classes.Services.Media.Sources.NetEase;
 // 验证独立来源通过同一契约接入发现、选择、过滤和合并；不启动播放器或访问网络。
 using AFMediaBar.Classes.Abstractions;
 using AFMediaBar.Classes.Models;

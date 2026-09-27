@@ -6,7 +6,7 @@ using System.Text;
 using AFMediaBar.Classes.Models;
 using AFMediaBar.Classes.Services.Win32;
 
-namespace AFMediaBar.Classes.Services.Players;
+namespace AFMediaBar.Classes.Services.Media.Sources.NetEase;
 
 /// <summary>
 /// 从网易云音乐进程内存读取播放状态（进度、曲目 id），元数据由正在播放列表与私人FM 队列解析。

@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace AFMediaBar.Classes.Services.Players;
+namespace AFMediaBar.Classes.Services.Media.Sources.NetEase;
 
 /// <summary>
 /// 从网易云客户端的元数据文件里解析出的一条曲目信息。

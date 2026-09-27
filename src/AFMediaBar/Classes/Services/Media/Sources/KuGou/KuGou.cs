@@ -6,7 +6,7 @@
 using System.Diagnostics;
 using AFMediaBar.Classes.Services.Win32;
 
-namespace AFMediaBar.Classes.Services.Players;
+namespace AFMediaBar.Classes.Services.Media.Sources.KuGou;
 
 /// <summary>
 /// 从酷狗音乐进程内存读取播放进度与曲目时长。

@@ -1,3 +1,6 @@
+using AFMediaBar.Classes.Services.Media.Sources.KuGou;
+using AFMediaBar.Classes.Services.Media.Sources.NetEase;
+using AFMediaBar.Classes.Services.Media.Smtc;
 using AFMediaBar.Classes.Services;
 using AFMediaBar.Classes.Abstractions;
 using AFMediaBar.Classes.Services.Credits;

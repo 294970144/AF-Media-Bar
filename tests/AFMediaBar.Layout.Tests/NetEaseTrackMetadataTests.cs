@@ -1,4 +1,4 @@
-using AFMediaBar.Classes.Services.Players;
+using AFMediaBar.Classes.Services.Media.Sources.NetEase;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace AFMediaBar.Layout.Tests;

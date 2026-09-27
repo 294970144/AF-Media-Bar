@@ -1,6 +1,7 @@
+// Checks borrowed SMTC session references; owns no sessions or native resources.
 using static WindowsMediaController.MediaManager;
 
-namespace AFMediaBar.Classes.Services;
+namespace AFMediaBar.Classes.Services.Media.Smtc;
 
 /// <summary>
 /// 统一判定第三方媒体会话是否仍可读取，并提供不依赖 <c>ControlSession</c> 的稳定来源标识。

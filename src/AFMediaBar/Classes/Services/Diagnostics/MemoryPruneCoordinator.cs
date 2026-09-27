@@ -1,3 +1,4 @@
+using AFMediaBar.Classes.Services.Media.Smtc;
 using System.Diagnostics;
 using System.Windows.Threading;
 using AFMediaBar.Classes.Abstractions;

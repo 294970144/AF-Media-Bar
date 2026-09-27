@@ -1,6 +1,7 @@
+// Pure recovery policy for the SMTC catalog; does not enumerate or restart sessions itself.
 using AFMediaBar.Classes.Abstractions;
 
-namespace AFMediaBar.Classes.Services;
+namespace AFMediaBar.Classes.Services.Media.Smtc;
 
 /// <summary>
 /// 自动重连看门狗一次动作的选择。

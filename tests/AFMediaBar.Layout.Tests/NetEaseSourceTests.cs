@@ -1,3 +1,4 @@
+using AFMediaBar.Classes.Services.Media.Sources.NetEase;
 // 验证无 SMTC 来源选择、双通道隔离与读取失败恢复；不访问真实播放器或网络。
 using System.Windows.Threading;
 using AFMediaBar.Classes.Models;

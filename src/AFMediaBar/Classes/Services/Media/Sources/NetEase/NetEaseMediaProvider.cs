@@ -1,3 +1,4 @@
+// Owns NetEase polling and readers; publishes snapshots through the shared source contract.
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Media;
@@ -6,12 +7,11 @@ using System.Windows.Threading;
 using AFMediaBar.Classes.Abstractions;
 using AFMediaBar.Classes.Models;
 using AFMediaBar.Classes.Services.Lyrics;
-using AFMediaBar.Classes.Services.Players;
 using AFMediaBar.Classes.Settings;
 using AFMediaBar.Classes.Utils;
 using AFMediaBar.Resources;
 
-namespace AFMediaBar.Classes.Services;
+namespace AFMediaBar.Classes.Services.Media.Sources.NetEase;
 
 /// <summary>
 /// 读取网易云客户端内存并提供更精确的进度、歌曲标识、封面和歌词。

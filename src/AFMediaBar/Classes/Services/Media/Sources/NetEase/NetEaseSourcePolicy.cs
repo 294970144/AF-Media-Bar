@@ -2,7 +2,7 @@
 using AFMediaBar.Classes.Models;
 using AFMediaBar.Classes.Abstractions;
 
-namespace AFMediaBar.Classes.Services;
+namespace AFMediaBar.Classes.Services.Media.Sources.NetEase;
 
 /// <summary>网易云以一个来源承接内存信息和 SMTC 控制。 / One NetEase source combines memory information and SMTC controls.</summary>
 public sealed class NetEaseSourcePolicy : IMediaSourcePolicy

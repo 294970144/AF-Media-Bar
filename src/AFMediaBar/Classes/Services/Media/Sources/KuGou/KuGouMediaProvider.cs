@@ -1,9 +1,9 @@
+// Owns KuGou polling and readers; enriches the selected SMTC snapshot without owning the session.
 using System.Windows.Threading;
 using AFMediaBar.Classes.Abstractions;
 using AFMediaBar.Classes.Models;
-using AFMediaBar.Classes.Services.Players;
 
-namespace AFMediaBar.Classes.Services;
+namespace AFMediaBar.Classes.Services.Media.Sources.KuGou;
 
 /// <summary>
 /// 读取酷狗客户端内存，把更精确的播放进度与时长合并进酷狗的 SMTC 快照；元数据、封面、歌词与播放状态仍由 SMTC 提供。

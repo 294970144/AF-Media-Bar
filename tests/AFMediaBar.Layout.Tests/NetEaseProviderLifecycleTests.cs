@@ -1,9 +1,9 @@
+using AFMediaBar.Classes.Services.Media.Sources.NetEase;
 // 用受控读取器验证隐藏、重启和退出期间的线程与释放边界；不读取真实进程或访问网络。
 using System.Windows.Threading;
 using AFMediaBar.Classes.Models;
 using AFMediaBar.Classes.Services;
 using AFMediaBar.Classes.Services.Lyrics;
-using AFMediaBar.Classes.Services.Players;
 using AFMediaBar.Classes.Abstractions;
 using AFMediaBar.Classes.Settings;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
