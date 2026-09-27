@@ -55,6 +55,13 @@ public sealed class AudioMonitorService : BackgroundService, IMemoryPrunable
     /// <summary>创建由宿主控制生命周期的频谱服务。 / Creates the host-managed spectrum service.</summary>
     public AudioMonitorService(AudioCaptureDeviceResolver deviceResolver) => _deviceResolver = deviceResolver;
 
+    /// <summary>
+    /// 在后台计算频谱并把结果交给 UI；UI 线程不等待采样回调持有的锁或 FFT。
+    /// Computes the spectrum in the background so the UI never waits on the capture callback's gate or FFT.
+    /// </summary>
+    public Task<bool> GetSpectrumAsync(float[] bands, int bandCount) =>
+        Task.Run(() => GetSpectrum(bands, bandCount));
+
     /// <summary>从缓存样本填充频谱；不会等待音频设备或后台采集。 / Fills bands from cached samples without waiting on audio devices.</summary>
     public bool GetSpectrum(float[] bands, int bandCount)
     {

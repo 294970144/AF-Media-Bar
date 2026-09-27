@@ -23,6 +23,9 @@ public sealed class AudioMonitorLifecycleTests
         var bands = Enumerable.Repeat(1f, SpectrumComponentSettings.DefaultBandCount).ToArray();
         Assert.IsFalse(monitor.GetSpectrum(bands, bands.Length));
         Assert.IsTrue(bands.All(value => value == 0));
+        Array.Fill(bands, 1f);
+        Assert.IsFalse(await monitor.GetSpectrumAsync(bands, bands.Length));
+        Assert.IsTrue(bands.All(value => value == 0));
         monitor.Dispose();
         monitor.Dispose();
     }

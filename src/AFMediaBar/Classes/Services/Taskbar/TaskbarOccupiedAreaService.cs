@@ -80,8 +80,8 @@ public sealed class TaskbarOccupiedAreaService
             if (_activeProbes.TryGetValue(key, out var activeProbe) &&
                 (activeProbe.Generation != _cacheGeneration || now - activeProbe.StartedAtUtc > ProbeResultTimeout))
             {
-                // 过期请求让出逻辑槽位以更新待处理参数；探测器复用同一线程，旧回调靠 probeId 淘汰。
-                // Replace expired logical requests with fresh parameters; the probe reuses its worker and old callbacks are discarded by probeId.
+                // UIA 偶尔会永久卡在失效的 Explorer 树上；只释放这个任务栏的槽位，旧回调靠 probeId 淘汰。
+                // UIA can remain stuck on a stale Explorer tree. Release only this taskbar's slot and discard its old callback by probeId.
                 _activeProbes.Remove(key);
                 availableCache = [];
             }
