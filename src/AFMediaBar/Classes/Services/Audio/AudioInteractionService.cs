@@ -73,10 +73,15 @@ public sealed class AudioInteractionService
 
     public async Task SetOutputDeviceAsync(AudioDeviceOption device)
     {
-        if (_deviceService.IsDefaultRenderDevice(device.Id))
+        var changed = await Task.Run(() =>
+        {
+            if (_deviceService.IsDefaultRenderDevice(device.Id))
+                return false;
+            _deviceService.SetDefaultRenderDevice(device.PolicyId);
+            return true;
+        });
+        if (!changed)
             return;
-
-        await Task.Run(() => _deviceService.SetDefaultRenderDevice(device.PolicyId));
         _audioMonitorService.ResetAfterEnvironmentChange();
     }
 

@@ -239,17 +239,23 @@ public partial class AudioControlViewModel : ObservableObject, IDisposable
 
             // 缓冲结束后再次读取系统默认设备；循环滚回原设备时不要重复切换而打断音频。
             // Recheck the system default after buffering so cycling back does not interrupt audio with a redundant switch.
-            if (_deviceService.IsDefaultRenderDevice(device.Id))
+            if (await Task.Run(() => _deviceService.IsDefaultRenderDevice(device.Id)))
             {
                 return;
             }
 
+            if (!AudioApplyPolicy.IsCurrent(_disposed, version, _deviceApplyVersion))
+                return;
             await Task.Run(() => _deviceService.SetDefaultRenderDevice(device.PolicyId));
             _audioMonitorService.ResetAfterEnvironmentChange();
+            if (!AudioApplyPolicy.IsCurrent(_disposed, version, _deviceApplyVersion))
+                return;
             await RefreshAsync();
         }
         catch (Exception exception)
         {
+            if (!AudioApplyPolicy.IsCurrent(_disposed, version, _deviceApplyVersion))
+                return;
             StatusText = Translations.Format("Audio.Status.SwitchOutputDeviceFailed", exception.Message);
             SetTrayTooltip(Translations.Get("Audio.Tooltip.SwitchOutputDeviceFailed"));
         }
