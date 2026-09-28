@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         Title="{DynamicResource Loc.Panel.Notification.WindowTitle}"
-        MinWidth="0" MinHeight="0" MaxWidth="360" SizeToContent="WidthAndHeight"
+        MinWidth="0" MinHeight="0" MaxWidth="400" SizeToContent="WidthAndHeight"
         ShowInTaskbar="False" ShowActivated="False" Topmost="True"
         ResizeMode="NoResize" WindowStyle="None"
         WindowStartupLocation="Manual"
@@ -26,11 +26,11 @@
         </Border.RenderTransform>
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="44" />
+                <ColumnDefinition x:Name="ArtworkColumn" Width="44" />
                 <ColumnDefinition Width="9" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <Border Width="44" Height="44" CornerRadius="7" ClipToBounds="True" Background="#18FFFFFF">
+            <Border x:Name="ArtworkBorder" Width="44" Height="44" CornerRadius="7" ClipToBounds="True" Background="#18FFFFFF">
                 <Grid>
                     <ui:SymbolIcon x:Name="ArtworkPlaceholder" Symbol="MusicNote220" FontSize="24" />
                     <Image x:Name="ArtworkImage" Stretch="UniformToFill" />

@@ -3,11 +3,13 @@ using System.Windows.Interop;
 using System.Windows.Input;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using AFMediaBar.Classes.Interop;
 using AFMediaBar.Classes.Models;
 using AFMediaBar.Classes.Services;
+using AFMediaBar.Classes.Services.Layout;
 using AFMediaBar.Classes.Settings;
 using AFMediaBar.Classes.Utils;
 using Wpf.Ui.Controls;
@@ -158,6 +160,13 @@ public partial class TrackChangeNotificationWindow : FluentWindow
             : snapshot.Artist;
         ArtworkImage.Source = snapshot.Artwork;
         ArtworkPlaceholder.Visibility = snapshot.Artwork is null ? Visibility.Visible : Visibility.Collapsed;
+        // 与任务栏封面共用宽高比约束；极端宽高比使用留白，避免通知将视频封面裁成正方形。
+        // Match the taskbar artwork box; extreme aspects letterbox instead of cropping the notification image.
+        var bitmap = snapshot.Artwork as BitmapSource;
+        var box = ArtworkBoxPolicy.Resolve(ArtworkBorder.Height, bitmap?.PixelWidth ?? 0, bitmap?.PixelHeight ?? 0);
+        ArtworkBorder.Width = box.Width;
+        ArtworkColumn.Width = new GridLength(box.Width);
+        ArtworkImage.Stretch = box.Letterbox ? Stretch.Uniform : Stretch.UniformToFill;
     }
 
     /// <summary>立即隐藏通知并取消动画和计时。 / Immediately hides the notification and cancels animations and timing.</summary>
