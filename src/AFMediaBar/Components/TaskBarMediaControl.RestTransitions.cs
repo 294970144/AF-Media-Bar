@@ -51,7 +51,8 @@ public partial class TaskBarMediaControl
             if (element.Visibility != Visibility.Visible || element.ActualWidth <= 0 || element.ActualHeight <= 0)
                 continue;
 
-            var point = element.TransformToAncestor(MainCanvas).Transform(new Point(0, 0));
+            if (!TryGetRestPosition(element, MainCanvas, out var point))
+                continue;
             var dpi = VisualTreeHelper.GetDpi(element);
             var pixelWidth = (int)Math.Ceiling(element.ActualWidth * dpi.DpiScaleX);
             var pixelHeight = (int)Math.Ceiling(element.ActualHeight * dpi.DpiScaleY);
@@ -93,6 +94,26 @@ public partial class TaskBarMediaControl
         _ => throw new ArgumentOutOfRangeException(nameof(component))
     };
 
+    internal static bool TryGetRestPosition(FrameworkElement element, UIElement canvas, out Point position)
+    {
+        position = default;
+        if (element.FindCommonVisualAncestor(canvas) is null)
+            return false;
+
+        try
+        {
+            // The four rest widgets are siblings of MainCanvas, not descendants of it.
+            // TranslatePoint uses their shared ancestor and also covers artwork/text inside the canvas.
+            position = element.TranslatePoint(new Point(), canvas);
+            return double.IsFinite(position.X) && double.IsFinite(position.Y);
+        }
+        catch (InvalidOperationException)
+        {
+            // A control can leave the visual tree while its media or host window is changing.
+            return false;
+        }
+    }
+
     private void AnimateRestConnectionChange(Dictionary<TaskbarRestComponent, RestVisual>? before)
     {
         if (before is null)
@@ -107,7 +128,7 @@ public partial class TaskBarMediaControl
         // must not become part of the new layout destination.
         foreach (var component in TaskbarRestLayoutPolicy.DefaultOrder)
             GetRestElement(component).RenderTransform = Transform.Identity;
-        MainCanvas.UpdateLayout();
+        InteractionSurface.UpdateLayout();
 
         foreach (var component in TaskbarRestLayoutPolicy.DefaultOrder)
         {
@@ -125,7 +146,8 @@ public partial class TaskBarMediaControl
 
             // The layout lands first. Its inverse transform keeps the old screen position visible,
             // then one geometry animation lets the persistent component travel to its new position.
-            var target = element.TransformToAncestor(MainCanvas).Transform(new Point(0, 0));
+            if (!TryGetRestPosition(element, MainCanvas, out var target))
+                continue;
             var fromX = wasVisible ? previous!.Position.X - target.X : -4;
             var fromY = wasVisible ? previous!.Position.Y - target.Y : 0;
             var transform = new TranslateTransform();
