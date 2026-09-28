@@ -33,7 +33,8 @@
             implicit TextBox style so the binding row's remark reads as plain text until clicked.
         -->
         <ControlTemplate x:Key="AfBareTextBoxTemplate" TargetType="{x:Type TextBox}">
-            <ScrollViewer x:Name="PART_ContentHost" Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" />
+            <ScrollViewer x:Name="PART_ContentHost" Focusable="False" HorizontalScrollBarVisibility="Hidden"
+                          VerticalScrollBarVisibility="Hidden" />
         </ControlTemplate>
 
         <!--
@@ -134,7 +135,8 @@
                 MaxWidth="{StaticResource AfSettingsContentMaxWidth}"
                 Loaded="OnPageLoaded">
 
-                <components:SettingsGroup Header="{DynamicResource Loc.Common.Group.LyricsDisplay}" Icon="{ui:SymbolIcon TextQuote24}">
+                <components:SettingsGroup Header="{DynamicResource Loc.Common.Group.LyricsDisplay}"
+                                          Icon="{ui:SymbolIcon TextQuote24}">
                     <StackPanel>
                         <components:SettingsCallout
                             Margin="0,0,0,12"
@@ -206,8 +208,10 @@
                             IsExpanded="{Binding ViewModel.TwoLineLyricsEnabled, Mode=OneWay}">
                             <ui:CardExpander.Header>
                                 <StackPanel>
-                                    <TextBlock Style="{StaticResource AfSettingsRowTitleStyle}" Text="{DynamicResource Loc.Lyrics.Row.SecondLine.Title}" />
-                                    <TextBlock Style="{StaticResource AfSettingsRowDescriptionStyle}" Text="{DynamicResource Loc.Lyrics.Row.SecondLine.Description}" />
+                                    <TextBlock Style="{StaticResource AfSettingsRowTitleStyle}"
+                                               Text="{DynamicResource Loc.Lyrics.Row.SecondLine.Title}" />
+                                    <TextBlock Style="{StaticResource AfSettingsRowDescriptionStyle}"
+                                               Text="{DynamicResource Loc.Lyrics.Row.SecondLine.Description}" />
                                 </StackPanel>
                             </ui:CardExpander.Header>
                             <StackPanel>
@@ -338,7 +342,8 @@
                     </StackPanel>
                 </components:SettingsGroup>
 
-                <components:SettingsGroup Header="{DynamicResource Loc.Common.Group.LyricsAlignment}" Icon="{ui:SymbolIcon TextAlignLeft24}">
+                <components:SettingsGroup Header="{DynamicResource Loc.Common.Group.LyricsAlignment}"
+                                          Icon="{ui:SymbolIcon TextAlignLeft24}">
                     <StackPanel>
                         <components:SettingsDiagram Margin="0,0,0,12" Kind="LyricsAlignment" />
 
@@ -350,30 +355,30 @@
                                 MinWidth="160"
                                 SelectedValue="{Binding ViewModel.TextAlignment, Mode=TwoWay}"
                                 SelectedValuePath="Tag">
-                                <ComboBoxItem Content="{DynamicResource Loc.Common.AlignLeft}" Tag="{x:Static settings:LyricsTextAlignment.Left}" />
-                                <ComboBoxItem Content="{DynamicResource Loc.Common.AlignCenter}" Tag="{x:Static settings:LyricsTextAlignment.Center}" />
-                                <ComboBoxItem Content="{DynamicResource Loc.Common.AlignRight}" Tag="{x:Static settings:LyricsTextAlignment.Right}" />
+                                <ComboBoxItem Content="{DynamicResource Loc.Common.AlignLeft}"
+                                              Tag="{x:Static settings:LyricsTextAlignment.Left}" />
+                                <ComboBoxItem Content="{DynamicResource Loc.Common.AlignCenter}"
+                                              Tag="{x:Static settings:LyricsTextAlignment.Center}" />
+                                <ComboBoxItem Content="{DynamicResource Loc.Common.AlignRight}"
+                                              Tag="{x:Static settings:LyricsTextAlignment.Right}" />
                             </ComboBox>
                         </components:SettingsRow>
                     </StackPanel>
                 </components:SettingsGroup>
 
-                <components:SettingsGroup Header="{DynamicResource Loc.Common.Group.LyricsSources}" Icon="{ui:SymbolIcon CloudArrowDown24}">
+                <components:SettingsGroup Header="{DynamicResource Loc.Common.Group.LyricsSources}"
+                                          Icon="{ui:SymbolIcon CloudArrowDown24}">
                     <StackPanel>
-                        <components:SettingsCallout
-                            Margin="0,0,0,12"
-                            IsAccent="True"
-                            Symbol="CloudArrowDown24"
-                            Text="{DynamicResource Loc.Lyrics.Sources.Callout}" />
-
                         <!-- 固定 QQ 优先/并发最高分策略由代码拥有；不再暴露严格度、调度或播放器绑定。 -->
                         <ui:CardExpander
                             Style="{StaticResource AfSettingsExpanderStyle}"
                             Icon="{ui:SymbolIcon CloudArrowDown24}">
                             <ui:CardExpander.Header>
                                 <StackPanel>
-                                    <TextBlock Style="{StaticResource AfSettingsRowTitleStyle}" Text="{DynamicResource Loc.Lyrics.Sources.Expander.Title}" />
-                                    <TextBlock Style="{StaticResource AfSettingsRowDescriptionStyle}" Text="{DynamicResource Loc.Lyrics.Sources.Expander.Description}" />
+                                    <TextBlock Style="{StaticResource AfSettingsRowTitleStyle}"
+                                               Text="{DynamicResource Loc.Lyrics.Sources.Expander.Title}" />
+                                    <TextBlock Style="{StaticResource AfSettingsRowDescriptionStyle}"
+                                               Text="{DynamicResource Loc.Lyrics.Sources.Expander.Description}" />
                                 </StackPanel>
                             </ui:CardExpander.Header>
                             <StackPanel>
@@ -406,13 +411,15 @@
 
                                 <!-- 全部来源关闭时说明后果：这时不会有任何歌词请求，媒体栏只显示标题与歌手。 -->
                                 <!-- With every source off the callout states the consequence: no lyric request is made at all and the bar shows title and artist only. -->
-                                <components:SettingsCallout Text="{DynamicResource Loc.Lyrics.Sources.AllDisabled.Callout}">
+                                <components:SettingsCallout
+                                    Text="{DynamicResource Loc.Lyrics.Sources.AllDisabled.Callout}">
                                     <components:SettingsCallout.Style>
                                         <Style TargetType="{x:Type components:SettingsCallout}">
                                             <Setter Property="Margin" Value="0,8,0,0" />
                                             <Setter Property="Visibility" Value="Collapsed" />
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding ViewModel.IsEverySourceDisabled}" Value="True">
+                                                <DataTrigger Binding="{Binding ViewModel.IsEverySourceDisabled}"
+                                                             Value="True">
                                                     <Setter Property="Visibility" Value="Visible" />
                                                 </DataTrigger>
                                             </Style.Triggers>
