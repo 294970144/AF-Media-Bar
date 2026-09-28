@@ -181,6 +181,7 @@ public partial class TaskbarWindow : Window
         MediaControl.OpenTaskManagerRequested += MediaControl_OpenTaskManagerRequested;
         MediaControl.WheelRequested += MediaControl_WheelRequested;
         MediaControl.DesiredSizeChanged += MediaControl_DesiredSizeChanged;
+        MediaControl.RestTransitionFinished += MediaControl_RestTransitionFinished;
         MediaControl.OutputDeviceInfoRequested += MediaControl_OutputDeviceInfoRequested;
         MediaControl.VolumeInfoRequested += MediaControl_VolumeInfoRequested;
 
@@ -1855,6 +1856,12 @@ public partial class TaskbarWindow : Window
         ApplyDesiredSizeRequest(request, orientation);
     }
 
+    private void MediaControl_RestTransitionFinished(object? sender, EventArgs e)
+    {
+        if (!_isClosing)
+            ApplyMediaBarVisibility();
+    }
+
     private void ApplyDesiredSizeRequest(MediaBarSizeRequest request, LayoutOrientation orientation)
     {
         var maximum = GetAvailablePrimaryLengthDip(orientation);
@@ -2182,6 +2189,7 @@ public partial class TaskbarWindow : Window
         MediaControl.OpenTaskManagerRequested -= MediaControl_OpenTaskManagerRequested;
         MediaControl.WheelRequested -= MediaControl_WheelRequested;
         MediaControl.DesiredSizeChanged -= MediaControl_DesiredSizeChanged;
+        MediaControl.RestTransitionFinished -= MediaControl_RestTransitionFinished;
         MediaControl.OutputDeviceInfoRequested -= MediaControl_OutputDeviceInfoRequested;
         MediaControl.VolumeInfoRequested -= MediaControl_VolumeInfoRequested;
         _compactFlyout.Dispose();

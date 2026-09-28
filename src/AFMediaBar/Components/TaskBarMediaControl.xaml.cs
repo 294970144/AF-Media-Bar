@@ -143,6 +143,7 @@ namespace AFMediaBar.Components
                 _marqueeTimer.Stop();
                 StopWebLyrics();
                 StopMarqueeAnimations();
+                StopRestTransitions();
             };
 
             // 计时器必须先于布局初始化；布局会立即应用已持久化的悬停层开关。
@@ -253,7 +254,8 @@ namespace AFMediaBar.Components
         public bool ShouldHideTaskbarWindow =>
             SettingsManager.Current.TaskbarBarEnabled &&
             !_isConnected &&
-            _isRestLayerEmpty;
+            _isRestLayerEmpty &&
+            !_restTransitionDefersHide;
 
         /// <summary>
         /// 最近一次应用设置时频谱是否可见。宿主的频谱采样按它决定是否继续采集：静置层显隐的唯一判据在
@@ -1626,6 +1628,7 @@ namespace AFMediaBar.Components
                 Dispatcher.Invoke(() =>
                 {
                     var wasConnected = _isConnected;
+                    var restBefore = wasConnected ? CaptureRestVisuals(targetConnected: false) : null;
                     if (wasConnected)
                         _quickLaunchTooltip.Content = null;
                     _actualTitle = string.Empty;
@@ -1659,7 +1662,12 @@ namespace AFMediaBar.Components
                     UpdateTaskbarProgress();
                     ApplyTaskbarExperienceSettings();
                     if (wasConnected)
-                        AnimateArtworkConnectionTransition();
+                    {
+                        if (restBefore is not null)
+                            AnimateRestConnectionChange(restBefore);
+                        else
+                            AnimateArtworkConnectionTransition();
+                    }
 
                     // 任务栏无媒体时保持完全透明。
                     // Keep the disconnected taskbar transparent; preserve the dynamic-island layout background.
@@ -1684,6 +1692,7 @@ namespace AFMediaBar.Components
 
             Dispatcher.Invoke(() =>
             {
+                var restBefore = !wasConnected ? CaptureRestVisuals(targetConnected: true) : null;
                 string newTitle = !string.IsNullOrEmpty(snapshot.Title) ? snapshot.Title : "-";
                 string newArtist = !string.IsNullOrWhiteSpace(snapshot.Artist)
                     ? snapshot.Artist
@@ -1769,11 +1778,14 @@ namespace AFMediaBar.Components
                 TaskbarPlayPauseIcon.Symbol = _isPaused ? SymbolRegular.Play24 : SymbolRegular.Pause24;
                 UpdateTaskbarProgress();
                 ApplyTaskbarExperienceSettings();
-                // 入场放在布局显隐之后：无媒体时文字被折叠，提前启动会把动画消耗在不可见阶段。
-                // Start the entrance after layout restores visibility; while disconnected the text is collapsed.
                 if (!wasConnected)
-                    AnimateArtworkConnectionTransition();
-                if (textChanged)
+                {
+                    if (restBefore is not null)
+                        AnimateRestConnectionChange(restBefore);
+                    else
+                        AnimateArtworkConnectionTransition();
+                }
+                if (textChanged && wasConnected)
                     AnimateEntrance();
 
                 Visibility = Visibility.Visible;
