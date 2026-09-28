@@ -33,6 +33,7 @@ Reliability fixes: media-session self-healing, spectrum level calibration, and l
 
 ### Improved
 
+- Taskbar UIA probes reuse one persistent MTA worker to reduce thread creation and teardown overhead. Probes run serially with a bounded queue that coalesces requests per taskbar. A rare stuck UIA call delays subsequent probes until it returns; the existing timeout fallback remains in effect, and shutdown does not wait for the call.
 - Spectrum resolution and look: the FFT size now follows the sample rate (96 kHz goes from 512 to 4096 points), band values integrate power with fractional-bin linear interpolation (low bands no longer share one bin with their neighbour, so the leading columns stop sharing one height), and a +3 dB/octave tilt in the power domain compensates the natural roll-off for a more balanced look.
 
 ## [1.2.1] - 2026-09-21
