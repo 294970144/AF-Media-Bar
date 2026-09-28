@@ -814,6 +814,13 @@ namespace AFMediaBar.Components
             double lengthScalePercent,
             double thicknessScalePercent)
         {
+            var previousLayout = _layoutEngine?.CurrentLayout;
+            var previousPrimary = previousLayout is null
+                ? 0
+                : previousLayout.Orientation == LayoutOrientation.Horizontal
+                    ? previousLayout.Canvas.Width
+                    : previousLayout.Canvas.Height;
+            var preservePrimary = previousLayout?.Orientation == orientation && previousPrimary > 0;
             _currentMode = mode;
 
             // 从预设中获取布局
@@ -837,9 +844,11 @@ namespace AFMediaBar.Components
             // 更新内部状态标志以保持兼容
             // Update internal state flags to maintain compatibility
             _isVertical = orientation == LayoutOrientation.Vertical;
-            ApplyTaskbarExperienceSettings();
-            ApplyTaskbarSectionGeometry(MainBorder.Width);
-            RaiseDesiredSizeChanged();
+            ApplyTaskbarExperienceSettings(publishSize: false);
+            // The host computes the new target after this call. Keep the displayed length until then,
+            // so a layout-setting change cannot overwrite the animation's starting geometry.
+            if (preservePrimary)
+                ApplyPrimaryLength(previousPrimary);
         }
 
         /// <summary>
@@ -850,22 +859,9 @@ namespace AFMediaBar.Components
 
         /// <summary>
         /// 应用自动计算的主轴长度。
-        ///
-        /// 布局引擎在这里也会写一遍封面与文字区的 `Visibility`（`LayoutRenderEngine.ApplyArtworkLayout` / `ApplySongInfoLayout`
-        /// 按预设的 `IsVisible` 写，而预设里它恒为 true——预设不知道用户在"没有媒体时显示"里怎么选），并且宿主每次尺寸动画的
-        /// 每一帧、位置计时器的每次重放都会走到这里。因此显隐 MUST 由紧随其后的 `ApplyTaskbarSectionGeometry` 重新断言：
-        /// 漏掉它时，用户关掉小音符之后它会被下一帧尺寸动画显示回来，而断开时的快照是一个常量
-        /// （`MediaSnapshot.Disconnected`）不会重新发布，那次撤销要等到下一次设置变化才被纠正——表现正是"关掉小音符、
-        /// 保持其它组件时音符还在"。
         /// Applies an auto-calculated primary length.
-        ///
-        /// The layout engine writes the artwork's and the text region's `Visibility` here as well (`LayoutRenderEngine.ApplyArtworkLayout` /
-        /// `ApplySongInfoLayout` write the preset's `IsVisible`, which is always true — the preset knows nothing about the user's "shown without
-        /// media" choices), and the host reaches this method on every frame of a size animation and on every replay by the position timer. The
-        /// visibility therefore MUST be asserted again by the `ApplyTaskbarSectionGeometry` that follows: without it, turning the note off is
-        /// undone by the next size-animation frame, and since the disconnected snapshot is a constant (`MediaSnapshot.Disconnected`) that is never
-        /// republished, the undo survives until the next settings change — which is exactly "the note stays after turning it off while other
-        /// components are kept".
+        /// 横向任务栏的组件位置和显隐由紧随其后的节几何统一写入。
+        /// On a horizontal taskbar, the following section geometry owns component positions and visibility.
         /// </summary>
         public void ApplyPrimaryLength(double primaryLength)
         {
@@ -888,7 +884,7 @@ namespace AFMediaBar.Components
         /// 应用横向任务栏的层级和交互设置，不改变原有封面、文字或布局引擎。
         /// Applies horizontal-taskbar layer and interaction settings without replacing the original artwork, text, or layout engine.
         /// </summary>
-        public void ApplyTaskbarExperienceSettings()
+        public void ApplyTaskbarExperienceSettings(bool publishSize = true)
         {
             var isHorizontalTaskbar = _currentMode == WindowMode.Taskbar && !_isVertical;
             var experience = SettingsManager.Current.TaskbarExperience.Normalize();
@@ -1007,7 +1003,8 @@ namespace AFMediaBar.Components
                 AnimateComponentHover(TaskbarSpectrumHoverSurface, false);
             }
 
-            RaiseDesiredSizeChanged();
+            if (publishSize)
+                RaiseDesiredSizeChanged();
 
             // 跑马灯 MUST 放在本方法所有文字写入之后重跑：上面按内容布局写的标题会把正在滚动的窗口顶掉，而
             // ApplyTaskbarSectionGeometry（以及它内部的跑马灯配置）发生在那之前，于是屏幕上会先留下原文开头，
@@ -1048,13 +1045,8 @@ namespace AFMediaBar.Components
             var experience = SettingsManager.Current.TaskbarExperience.Normalize();
             var layout = ResolveRestLayout(experience, primaryLength);
             _isRestLayerEmpty = layout.IsEmpty;
-            // 显隐必须在这里落地，而不是只在 ApplyTaskbarExperienceSettings 里：布局引擎会在每次 ApplyPrimaryLength
-            // （尺寸动画的每一帧、位置计时器的每次重放）把封面的 Visibility 按预设写回 Visible，而几何是那些路径上唯一
-            // 紧随其后的调用。布局本身已经表达了"谁可见"（不可见的组件不在 placements 里），因此这里不再判一次显隐。
-            // Visibility has to land here rather than only inside ApplyTaskbarExperienceSettings: the layout engine writes the artwork's
-            // Visibility back to Visible (from the preset) on every ApplyPrimaryLength — each frame of a size animation and each replay by the
-            // position timer — and the geometry is the only call that follows it on those paths. The layout already expresses who is visible
-            // (an invisible component is absent from the placements), so the decision is not made a second time here.
+            // 布局本身表达了谁可见；这里统一落地显隐，避免设置与尺寸路径的判据漂移。
+            // The layout owns visibility; asserting it here keeps settings and size paths in sync.
             ApplyRestComponentVisibility(layout);
 
             var textLeft = layout.TextLeft;
@@ -1120,9 +1112,8 @@ namespace AFMediaBar.Components
             TaskbarDirectFullPanelHandle.Margin = new Thickness(textLeft, 1, 0, 0);
             if (HoverRevealHost.Visibility == Visibility.Visible)
             {
-                HoverRevealClip.BeginAnimation(RectangleGeometry.RectProperty, null);
-                HoverRevealHost.Width = textWidth;
-                HoverRevealClip.Rect = new Rect(0, 0, textWidth, HoverRevealHost.Height);
+                if (Math.Abs(HoverRevealHost.Width - textWidth) > 0.01)
+                    RetargetHoverRevealWidth(textWidth);
             }
 
             ApplyMarqueeLayout(textWidth);
@@ -1134,22 +1125,22 @@ namespace AFMediaBar.Components
         /// 判据就是布局本身：某个组件不在 <paramref name="layout"/> 的 placements 里，说明这次它不可见（判据只有
         /// <see cref="TaskbarRestLayoutPolicy.IsVisible"/> 一处，这里 MUST NOT 再判一次，否则两处会漂）。
         ///
-        /// 单独一个方法是因为布局引擎也会写这些元素的 `Visibility`（`LayoutRenderEngine.ApplyArtworkLayout` 按预设的
-        /// `IsVisible` 写，而预设里它恒为 true），因此每次几何计算都必须重新断言一次，否则一次尺寸动画就会把用户的选择撤销。
         /// Writes the visibility of the rest-layer components and the artwork into the visual tree from the layout just computed.
         ///
         /// The layout is the decision: a component absent from <paramref name="layout"/>'s placements is not visible this time (the only rule is
         /// <see cref="TaskbarRestLayoutPolicy.IsVisible"/>, and it MUST NOT be judged a second time here or the two would drift).
         ///
-        /// It is a method of its own because the layout engine writes these elements' `Visibility` as well (`LayoutRenderEngine.ApplyArtworkLayout`
-        /// writes the preset's `IsVisible`, which is always true), so every geometry pass has to assert it again, otherwise one size animation
-        /// undoes the user's choice.
         /// </summary>
         /// <param name="layout">这次算出的静置层布局。/ The rest-layer layout computed this time.</param>
         private void ApplyRestComponentVisibility(TaskbarRestLayout layout)
         {
             bool Visible(TaskbarRestComponent component) => layout.Find(component) is not null;
 
+            var wasSpectrumVisible = TaskbarSpectrumHoverSurface.Visibility == Visibility.Visible;
+            var wasPerformanceVisible = TaskbarPerformanceHoverSurface.Visibility == Visibility.Visible;
+            var wasOutputDeviceVisible = TaskbarOutputDeviceHoverSurface.Visibility == Visibility.Visible;
+            var wasVolumeVisible = TaskbarVolumeHoverSurface.Visibility == Visibility.Visible;
+            var wasArtworkVisible = SongImageBorder.Visibility == Visibility.Visible;
             var spectrumVisible = Visible(TaskbarRestComponent.Spectrum);
             IsSpectrumComponentVisible = spectrumVisible;
             // 性能组件与频谱同样由"外层悬停表面 + 内层外观"组成：显隐、命中测试与 hover 都落在外层，
@@ -1174,13 +1165,13 @@ namespace AFMediaBar.Components
             // Only the outer hover surfaces get the hover wind-down: the inner looks (the performance chip and the two round buttons)
             // carry a background of their own, and running the hover animation on them fades that background to transparent, leaving a
             // blank spot the next time they are shown.
-            if (!spectrumVisible)
+            if (wasSpectrumVisible && !spectrumVisible)
                 AnimateComponentHover(TaskbarSpectrumHoverSurface, false);
-            if (!performanceVisible)
+            if (wasPerformanceVisible && !performanceVisible)
                 AnimateComponentHover(TaskbarPerformanceHoverSurface, false);
-            if (!outputDeviceVisible)
+            if (wasOutputDeviceVisible && !outputDeviceVisible)
                 AnimateComponentHover(TaskbarOutputDeviceHoverSurface, false);
-            if (!volumeVisible)
+            if (wasVolumeVisible && !volumeVisible)
                 AnimateComponentHover(TaskbarVolumeHoverSurface, false);
 
             // 封面与媒体文字按布局里的那一项决定；"没有媒体时显示"列表里没有勾音符时，封面框整块收起（不留空白框）。
@@ -1189,7 +1180,7 @@ namespace AFMediaBar.Components
             var artworkVisible = Visible(TaskbarRestComponent.Artwork);
             SetRestComponentVisible(SongImageBorder, artworkVisible);
             SetRestComponentVisible(SongInfoStackPanel, Visible(TaskbarRestComponent.MediaText));
-            if (!artworkVisible)
+            if (wasArtworkVisible && !artworkVisible)
                 AnimateComponentHover(SongImageHoverOverlay, false);
         }
 

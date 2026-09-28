@@ -68,6 +68,9 @@ namespace AFMediaBar.Views.Windows
         private int _taskbarCreatedMessage;
         private bool _isSystemThemeWatcherActive;
         private bool _isClosing;
+        private bool _layoutSettingsUpdateScheduled;
+        private bool _experienceSettingsUpdateScheduled;
+        private LayoutSettingsChangedEventArgs? _latestLayoutSettings;
         private ApplicationBackdropMode? _watchedBackdropMode;
         private CancellationTokenSource? _taskbarRecoveryCancellation;
 
@@ -521,17 +524,30 @@ namespace AFMediaBar.Views.Windows
         /// </summary>
         private void SettingsManager_OnLayoutSettingsChanged(object? sender, LayoutSettingsChangedEventArgs e)
         {
-            // 在 UI 线程上执行布局更新
-            // Execute layout update on UI thread
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(() => SettingsManager_OnLayoutSettingsChanged(sender, e));
+                return;
+            }
+
+            _latestLayoutSettings = e;
+            if (_layoutSettingsUpdateScheduled)
+                return;
+            _layoutSettingsUpdateScheduled = true;
             Dispatcher.BeginInvoke(() =>
             {
+                _layoutSettingsUpdateScheduled = false;
                 if (_isClosing)
                     return;
 
+                var latest = _latestLayoutSettings;
+                _latestLayoutSettings = null;
+                if (latest is null)
+                    return;
                 ActivateTaskbarMode();
                 foreach (var taskbarWindow in _taskbarWindows)
-                    taskbarWindow.ApplyLayoutSettings(WindowMode.Taskbar, e.OrientationMode);
-            });
+                    taskbarWindow.ApplyLayoutSettings(WindowMode.Taskbar, latest.OrientationMode);
+            }, DispatcherPriority.Render);
         }
 
         private void SettingsManager_OnAppearanceSettingsChanged(object? sender, AppearanceSettingsChangedEventArgs e)
@@ -744,12 +760,23 @@ namespace AFMediaBar.Views.Windows
 
         private void SettingsManager_OnTaskbarExperienceSettingsChanged(object? sender, EventArgs e)
         {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(() => SettingsManager_OnTaskbarExperienceSettingsChanged(sender, e));
+                return;
+            }
+
+            if (_experienceSettingsUpdateScheduled)
+                return;
+            _experienceSettingsUpdateScheduled = true;
             Dispatcher.BeginInvoke(() =>
             {
-                if (_isClosing) return;
+                _experienceSettingsUpdateScheduled = false;
+                if (_isClosing)
+                    return;
                 foreach (var taskbarWindow in _taskbarWindows)
                     taskbarWindow.ApplyExperienceSettings();
-            });
+            }, DispatcherPriority.Render);
         }
 
         private void CreateTaskbarWindows()

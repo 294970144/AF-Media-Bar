@@ -100,8 +100,13 @@ public partial class TaskbarWindow : Window
     private double _sizeAnimationStart;
     private double _sizeAnimationTarget;
     private double _sizeAnimationProgress;
+    private long _sizeAnimationLastTimestamp;
+    private bool _applySettingsSizeImmediately;
     private MediaBarSizeRequest? _pendingSizeRequest;
     private MediaBarSizeRequest? _lastDesiredSizeRequest;
+    private IntPtr _inputRegionWindowHandle;
+    private RECT _lastInputRegion;
+    private bool _hasInputRegion;
     private readonly AudioMonitorService _audioMonitorService;
     private readonly NativeMouseInputMonitor _mouseInputMonitor;
     private readonly AdaptiveForegroundSamplingSession _foregroundSamplingSession;
@@ -734,7 +739,14 @@ public partial class TaskbarWindow : Window
 
             // Place the bar on the canvas and clip the window to it
             RECT barRect = PositionBar(taskbarRect, dpiScale);
-            _taskBarService.ApplyInputRegion(taskbarWindowHandle, [barRect]);
+            if (!_hasInputRegion || _inputRegionWindowHandle != taskbarWindowHandle ||
+                !SameRect(_lastInputRegion, barRect))
+            {
+                _taskBarService.ApplyInputRegion(taskbarWindowHandle, [barRect]);
+                _inputRegionWindowHandle = taskbarWindowHandle;
+                _lastInputRegion = barRect;
+                _hasInputRegion = true;
+            }
             // 首次占用区探测完成前宿主保持隐藏；发布事件会立即重跑定位并在安全几何落地后显示。
             // Keep the host hidden until its first occupancy probe completes; publication immediately repositions and reveals it after safe geometry lands.
             ApplyMediaBarVisibility();
@@ -832,6 +844,10 @@ public partial class TaskbarWindow : Window
             Bottom = (isVertical ? primaryPos : crossPos) + physicalHeight
         };
     }
+
+    private static bool SameRect(RECT left, RECT right) =>
+        left.Left == right.Left && left.Top == right.Top &&
+        left.Right == right.Right && left.Bottom == right.Bottom;
 
     #endregion
 
@@ -953,15 +969,23 @@ public partial class TaskbarWindow : Window
                             mediaFontSizePercent != _appliedMediaFontSizePercent;
         if (layoutChanged)
         {
-            MediaControl.ApplyLayout(windowMode, orientation, lengthScalePercent, thicknessScalePercent);
-            MediaControl.ApplyAppearanceSettings();
-            MediaControl.ApplyTaskbarExperienceSettings();
-            _appliedWindowMode = windowMode;
-            _appliedOrientation = orientation;
-            _appliedLengthScalePercent = lengthScalePercent;
-            _appliedThicknessScalePercent = thicknessScalePercent;
-            _appliedMediaFontSizePercent = mediaFontSizePercent;
-            MediaControl.RefreshDesiredSize();
+            var previousImmediate = _applySettingsSizeImmediately;
+            _applySettingsSizeImmediately = true;
+            try
+            {
+                MediaControl.ApplyLayout(windowMode, orientation, lengthScalePercent, thicknessScalePercent);
+                MediaControl.ApplyAppearanceSettings();
+                _appliedWindowMode = windowMode;
+                _appliedOrientation = orientation;
+                _appliedLengthScalePercent = lengthScalePercent;
+                _appliedThicknessScalePercent = thicknessScalePercent;
+                _appliedMediaFontSizePercent = mediaFontSizePercent;
+                MediaControl.RefreshDesiredSize();
+            }
+            finally
+            {
+                _applySettingsSizeImmediately = previousImmediate;
+            }
             // 横/竖布局会改变静置层性能组件是否存在；没有新媒体快照时也必须同步租约。
             // Horizontal/vertical layout changes can add or remove the rest-layer performance component, even when no new media snapshot follows.
             SynchronizeMetricsSubscription(SettingsManager.Current.PerformanceComponent.Normalize());
@@ -972,8 +996,8 @@ public partial class TaskbarWindow : Window
             Dispatcher.BeginInvoke(UpdatePosition, DispatcherPriority.Loaded);
         }
 
-        // 窗口模式切换由 MainWindow 负责重新创建任务栏或灵动岛宿主。
-        // MainWindow recreates the taskbar or dynamic-island host when the window mode changes.
+        // 此宿主只呈现任务栏模式；旧模式值由设置归一化处理。
+        // This host renders the taskbar only; settings normalization handles legacy mode values.
     }
 
     private double ResolveTaskbarThicknessScalePercent(
@@ -1072,18 +1096,27 @@ public partial class TaskbarWindow : Window
 
     public void ApplyExperienceSettings()
     {
-        // 静置层设置里包含媒体文字字号，必须重新应用布局才能把新字号写进文本块；
-        // 布局状态未变化时 ApplyLayoutSettings 不会做任何工作。
-        // Rest-layer settings include the media font size, so the layout has to be re-applied before the text update;
-        // ApplyLayoutSettings does nothing when the layout state is unchanged.
-        ApplyLayoutSettings(SettingsManager.Current.WindowMode, SettingsManager.Current.LayoutOrientationMode);
-        ApplyExtraFeaturesSettings();
-        MediaControl.UpdateSongInfo(_lastSnapshot);
-        // 改设置就可能改变静置层还剩几个组件，因此"完全隐藏"的结论必须跟着重算一次：
-        // 只在快照变化时同步会让"把无媒体保留组件全部取消"这一步要等下一首歌才生效。
-        // A settings change can change how many components the rest layer keeps, so the "hide completely" verdict has to be recomputed
-        // here: synchronizing it on snapshot changes alone would delay "keep nothing while idle" until the next track.
-        ApplyMediaBarVisibility();
+        var previousImmediate = _applySettingsSizeImmediately;
+        _applySettingsSizeImmediately = true;
+        try
+        {
+            // 静置层设置里包含媒体文字字号，必须重新应用布局才能把新字号写进文本块；
+            // 布局状态未变化时 ApplyLayoutSettings 不会做任何工作。
+            // Rest-layer settings include the media font size, so the layout has to be re-applied before the text update;
+            // ApplyLayoutSettings does nothing when the layout state is unchanged.
+            ApplyLayoutSettings(SettingsManager.Current.WindowMode, SettingsManager.Current.LayoutOrientationMode);
+            ApplyExtraFeaturesSettings();
+            MediaControl.UpdateSongInfo(_lastSnapshot);
+            // 改设置就可能改变静置层还剩几个组件，因此"完全隐藏"的结论必须跟着重算一次：
+            // 只在快照变化时同步会让"把无媒体保留组件全部取消"这一步要等下一首歌才生效。
+            // A settings change can change how many components the rest layer keeps, so the "hide completely" verdict has to be recomputed
+            // here: synchronizing it on snapshot changes alone would delay "keep nothing while idle" until the next track.
+            ApplyMediaBarVisibility();
+        }
+        finally
+        {
+            _applySettingsSizeImmediately = previousImmediate;
+        }
         Dispatcher.BeginInvoke(UpdatePosition, DispatcherPriority.Background);
     }
 
@@ -1845,8 +1878,9 @@ public partial class TaskbarWindow : Window
         // 歌词换行等离散内容切换必须立即落到目标长度：过渡动画期间新内容按旧长度渲染会被省略号截断。
         // Discrete content switches such as a lyric line change must land immediately: while the length animates the new content
         // renders at the previous length and gets clipped with an ellipsis.
-        if (request.SkipTransition || !motion.UseContinuousMotion || Math.Abs(target - current) < LayoutSizeCalculator.MinimumChangeDip)
+        if (_applySettingsSizeImmediately || request.SkipTransition || !motion.UseContinuousMotion || Math.Abs(target - current) < LayoutSizeCalculator.MinimumChangeDip)
         {
+            _sizeAnimationTimer.Stop();
             ApplyPrimaryLength(target);
             UpdatePosition();
             return;
@@ -1855,6 +1889,7 @@ public partial class TaskbarWindow : Window
         _sizeAnimationStart = current;
         _sizeAnimationTarget = target;
         _sizeAnimationProgress = 0;
+        _sizeAnimationLastTimestamp = Stopwatch.GetTimestamp();
         _sizeAnimationTimer.Start();
     }
 
@@ -2037,19 +2072,20 @@ public partial class TaskbarWindow : Window
             return;
         }
 
+        var now = Stopwatch.GetTimestamp();
+        var elapsedMilliseconds = Stopwatch.GetElapsedTime(_sizeAnimationLastTimestamp, now).TotalMilliseconds;
+        _sizeAnimationLastTimestamp = now;
         var frame = MediaBarSizeAnimationCalculator.Advance(
             _sizeAnimationStart,
             _sizeAnimationTarget,
             _sizeAnimationProgress,
-            elapsedMilliseconds: 16,
+            elapsedMilliseconds,
             durationMilliseconds: MotionPolicy.ResolveCurrent().PositionDuration.TotalMilliseconds);
         _sizeAnimationProgress = frame.Progress;
         ApplyPrimaryLength(frame.Value);
         UpdatePosition();
         if (frame.IsCompleted)
         {
-            ApplyPrimaryLength(_sizeAnimationTarget);
-            UpdatePosition();
             _sizeAnimationTimer.Stop();
         }
     }

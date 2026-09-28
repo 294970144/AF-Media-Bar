@@ -99,7 +99,8 @@ public partial class TaskBarMediaControl
             ? TaskbarExperiencePolicy.CalculateMarqueeOverflow(measured, available)
             : 0;
         var advancing = overflow > 1 && state.Base.Length > 0;
-        var key = $"{advancing}|{available:0.##}|{state.Base}";
+        // Width changes during a bar resize must not restart a running marquee from the first character.
+        var key = $"{advancing}|{state.Base}|{element.FontSize:0.##}|{element.FontWeight}|{element.FontFamily.Source}";
         if (!string.Equals(state.Key, key, StringComparison.Ordinal))
         {
             // 内容、宽度、方式或允许状态变化时从头开始，并重新走一遍起读停留。
@@ -984,6 +985,40 @@ public partial class TaskBarMediaControl
             EasingFunction = CreateEaseOut()
         };
         HoverRevealClip.BeginAnimation(RectangleGeometry.RectProperty, reveal, HandoffBehavior.SnapshotAndReplace);
+    }
+
+    // Keep the reveal fraction when the text area changes size during an open or close transition.
+    private void RetargetHoverRevealWidth(double targetWidth)
+    {
+        var oldWidth = Math.Max(0, HoverRevealHost.Width);
+        var fraction = oldWidth > 0
+            ? Math.Clamp(HoverRevealClip.Rect.Width / oldWidth, 0, 1)
+            : (_isTaskbarHoverVisible ? 1 : 0);
+        HoverRevealClip.BeginAnimation(RectangleGeometry.RectProperty, null);
+        HoverRevealHost.Width = targetWidth;
+        var currentWidth = targetWidth * fraction;
+        HoverRevealClip.Rect = new Rect(0, 0, currentWidth, HoverRevealHost.Height);
+        var destinationWidth = _isTaskbarHoverVisible ? targetWidth : 0;
+        if (!CurrentMotion.UseTransitions || Math.Abs(destinationWidth - currentWidth) < 0.5)
+        {
+            HoverRevealClip.Rect = new Rect(0, 0, destinationWidth, HoverRevealHost.Height);
+            if (!_isTaskbarHoverVisible)
+                FinishTaskbarHoverLayerHide();
+            return;
+        }
+
+        var duration = _isTaskbarHoverVisible ? CurrentMotion.PanelDuration : CurrentMotion.ExitDuration;
+        var remaining = _isTaskbarHoverVisible ? 1 - fraction : fraction;
+        var animation = new RectAnimation
+        {
+            From = HoverRevealClip.Rect,
+            To = new Rect(0, 0, destinationWidth, HoverRevealHost.Height),
+            Duration = TimeSpan.FromMilliseconds(Math.Max(1, duration.TotalMilliseconds * remaining)),
+            EasingFunction = _isTaskbarHoverVisible ? CreateEaseOut() : CreateEaseInOut()
+        };
+        if (!_isTaskbarHoverVisible)
+            animation.Completed += (_, _) => FinishTaskbarHoverLayerHide();
+        HoverRevealClip.BeginAnimation(RectangleGeometry.RectProperty, animation, HandoffBehavior.SnapshotAndReplace);
     }
 
     private void HideTaskbarHoverLayer(bool immediate = false)
