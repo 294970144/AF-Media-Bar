@@ -24,6 +24,7 @@ namespace AFMediaBar.ViewModels.Windows;
 public partial class AudioControlViewModel : ObservableObject, IDisposable
 {
     private const int VolumeStepPercent = 2;
+    private const bool TrayChordWheelEnabled = false;
     private static readonly TimeSpan DeviceApplyDelay =
         TimeSpan.FromMilliseconds(AudioApplyPolicy.OutputDevicePreviewDelayMilliseconds);
     private static readonly TimeSpan VolumeApplyDelay =
@@ -321,9 +322,14 @@ public partial class AudioControlViewModel : ObservableObject, IDisposable
     private void OnTrayWheelChanged(object? sender, TrayWheelEventArgs e)
     {
         var interaction = SettingsManager.Current.Interaction.Normalize();
-        if (interaction.Modifier == InteractionModifier.LeftMouseButton && e.IsLeftButtonDown)
+        var chordHeld = GlobalWheelGesturePolicy.IsChordHeld(
+            interaction, e.IsShiftDown, e.IsLeftButtonDown, e.IsRightButtonDown);
+        if (chordHeld && !TrayChordWheelEnabled)
+            return;
+
+        if (TrayChordWheelEnabled && interaction.Modifier == InteractionModifier.LeftMouseButton && e.IsLeftButtonDown)
             _suppressTrayLeftClickUntilUtc = DateTime.UtcNow.AddMilliseconds(450);
-        if (interaction.Modifier == InteractionModifier.RightMouseButton && e.IsRightButtonDown)
+        if (TrayChordWheelEnabled && interaction.Modifier == InteractionModifier.RightMouseButton && e.IsRightButtonDown)
             _suppressTrayContextMenuUntilUtc = DateTime.UtcNow.AddMilliseconds(450);
 
         switch (GlobalWheelGesturePolicy.ResolveTray(
@@ -480,7 +486,7 @@ public partial class AudioControlViewModel : ObservableObject, IDisposable
         // 判定来自全局鼠标钩子，且标记是一次性的，所以无论结果如何都要取走。
         // Releasing the button after a chord wheel (scrolling while a mouse button is held) synthesizes a click, and the user only
         // meant to scroll, so it has to be swallowed. The hook makes that call and the flag is one-shot, so it is taken either way.
-        var chordWheelClick = _mouseInputMonitor.ConsumeSuppressedClick();
+        var chordWheelClick = TrayChordWheelEnabled && _mouseInputMonitor.ConsumeSuppressedClick();
         if (chordWheelClick || DateTime.UtcNow < _suppressTrayLeftClickUntilUtc)
             return;
 
@@ -507,7 +513,7 @@ public partial class AudioControlViewModel : ObservableObject, IDisposable
     {
         // 右键菜单同样可能是组合滚轮松键的合成结果，因此与左键点击走同一个抑制判定。
         // The context menu can equally be synthesized by releasing after a chord wheel, so it shares the left click's rule.
-        var chordWheelClick = _mouseInputMonitor.ConsumeSuppressedClick();
+        var chordWheelClick = TrayChordWheelEnabled && _mouseInputMonitor.ConsumeSuppressedClick();
         if (!chordWheelClick && DateTime.UtcNow >= _suppressTrayContextMenuUntilUtc)
             TrayContextMenuRequested?.Invoke(GetTrayBounds());
     }
@@ -559,7 +565,7 @@ public partial class AudioControlViewModel : ObservableObject, IDisposable
             _appliedTrayWheelSlot = slot;
             _trayWheelResultShown = false;
             var behavior = slot == WheelGestureSlot.Chord
-                ? settings.TrayChordWheelAction
+                ? (TrayChordWheelEnabled ? settings.TrayChordWheelAction : TrayWheelBehavior.Disabled)
                 : settings.TrayPrimaryWheelAction;
             ApplicationVolumeSnapshot? application = null;
             AudioDeviceOption? device = null;

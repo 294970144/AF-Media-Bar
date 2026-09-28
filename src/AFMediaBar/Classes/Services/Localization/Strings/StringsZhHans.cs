@@ -405,7 +405,7 @@ internal static class StringsZhHans
         table.Add("Interaction.Row.WheelTooltip.Title", "显示滚轮提示");
         table.Add("Interaction.Row.WheelTooltip.Description", "悬停封面或歌词时显示当前滚轮操作；未绑定的操作不显示提示");
         table.Add("Interaction.Row.TextClick.Title", "点击标题或歌词");
-        table.Add("Interaction.Row.TrayChordWheel.Description", "先显示设备候选，停止滚动约 1.2 秒后应用");
+        table.Add("Interaction.Row.TrayChordWheel.Description", "暂时禁用");
         table.Add("Interaction.Row.TrayClick.Description", "右键始终打开菜单；此处设置左键单击行为");
         table.Add("Interaction.Row.TrayClick.Title", "点击托盘图标");
         table.Add("Interaction.Row.TrayPrimaryWheel.Description", "仅在指针位于托盘图标上时生效");
