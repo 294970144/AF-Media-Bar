@@ -1879,9 +1879,17 @@ public partial class TaskbarWindow : Window
         if (dpi <= 0)
             return 0;
 
-        // 这里问的是"这个方向最多能有多长"，因此不做"放得下"判断（0 表示按位置偏好取区间）。
-        // This asks how long the bar may become in this orientation, so no fitting test is applied (0 keeps the plain preference).
-        var range = GetPreferredSafeRange(rect, orientation, dpi, requiredPrimaryPixels: 0, out _);
+        // 设置页上限必须取当前媒体栏实际会落入的安全区间；用 0 会选到前方放不下媒体栏的窄缝，
+        // 而 PositionBar 会跳过那条缝，导致滑杆与实际可用宽度不一致。
+        // Match the safe range used by PositionBar. A zero requirement can select an earlier sliver
+        // that cannot fit the bar, giving the settings slider a different maximum from the placed bar.
+        var currentPrimary = MediaControl.CurrentLayout?.Canvas is { } canvas
+            ? orientation == LayoutOrientation.Horizontal ? canvas.Width : canvas.Height
+            : MediaControl.MinimumPrimaryLength;
+        var requiredPixels = double.IsFinite(currentPrimary) && currentPrimary > 0
+            ? (int)Math.Round(currentPrimary * dpi)
+            : (int)Math.Round(MediaControl.MinimumPrimaryLength * dpi);
+        var range = GetPreferredSafeRange(rect, orientation, dpi, requiredPixels, out _);
         return Math.Max(1, range.Length / dpi);
     }
 
