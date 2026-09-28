@@ -343,6 +343,35 @@ public sealed class TaskbarOccupiedAreaServiceTests
             out _));
     }
 
+    [TestMethod]
+    public void StableExpansionEventuallyRaisesTheAvailableWidthAfterIconsClose()
+    {
+        var tracker = new TaskbarSafeRangeExpansionTracker();
+        var previous = new TaskbarPrimaryRange(360, 1320);
+        var expanded = new TaskbarPrimaryRange(200, 1700);
+        var start = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        Assert.IsFalse(tracker.TryAccept([expanded], previous, start, out _));
+        Assert.IsFalse(tracker.TryAccept([expanded], previous, start.AddSeconds(1), out _));
+        Assert.IsTrue(tracker.TryAccept([expanded], previous, start.AddSeconds(2), out var accepted));
+        Assert.AreEqual(expanded, accepted);
+    }
+
+    [TestMethod]
+    public void TransientExpansionMustRestartConfirmation()
+    {
+        var tracker = new TaskbarSafeRangeExpansionTracker();
+        var previous = new TaskbarPrimaryRange(360, 1320);
+        var expanded = new TaskbarPrimaryRange(200, 1700);
+        var start = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        Assert.IsFalse(tracker.TryAccept([expanded], previous, start, out _));
+        Assert.IsFalse(tracker.TryAccept([previous], previous, start.AddSeconds(1), out _));
+        Assert.IsFalse(tracker.TryAccept([expanded], previous, start.AddSeconds(2), out _));
+        Assert.IsFalse(tracker.TryAccept([expanded], previous, start.AddSeconds(3), out _));
+        Assert.IsTrue(tracker.TryAccept([expanded], previous, start.AddSeconds(4), out _));
+    }
+
     /// <summary>
     /// 拖动写回的偏移 MUST 与放置时的加法基准一致：否则媒体栏会与鼠标差出"空闲区间起点 − 边缘留白"，
     /// 自动避让打开、区间起点不在最左边时表现为"拖不动/位置和鼠标不对应"。

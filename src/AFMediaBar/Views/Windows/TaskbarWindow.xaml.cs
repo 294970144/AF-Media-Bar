@@ -88,6 +88,7 @@ public partial class TaskbarWindow : Window
     private DateTime _suppressContextMenuUntilUtc;
     private DateTime _skipOccupiedAreaProbeUntilUtc;
     private TaskbarSafeRangeSnapshot? _lastStableSafeRange;
+    private readonly TaskbarSafeRangeExpansionTracker _safeRangeExpansion = new();
     private bool _hasSafePlacement;
     private WindowMode? _appliedWindowMode;
     private LayoutOrientation? _appliedOrientation;
@@ -1947,6 +1948,7 @@ public partial class TaskbarWindow : Window
         if (!SettingsManager.Current.TaskbarBarAvoidIcons)
         {
             _lastStableSafeRange = null;
+            _safeRangeExpansion.Reset();
             isSafePlacement = true;
             return fallback;
         }
@@ -1963,6 +1965,7 @@ public partial class TaskbarWindow : Window
             IsTaskbarPresentationSuspended ||
             DateTime.UtcNow < _skipOccupiedAreaProbeUntilUtc)
         {
+            _safeRangeExpansion.Reset();
             if (TryReuseStableSafeRange(
                     primaryLength,
                     orientation,
@@ -1986,6 +1989,7 @@ public partial class TaskbarWindow : Window
             EdgePadding);
         if (ranges.Count == 0)
         {
+            _safeRangeExpansion.Reset();
             if (TryReuseStableSafeRange(
                     primaryLength,
                     orientation,
@@ -2001,10 +2005,8 @@ public partial class TaskbarWindow : Window
             return fallback;
         }
 
-        // UIA 偶尔会漏掉一组图标，表现为安全区间突然扩大。旧区间仍被新结果完整包含时保持原位；
-        // 真正有新图标侵入旧区间时包含关系会失效，下面会立即选择新位置。
-        // UIA can transiently omit an icon group, making a safe range suddenly expand. Keep the old placement while the new result still
-        // fully contains it; when icons genuinely invade that range containment fails and a new position is selected immediately below.
+        // UIA 偶尔会漏报图标：先保留旧区间，扩大结果连续稳定后再采用；真正有图标侵入则立即重新选区。
+        // UIA can briefly omit icons. Keep the previous range until an expanded result remains stable; shrink immediately on an intrusion.
         if (TryReuseStableSafeRange(
                 primaryLength,
                 orientation,
@@ -2018,10 +2020,19 @@ public partial class TaskbarWindow : Window
                 requiredPrimaryPixels,
                 out var keptRange))
         {
+            if (_safeRangeExpansion.TryAccept(ranges, previousRange, DateTime.UtcNow, out var expandedRange))
+            {
+                _lastStableSafeRange = new TaskbarSafeRangeSnapshot(
+                    _lastTaskbarHandle, primaryLength, orientation, dpiScale, position, expandedRange);
+                isSafePlacement = true;
+                return expandedRange;
+            }
+
             isSafePlacement = true;
             return keptRange;
         }
 
+        _safeRangeExpansion.Reset();
         // 选区间 MUST 用纯策略：空闲区间里可能有比媒体栏还窄的缝隙，"最左边那条"会把媒体栏压细并钉在缝里。
         // The range MUST be chosen by the pure policy: the free ranges can hold a gap narrower than the bar itself, and "the leftmost
         // one" would squash the bar into that sliver.
