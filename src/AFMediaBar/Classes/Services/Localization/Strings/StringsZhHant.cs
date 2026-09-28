@@ -453,39 +453,12 @@ internal static class StringsZhHant
         table.Add("Layout.WindowMode.Taskbar", "停靠工作列");
 
         // ---- Lyrics ----
-        table.Add("Lyrics.Adoption.FirstArrival", "先到先得");
-        table.Add("Lyrics.Adoption.PreferDefaultSource", "偏心預設來源");
-        table.Add("Lyrics.Adoption.PreferDefaultSourceWithDeadline", "偏心預設來源（限時）");
-        table.Add("Lyrics.DefaultBindings.Add", "添加播放器");
-        table.Add("Lyrics.DefaultBindings.Remark.Placeholder", "備註名");
-        table.Add("Lyrics.DefaultBindings.Add.Placeholder", "輸入 AppID（AUMID 或其片段）");
-        table.Add("Lyrics.DefaultBindings.Expander.Description", "識別正在播放的播放器，並指定它的預設取詞介面；未綁定的播放器沒有預設介面");
-        table.Add("Lyrics.DefaultBindings.Expander.Title", "預設取詞介面綁定");
-        table.Add("Lyrics.DefaultBindings.None", "不綁定（無預設介面）");
-        table.Add("Lyrics.DefaultBindings.Player.Kugou", "酷狗音樂");
-        table.Add("Lyrics.DefaultBindings.Player.Netease", "網易雲音樂");
-        table.Add("Lyrics.DefaultBindings.Player.QQMusic", "QQ 音樂");
-        table.Add("Lyrics.DefaultBindings.Player.SodaMusic", "汽水音樂");
-        table.Add("Lyrics.DefaultBindings.Remove", "移除此行");
-        table.Add("Lyrics.DefaultBindings.Scan", "掃描正在播放");
-        table.Add("Lyrics.QueryStrategy.Concurrent", "同時查詢");
-        table.Add("Lyrics.QueryStrategy.Sequential", "按序查詢");
         table.Add("Lyrics.Callout.Display", "有歌詞時，媒體列顯示歌詞；沒有歌詞時顯示標題與歌手。");
         table.Add("Lyrics.Header.Subtitle", "在工作列靜置層顯示目前歌詞");
-        table.Add("Lyrics.Row.QueryStrategy.Description", "按序逐個嘗試來源，或同時發出（預設介面與優先級批次同時查詢）；按序時只保留優先級順序");
-        table.Add("Lyrics.Row.QueryStrategy.Title", "查詢策略");
-        table.Add("Lyrics.Row.AdoptionMode.Description", "並發取詞時如何採納結果；「偏心預設來源」優先採用播放器對應的取詞介面");
-        table.Add("Lyrics.Row.AdoptionMode.Title", "結果採納策略");
-        table.Add("Lyrics.Row.BatchSize.Description", "每批同時取詞的來源個數；目前批次全部未命中才會請求下一批");
-        table.Add("Lyrics.Row.BatchSize.Title", "並發批次數");
-        table.Add("Lyrics.Row.Deadline.Description", "優先級來源先返回結果後，再給預設介面這麼長的時間；僅「偏心預設來源（限時）」時生效");
-        table.Add("Lyrics.Row.Deadline.Title", "預設介面倒數");
         table.Add("Lyrics.Row.Alignment.Description", "歌詞在靜置層的對齊方式；標題與歌手的對齊在顯示模式頁");
         table.Add("Lyrics.Row.Alignment.Title", "歌詞對齊");
         table.Add("Lyrics.Row.InfoLines.Description", "隱藏作者、作曲、製作等署名行");
         table.Add("Lyrics.Row.InfoLines.Title", "過濾署名行");
-        table.Add("Lyrics.Row.MatchStrictness.Description", "依曲名搜尋歌詞時要求的符合程度；越嚴格越不容易配到同名的現場版或翻唱");
-        table.Add("Lyrics.Row.MatchStrictness.Title", "搜尋符合嚴格度");
         table.Add("Lyrics.Row.SecondLine.Description", "第二行顯示目前句翻譯、目前句音譯或下一句歌詞；順序即優先順序，缺少的來源自動略過");
         table.Add("Lyrics.Row.SecondLine.Note", "順序即優先順序：排在上面的來源優先使用，沒有內容時往下取");
         table.Add("Lyrics.Row.SecondLine.OrderRow.Description", "上移即提高優先順序");
@@ -526,16 +499,12 @@ internal static class StringsZhHant
         table.Add("Lyrics.Sources.Callout", "先嘗試已啟用的 QQ 音樂（本機快取優先）；未命中後並行查詢其他已啟用來源，採用匹配分最高的歌詞。");
         table.Add("Lyrics.Sources.Expander.Description", "選擇允許取得歌詞的來源；查詢階段與評分由應用程式統一管理。");
         table.Add("Lyrics.Sources.Expander.Title", "歌詞來源");
-        table.Add("Lyrics.Sources.Expander.Title.Sequential", "優先級順序");
         table.Add("Lyrics.Sources.MoveDown", "下移");
         table.Add("Lyrics.Sources.MoveUp", "上移");
         table.Add("Lyrics.Sources.Reset.Action", "啟用全部來源");
         table.Add("Lyrics.Sources.Reset.Description", "重新啟用全部歌詞來源。");
         table.Add("Lyrics.Sources.Reset.Title", "恢復預設來源");
         table.Add("Lyrics.Sources.Row.Description", "允許從此來源取得歌詞。");
-        table.Add("Lyrics.Strictness.Balanced", "均衡");
-        table.Add("Lyrics.Strictness.Exact", "精確");
-        table.Add("Lyrics.Strictness.Strict", "嚴格");
 
         // ---- Media ----
         table.Add("Media.Badge.EnableFirst", "需先啟用");
@@ -667,7 +636,7 @@ internal static class StringsZhHant
         table.Add("Search.Interaction.TrayIcon.Description", "托盤圖示的點選與滾輪行為");
         table.Add("Search.Lyrics.Alignment.Description", "歌詞靠左、置中還是靠右");
         table.Add("Search.Lyrics.Display.Description", "顯示歌詞、顯示兩行、第二行顯示什麼、逐字擦亮與署名行過濾");
-        table.Add("Search.Lyrics.Sources.Description", "選擇歌詞來源、它們的優先順序與搜尋符合嚴格度");
+        table.Add("Search.Lyrics.Sources.Description", "選擇啟用的歌詞來源；取詞順序與評分由應用管理");
         table.Add("Search.MediaAndNotifications.MediaSource.Description", "來源允許清單與已偵測來源");
         table.Add("Search.MediaAndNotifications.QuickLaunch.Description", "沒有媒體時從音符啟動播放器");
         table.Add("Search.MediaAndNotifications.RestLayerComponents.Description", "疊加在靜置層右側的頻譜與效能元件");

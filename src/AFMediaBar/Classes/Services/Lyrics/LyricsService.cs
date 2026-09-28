@@ -28,7 +28,7 @@ public sealed class LyricsService
         _totalBudget = totalBudget > TimeSpan.Zero ? totalBudget : DefaultTotalBudget;
     }
 
-    /// <summary>按启用来源执行固定策略；旧调度设置不参与取词。/ Retrieves with the fixed policy and enabled sources.</summary>
+    /// <summary>按启用来源执行固定策略。/ Retrieves with the fixed policy and enabled sources.</summary>
     public async Task<LyricsResult?> GetLyricsAsync(LyricsRequest request, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

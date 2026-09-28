@@ -32,7 +32,6 @@ public static class LyricsCacheInvalidationPolicy
             return true;
         }
 
-        // 旧严格度/调度/默认绑定字段只兼容反序列化，不影响固定策略，不应造成重取。
         return propertyName is nameof(AppSettings.LyricsSource) or nameof(AppSettings.LyricsInfoLineFilterEnabled);
     }
 }

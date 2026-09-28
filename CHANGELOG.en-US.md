@@ -12,7 +12,7 @@ Reliability fixes: media-session self-healing, spectrum level calibration, and l
 
 ### Changed
 
-- Lyrics now try enabled QQ Music first, retaining its local cache, then query other enabled sources in parallel and choose the highest matching score. Independent scoring reduces preview-duration influence and supplies search variants for translated names. Strictness, dispatch, adoption, batch, player-binding, and source-order controls are removed; legacy fields remain compatible but no longer control retrieval.
+- Lyrics now try enabled QQ Music first, retaining its local cache, then query other enabled sources in parallel and choose the highest matching score. Independent scoring reduces preview-duration influence and supplies search variants for translated names. Strictness, dispatch, adoption, batch, player-binding, and source-order controls and their obsolete settings fields are removed; old files with the same schema remain readable, but saving drops those fields.
 
 - Replaced custom device enumeration, application-volume access, capture-endpoint discovery and loopback capture with NAudio.Wasapi 3.1.0, removing duplicated Core Audio COM declarations and manual PCM decoding. Spectrum capture runs on demand in a hosted worker and is released during host shutdown. Default-device switching retains a minimal PolicyConfig adapter; spatial audio continues to use Windows APIs.
 

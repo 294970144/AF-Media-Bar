@@ -313,12 +313,11 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable
                 artist,
                 album,
                 durationSeconds,
-                NetEaseSongId: null,
-                SourceAppId: sourceId);
+                NetEaseSongId: null);
             var result = await _lyricsService.GetLyricsAsync(request, CancellationToken.None);
 
-            // 取词过程中设置若被改过（来源、严格度、署名行过滤），这次结果已经不属于当前配置，写入只会让用户以为设置没生效。
-            // If the settings changed while this retrieval ran (sources, strictness, credit filtering), the result no longer belongs
+            // 取词过程中设置若被改过（来源、署名行过滤），这次结果已经不属于当前配置，写入只会让用户以为设置没生效。
+            // If the settings changed while this retrieval ran (sources, credit filtering), the result no longer belongs
             // to the current configuration and writing it would only make the setting look ineffective.
             if (generation == _lyricsCacheGeneration)
             {

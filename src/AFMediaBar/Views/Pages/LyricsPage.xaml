@@ -388,7 +388,7 @@
                                     IsNested="True"
                                     Title="{DynamicResource Loc.Lyrics.Sources.Reset.Title}">
                                     <ui:Button
-                                        Command="{Binding ViewModel.ResetSourceOrderCommand}"
+                                        Command="{Binding ViewModel.EnableAllSourcesCommand}"
                                         Content="{DynamicResource Loc.Lyrics.Sources.Reset.Action}"
                                         Icon="{ui:SymbolIcon ArrowReset24}"
                                         Style="{StaticResource AfSettingsButtonStyle}" />

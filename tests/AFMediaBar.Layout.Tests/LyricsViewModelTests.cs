@@ -74,7 +74,7 @@ public sealed class LyricsViewModelTests
         var viewModel = CreateViewModel();
         viewModel.SourceEntries[0].IsEnabled = false;
 
-        viewModel.ResetSourceOrderCommand.Execute(null);
+        viewModel.EnableAllSourcesCommand.Execute(null);
 
         CollectionAssert.AreEqual(
             LyricsSourceCatalog.DefaultOrder.ToArray(),

@@ -1,4 +1,4 @@
-// 固定取词阶段回归：QQ 命中不并发，失败后并发比较全部备用结果，旧调度配置不生效。
+// 固定取词阶段回归：QQ 命中不并发，失败后并发比较全部备用结果。
 using AFMediaBar.Classes.Abstractions;
 using AFMediaBar.Classes.Models;
 using AFMediaBar.Classes.Services.Lyrics;
@@ -12,7 +12,7 @@ public sealed class LyricsRetrievalTests
 {
     [TestInitialize] public void SetUp() => SettingsManager.ResetAll();
     [TestCleanup] public void TearDown() => SettingsManager.ResetAll();
-    private static LyricsRequest Request() => new("Song", "Artist", "Album", 30, "123", "cloudmusic.exe");
+    private static LyricsRequest Request() => new("Song", "Artist", "Album", 30, "123");
     private static LyricsResult Hit(string name, int score) => new(name,
         new LyricDocument([new LyricLine(0, 10, "lyrics")], LyricsSyncType.LineSynced, "Lrc")) { MatchScore = score };
 
@@ -72,20 +72,7 @@ public sealed class LyricsRetrievalTests
     }
 
     [TestMethod]
-    public async Task OldDispatchOptionsAndBindingsCannotChangeTheFixedPolicy()
-    {
-        SettingsManager.SetLyricsQueryStrategy(LyricsQueryStrategy.Sequential);
-        SettingsManager.SetLyricsAdoptionMode(LyricsAdoptionMode.FirstArrival);
-        SettingsManager.SetLyricsConcurrencyBatchSize(1);
-        SettingsManager.SetLyricsDefaultBindingSettings(new([new("cloudmusic", LyricsSourceCatalog.NetEase)]));
-        var qq = new Provider(LyricsSourceCatalog.QQMusic, _ => Task.FromResult<LyricsResult?>(Hit("QQ", 80)));
-        var other = new Provider(LyricsSourceCatalog.NetEase, _ => Task.FromResult<LyricsResult?>(Hit("exact", 100)));
-        Assert.AreEqual("QQ", (await new LyricsService(other, qq).GetLyricsAsync(Request(), CancellationToken.None))!.Source);
-        Assert.AreEqual(0, other.Calls);
-    }
-
-    [TestMethod]
-    public async Task DisabledQQIsSkippedAndDisablingAllSourcesSuppressesExactIdAndBoundSources()
+    public async Task DisabledQQIsSkippedAndDisablingAllSourcesSuppressesExactId()
     {
         var qq = new Provider(LyricsSourceCatalog.QQMusic, _ => Task.FromResult<LyricsResult?>(Hit("QQ", 100)));
         var other = new Provider(LyricsSourceCatalog.NetEase, _ => Task.FromResult<LyricsResult?>(Hit("exact", 90)));

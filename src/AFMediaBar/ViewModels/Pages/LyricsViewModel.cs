@@ -271,16 +271,14 @@ public partial class LyricsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 把列表状态写回设置：恰好是"全部来源按默认顺序"时写回"未配置"，让以后新增的来源自动生效。
-    /// Writes the list state back into the settings: an exact "every source in the default order" is stored as "never configured", so
+    /// 把列表状态写回设置：恰好是"全部来源启用"时写回"未配置"，让以后新增的来源自动生效。
+    /// Writes the list state back into the settings: "every source enabled" is stored as "never configured", so
     /// a source added later takes effect on its own.
     /// </summary>
     private void SaveSourceEntries()
     {
-        var ordered = SourceEntries.Where(entry => entry.IsEnabled).Select(entry => entry.SourceId).ToArray();
-        var isDefaultOrder = ordered.Length == LyricsSourceCatalog.DefaultOrder.Count &&
-                             ordered.SequenceEqual(LyricsSourceCatalog.DefaultOrder, StringComparer.Ordinal);
-        var settings = new LyricsSourceSettings(isDefaultOrder ? null : ordered);
+        var enabled = SourceEntries.Where(entry => entry.IsEnabled).Select(entry => entry.SourceId).ToArray();
+        var settings = new LyricsSourceSettings(SourceEntries.All(entry => entry.IsEnabled) ? null : enabled);
 
         _isSavingSources = true;
         try
@@ -296,11 +294,9 @@ public partial class LyricsViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void ResetSourceOrder()
+    private void EnableAllSources()
     {
-        // 逐项切换会各自触发一次写回，因此这里先挂起回调，排序完成后再整体写一次。
-        // Toggling each entry would publish one write per entry, so the callback is suspended here and the whole list is written once
-        // after the reordering.
+        // 暂停逐项写回；全部启用后仅发布一次设置变更。
         _isRefreshing = true;
         try
         {
@@ -309,16 +305,6 @@ public partial class LyricsViewModel : ObservableObject
                 entry.IsEnabled = true;
             }
 
-            var ordered = SourceEntries.OrderBy(
-                entry => LyricsSourceCatalog.DefaultOrder.ToList().IndexOf(entry.SourceId)).ToArray();
-            for (var i = 0; i < ordered.Length; i++)
-            {
-                var current = SourceEntries.IndexOf(ordered[i]);
-                if (current != i)
-                {
-                    SourceEntries.Move(current, i);
-                }
-            }
         }
         finally
         {
