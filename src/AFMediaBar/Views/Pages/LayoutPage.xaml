@@ -47,11 +47,6 @@
                              IsChecked="{Binding ViewModel.CurrentWindowMode, Converter={StaticResource GenericEnumToBooleanConverter}, ConverterParameter=Taskbar, Mode=OneWay}"
                              Command="{Binding ViewModel.SwitchToTaskbarModeCommand, Mode=OneWay}"
                              Margin="0,0,12,0" />
-                <RadioButton Content="{DynamicResource Loc.Common.DynamicIsland}"
-                             GroupName="HostMode"
-                             IsChecked="{Binding ViewModel.CurrentWindowMode, Converter={StaticResource GenericEnumToBooleanConverter}, ConverterParameter=DynamicIsland, Mode=OneWay}"
-                             Command="{Binding ViewModel.SwitchToDynamicIslandModeCommand, Mode=OneWay}"
-                             Margin="12,0,0,0" />
             </StackPanel>
         </ui:CardControl>
 
@@ -83,36 +78,6 @@
                              Command="{Binding ViewModel.SwitchToVerticalLayoutCommand, Mode=OneWay}" />
             </StackPanel>
         </ui:CardControl>
-
-        <StackPanel Visibility="{Binding ViewModel.IsDynamicIslandMode, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <TextBlock Text="{DynamicResource Loc.Common.Group.IslandAppearance}"
-                       FontSize="18"
-                       FontWeight="{DynamicResource AppTextStrongFontWeight}"
-                       Margin="0,0,0,12" />
-            <ui:CardControl Margin="0,0,0,24"
-                            Icon="{ui:SymbolIcon ColorBackground20}">
-                <ui:CardControl.Header>
-                    <StackPanel>
-                        <ui:TextBlock Text="{DynamicResource Loc.Layout.Row.IslandBackground.Title}"
-                                      FontWeight="{DynamicResource AppTextStrongFontWeight}" />
-                        <ui:TextBlock Text="{DynamicResource Loc.Layout.Row.IslandBackground.Description}"
-                                      Appearance="Secondary"
-                                      FontSize="12" />
-                    </StackPanel>
-                </ui:CardControl.Header>
-                <StackPanel Orientation="Horizontal">
-                    <RadioButton Content="{DynamicResource Loc.Layout.IslandBackground.SystemTheme}"
-                                 GroupName="DynamicIslandBackground"
-                                 IsChecked="{Binding ViewModel.CurrentDynamicIslandBackgroundMode, Converter={StaticResource GenericEnumToBooleanConverter}, ConverterParameter=SystemTheme, Mode=OneWay}"
-                                 Command="{Binding ViewModel.SwitchToSystemThemeBackgroundCommand}"
-                                 Margin="0,0,12,0" />
-                    <RadioButton Content="{DynamicResource Loc.Layout.IslandBackground.Transparent}"
-                                 GroupName="DynamicIslandBackground"
-                                 IsChecked="{Binding ViewModel.CurrentDynamicIslandBackgroundMode, Converter={StaticResource GenericEnumToBooleanConverter}, ConverterParameter=Transparent, Mode=OneWay}"
-                                 Command="{Binding ViewModel.SwitchToTransparentBackgroundCommand}" />
-                </StackPanel>
-            </ui:CardControl>
-        </StackPanel>
 
         <TextBlock Text="{DynamicResource Loc.Layout.Group.Size}"
                    FontSize="18"

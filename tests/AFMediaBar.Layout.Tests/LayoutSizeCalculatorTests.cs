@@ -60,7 +60,7 @@ public sealed class LayoutSizeCalculatorTests
     [TestMethod]
     public void ContentFingerprintAndForcedRefreshFlagArePreserved()
     {
-        var layout = LayoutPresets.GetLayout(WindowMode.DynamicIsland, LayoutOrientation.Horizontal);
+        var layout = LayoutPresets.GetLayout(WindowMode.Taskbar, LayoutOrientation.Horizontal);
 
         var request = LayoutSizeCalculator.Calculate(layout, 1, 1, 120, 1000, "lyric-1", true);
 
@@ -71,7 +71,7 @@ public sealed class LayoutSizeCalculatorTests
     [TestMethod]
     public void SkipTransitionDefaultsToFalseAndIsPreservedWhenRequested()
     {
-        var layout = LayoutPresets.GetLayout(WindowMode.DynamicIsland, LayoutOrientation.Horizontal);
+        var layout = LayoutPresets.GetLayout(WindowMode.Taskbar, LayoutOrientation.Horizontal);
 
         // 常规请求保持宿主过渡：只有离散内容切换（如歌词换行）才要求立即落位。
         // A regular request keeps the host transition: only a discrete content switch (such as a lyric line change) asks
@@ -350,53 +350,6 @@ public sealed class LayoutSizeCalculatorTests
         var colors = DominantColorCalculator.Calculate(pixels, 1, 1, 4);
 
         Assert.AreEqual(1, colors.Count);
-    }
-
-    [TestMethod]
-    public void DynamicIslandPositionCalculatorClampsExpandedPositionToWorkArea()
-    {
-        var position = DynamicIslandPositionCalculator.GetExpandedPosition(
-            new Rect(100, 50, 800, 500), 240, 80, savedLeft: 999, savedTop: -100);
-
-        Assert.AreEqual(660, position.X, 0.01);
-        Assert.AreEqual(50, position.Y, 0.01);
-    }
-
-    [TestMethod]
-    public void DynamicIslandPositionCalculatorKeepsCollapsedRevealOnEachEdge()
-    {
-        var workArea = new Rect(100, 50, 800, 500);
-
-        Assert.AreEqual(-135, DynamicIslandPositionCalculator.GetCollapsedPosition(workArea, 240, 80, DynamicIslandEdge.Left, 5, 300, 200).X, 0.01);
-        Assert.AreEqual(895, DynamicIslandPositionCalculator.GetCollapsedPosition(workArea, 240, 80, DynamicIslandEdge.Right, 5, 300, 200).X, 0.01);
-        Assert.AreEqual(-25, DynamicIslandPositionCalculator.GetCollapsedPosition(workArea, 240, 80, DynamicIslandEdge.Top, 5, 300, 200).Y, 0.01);
-        Assert.AreEqual(545, DynamicIslandPositionCalculator.GetCollapsedPosition(workArea, 240, 80, DynamicIslandEdge.Bottom, 5, 300, 200).Y, 0.01);
-    }
-
-    [TestMethod]
-    public void DynamicIslandPositionCalculatorDetectsNearestDockedEdge()
-    {
-        var workArea = new Rect(0, 0, 1000, 600);
-
-        Assert.AreEqual(DynamicIslandEdge.Right,
-            DynamicIslandPositionCalculator.FindDockedEdge(770, 200, 220, 80, workArea, 28));
-        Assert.IsNull(
-            DynamicIslandPositionCalculator.FindDockedEdge(400, 200, 220, 80, workArea, 28));
-    }
-
-    [TestMethod]
-    public void DynamicIslandPositionCalculatorRestoresNormalizedDpiCenterAndDocking()
-    {
-        var workArea = new Rect(100, 50, 800, 500);
-        var free = DynamicIslandPositionCalculator.GetDpiRestoredPosition(
-            workArea, 200, 80, new Point(0.75, 0.5), dockedEdge: null);
-        var docked = DynamicIslandPositionCalculator.GetDpiRestoredPosition(
-            workArea, 200, 80, new Point(0.75, 0.5), DynamicIslandEdge.Left);
-
-        Assert.AreEqual(600, free.X, 0.01);
-        Assert.AreEqual(260, free.Y, 0.01);
-        Assert.AreEqual(100, docked.X, 0.01);
-        Assert.AreEqual(260, docked.Y, 0.01);
     }
 
     [TestMethod]

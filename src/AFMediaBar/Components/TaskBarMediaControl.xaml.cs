@@ -243,12 +243,12 @@ namespace AFMediaBar.Components
         /// 媒体栏现在是否应当整个隐藏：当前没有媒体，且静置层的组件一个都不显示。
         ///
         /// 这里没有开关：没有媒体时媒体栏本来就没有内容可显示，要不要留、留哪几个由"没有媒体时保留的组件"那一份列表回答
-        /// （它的默认值是快速启动小音符）。宿主只在任务栏横向模式下读它；灵动岛与竖向任务栏不参与这条规则。
+        /// （它的默认值是快速启动小音符）。宿主只在任务栏横向模式下读它；竖向任务栏不参与这条规则。
         /// Whether the media bar should be hidden entirely: there is no media right now and the rest layer shows no component at all.
         ///
         /// There is no switch for this: without media the bar has nothing to show anyway, and whether anything stays — and which components —
         /// is answered by the "components kept without media" list (whose default is the quick-launch note). The host reads it in the horizontal
-        /// taskbar mode only; the dynamic island and a vertical taskbar are outside this rule.
+        /// horizontal taskbar mode only; a vertical taskbar is outside this rule.
         /// </summary>
         public bool ShouldHideTaskbarWindow =>
             SettingsManager.Current.TaskbarBarEnabled &&
@@ -789,7 +789,7 @@ namespace AFMediaBar.Components
         /// 应用布局：根据窗口模式和方向选择并应用对应的布局配置。
         /// Apply layout: select and apply corresponding layout config based on window mode and orientation.
         /// </summary>
-        /// <param name="mode">窗口模式（任务栏/灵动岛）/ Window mode (taskbar/dynamic island)</param>
+        /// <param name="mode">窗口模式；旧值按任务栏处理 / Window mode; legacy values use taskbar layout</param>
         /// <param name="orientation">布局方向（横向/竖向）/ Layout orientation (horizontal/vertical)</param>
         public void ApplyLayout(WindowMode mode, LayoutOrientation orientation)
         {
@@ -820,7 +820,7 @@ namespace AFMediaBar.Components
             // Get layout from presets
             var layout = LayoutPresets.GetLayout(mode, orientation);
 
-            // 字号设置只作用于任务栏静置层的媒体文字；灵动岛沿用预设字号。
+            // 字号设置只作用于任务栏静置层的媒体文字。
             // The font-size setting only scales taskbar rest-layer media text; the island keeps its preset sizes.
             var mediaFontScale = mode == WindowMode.Taskbar
                 ? SettingsManager.Current.TaskbarExperience.Normalize().MediaFontSizePercent / 100.0
@@ -1308,11 +1308,11 @@ namespace AFMediaBar.Components
         /// <summary>
         /// 按封面自身的宽高比调整封面框：高度取布局引擎给的尺寸，宽度按比例算，因此视频类宽封面不再被裁掉左右两边、
         /// 竖版封面也不再被裁掉上下两边。比例超出允许范围时改用 <see cref="Stretch.Uniform"/>（留白也不裁切）。
-        /// 只作用于任务栏横向模式：其余模式（竖向任务栏、灵动岛）的封面尺寸仍由布局引擎唯一决定。
+        /// 只作用于任务栏横向模式：竖向任务栏的封面尺寸仍由布局引擎唯一决定。
         /// Adjusts the artwork box to the artwork's own aspect: the height comes from the layout engine and the width follows the ratio, so a
         /// wide video cover is no longer cropped left and right and a portrait cover is no longer cropped top and bottom. Beyond the allowed
         /// range it switches to <see cref="Stretch.Uniform"/>, which letterboxes instead of cropping. This only applies to the horizontal
-        /// taskbar: in the other modes (vertical taskbar, dynamic island) the artwork size stays the layout engine's decision alone.
+        /// taskbar: on a vertical taskbar the artwork size stays the layout engine's decision alone.
         /// </summary>
         private void ApplyTaskbarArtworkAspect()
         {
@@ -1508,8 +1508,8 @@ namespace AFMediaBar.Components
         }
 
         /// <summary>
-        /// 应用播放器文字和灵动岛背景设置。
-        /// Applies player text and dynamic-island background settings.
+        /// 应用任务栏播放器文字和透明背景。
+        /// Applies taskbar player text and its transparent background.
         /// </summary>
         public void ApplyAppearanceSettings()
         {
@@ -1555,24 +1555,9 @@ namespace AFMediaBar.Components
             SongInfoStackPanel.Background = Brushes.Transparent;
             SetWebLyricsAppearance(foreground, needsContrastShadow: false, usesLightText: presentation.UsesLightText);
 
-            if (_currentMode == WindowMode.Taskbar)
-            {
-                MainBorder.Background = new SolidColorBrush(Colors.Transparent);
-                TopBorder.BorderBrush = Brushes.Transparent;
-                BackgroundImage.Visibility = Visibility.Collapsed;
-                return;
-            }
-
-            if (_currentMode != WindowMode.DynamicIsland)
-                return;
-
-            MainBorder.Background = SettingsManager.Current.DynamicIslandBackgroundMode == DynamicIslandBackgroundMode.Transparent
-                ? new SolidColorBrush(Color.FromArgb(1, 0, 0, 0))
-                : SystemParameters.HighContrast
-                    ? SystemColors.WindowBrush
-                    : new SolidColorBrush(isDark
-                        ? Color.FromArgb(0xFF, 0x20, 0x20, 0x20)
-                        : Color.FromArgb(0xFF, 0xF3, 0xF3, 0xF3));
+            MainBorder.Background = new SolidColorBrush(Colors.Transparent);
+            TopBorder.BorderBrush = Brushes.Transparent;
+            BackgroundImage.Visibility = Visibility.Collapsed;
         }
 
         private void ApplyTaskbarHoverAppearance(Brush foreground)
@@ -1652,7 +1637,7 @@ namespace AFMediaBar.Components
                     if (wasConnected)
                         AnimateArtworkConnectionTransition();
 
-                    // 任务栏无媒体时保持完全透明；灵动岛保留布局定义的稳定背景。
+                    // 任务栏无媒体时保持完全透明。
                     // Keep the disconnected taskbar transparent; preserve the dynamic-island layout background.
                     if (_currentMode == WindowMode.Taskbar)
                     {
@@ -1750,7 +1735,7 @@ namespace AFMediaBar.Components
                     : Visibility.Collapsed;
                 SongInfoStackPanel.Visibility = _isVertical ? Visibility.Collapsed : Visibility.Visible;
                 SongInfoStackPanel.IsHitTestVisible = !_isVertical;
-                // 任务栏主体保持透明；灵动岛继续沿用布局引擎已有背景行为。
+                // 任务栏主体保持透明。
                 // Keep the taskbar body transparent; the island retains its existing layout-engine background behavior.
                 BackgroundImage.Visibility = Visibility.Collapsed;
 

@@ -182,7 +182,6 @@ namespace AFMediaBar
                 services.AddSingleton<MainWindowViewModel>();
                 services.AddSingleton<TaskbarWindowViewModel>();
                 services.AddSingleton<AudioControlViewModel>();
-                services.AddTransient<DynamicIslandWindow>();
                 services.AddSingleton<AudioControlFlyoutWindow>();
 
                 // === 设置窗口（从任务栏右键菜单打开）Settings Window (opened from taskbar context menu) ===

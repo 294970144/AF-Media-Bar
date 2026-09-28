@@ -60,7 +60,6 @@ namespace AFMediaBar.Views.Windows
         /// queries the power state itself.</summary>
         private readonly MemoryPruneCoordinator _memoryPruneCoordinator;
         private readonly List<TaskbarWindow> _taskbarWindows = [];
-        private DynamicIslandWindow? _dynamicIslandWindow;
         private SettingsWindow? _settingsWindow;
         private readonly Dictionary<string, TaskbarFullPanelWindow> _fullPanelWindows = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, DateTime> _fullPanelClosedAtUtc = new(StringComparer.OrdinalIgnoreCase);
@@ -247,8 +246,6 @@ namespace AFMediaBar.Views.Windows
             TrayMenu.IsOpen = false;
             foreach (var taskbarWindow in _taskbarWindows)
                 taskbarWindow.ClosePlayerMenu();
-            if (_dynamicIslandWindow is not null)
-                _dynamicIslandWindow.ClosePlayerMenu();
 
             if (_isSystemThemeWatcherActive)
             {
@@ -265,9 +262,6 @@ namespace AFMediaBar.Views.Windows
             }
 
             CloseTaskbarWindows();
-            var dynamicIslandWindow = _dynamicIslandWindow;
-            _dynamicIslandWindow = null;
-            dynamicIslandWindow?.Close();
             _audioControlFlyout.Close();
             CloseFullPanelWindows();
             var notificationWindow = _trackChangeNotificationWindow;
@@ -457,12 +451,6 @@ namespace AFMediaBar.Views.Windows
 
         private void RecreateTaskbarWindows()
         {
-            if (SettingsManager.Current.WindowMode != WindowMode.Taskbar)
-            {
-                ActivateWindowMode(SettingsManager.Current.WindowMode);
-                return;
-            }
-
             CloseTaskbarWindows();
             CreateTaskbarWindows();
             _effectiveTaskbarTargetSignature = ResolveEffectiveTaskbarTargetSignature();
@@ -515,7 +503,6 @@ namespace AFMediaBar.Views.Windows
 
             foreach (var taskbarWindow in _taskbarWindows)
                 taskbarWindow.ApplySnapshot(snapshot);
-            _dynamicIslandWindow?.ApplySnapshot(snapshot);
         }
 
         private void MediaSessionService_OnSessionsChanged(IReadOnlyList<MediaSessionOption> options)
@@ -525,7 +512,6 @@ namespace AFMediaBar.Views.Windows
 
             foreach (var taskbarWindow in _taskbarWindows)
                 taskbarWindow.ApplySessions(options);
-            _dynamicIslandWindow?.ApplySessions(options);
             TrayMenu.ApplySessions(options);
         }
 
@@ -542,11 +528,9 @@ namespace AFMediaBar.Views.Windows
                 if (_isClosing)
                     return;
 
-                ActivateWindowMode(e.WindowMode);
+                ActivateTaskbarMode();
                 foreach (var taskbarWindow in _taskbarWindows)
-                    taskbarWindow.ApplyLayoutSettings(e.WindowMode, e.OrientationMode);
-                _dynamicIslandWindow?.ApplyLayoutSettings(e.OrientationMode);
-                _dynamicIslandWindow?.ApplyAppearanceSettings();
+                    taskbarWindow.ApplyLayoutSettings(WindowMode.Taskbar, e.OrientationMode);
             });
         }
 
@@ -560,7 +544,6 @@ namespace AFMediaBar.Views.Windows
                 UpdateSystemThemeWatcher(e.Appearance);
                 foreach (var taskbarWindow in _taskbarWindows)
                     taskbarWindow.ApplyAppearanceSettings();
-                _dynamicIslandWindow?.ApplyAppearanceSettings();
             });
         }
 
@@ -575,7 +558,6 @@ namespace AFMediaBar.Views.Windows
                 {
                     taskbarWindow.ApplySnapshot(snapshot);
                 }
-                _dynamicIslandWindow?.ApplySnapshot(snapshot);
             });
         }
 
@@ -608,25 +590,8 @@ namespace AFMediaBar.Views.Windows
             _watchedBackdropMode = shouldWatch ? appearance.BackdropMode : null;
         }
 
-        private void ActivateWindowMode(WindowMode mode)
+        private void ActivateTaskbarMode()
         {
-            if (mode == WindowMode.DynamicIsland)
-            {
-                _taskbarRecoveryCancellation?.Cancel();
-                TaskbarEnvironmentRecovering = false;
-                CloseTaskbarWindows();
-                _dynamicIslandWindow ??= App.Services.GetRequiredService<DynamicIslandWindow>();
-                _dynamicIslandWindow.ApplyLayoutSettings(SettingsManager.Current.LayoutOrientationMode);
-                _dynamicIslandWindow.ApplyAppearanceSettings();
-                _dynamicIslandWindow.ApplySessions(App.Services.GetRequiredService<MediaSessionService>().CurrentSessionOptions);
-                _dynamicIslandWindow.Show();
-                if (App.Services.GetRequiredService<MediaSessionService>().CurrentSnapshot is { } islandSnapshot)
-                    _dynamicIslandWindow.ApplySnapshot(islandSnapshot);
-                return;
-            }
-
-            _dynamicIslandWindow?.Close();
-            _dynamicIslandWindow = null;
             if (_taskbarWindows.Count == 0)
             {
                 CreateTaskbarWindows();
@@ -651,7 +616,7 @@ namespace AFMediaBar.Views.Windows
 
             _displayMonitorService.Refresh();
             _effectiveTaskbarTargetSignature = ResolveEffectiveTaskbarTargetSignature();
-            ActivateWindowMode(SettingsManager.Current.WindowMode);
+            ActivateTaskbarMode();
             _taskbarTopologyTimer.Start();
         }
 
@@ -679,7 +644,6 @@ namespace AFMediaBar.Views.Windows
                     return;
                 foreach (var taskbarWindow in _taskbarWindows)
                     taskbarWindow.ApplyAppearanceSettings();
-                _dynamicIslandWindow?.ApplyAppearanceSettings();
             }, DispatcherPriority.Background);
         }
 
@@ -983,7 +947,6 @@ namespace AFMediaBar.Views.Windows
                 ContextMenuHelper.CloseIfOutside(TrayMenu, e.ScreenX, e.ScreenY);
                 foreach (var taskbarWindow in _taskbarWindows)
                     taskbarWindow.CloseContextMenuIfOutside(e.ScreenX, e.ScreenY);
-                _dynamicIslandWindow?.CloseContextMenuIfOutside(e.ScreenX, e.ScreenY);
             }, System.Windows.Threading.DispatcherPriority.Background);
         }
 
