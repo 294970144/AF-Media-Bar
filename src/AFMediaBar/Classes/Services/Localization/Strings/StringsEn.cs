@@ -400,6 +400,8 @@ internal static class StringsEn
         table.Add("Interaction.Row.Modifier.Description", "The media bar and the tray icon share one modifier");
         table.Add("Interaction.Row.Modifier.Title", "Chord wheel modifier");
         table.Add("Interaction.Row.PrimaryWheel.Description", "Wheel behavior while the modifier is not held");
+        table.Add("Interaction.Row.WheelTooltip.Title", "Show wheel hints");
+        table.Add("Interaction.Row.WheelTooltip.Description", "Show the wheel action over artwork or lyrics; unbound actions have no hint");
         table.Add("Interaction.Row.TextClick.Title", "Title or lyrics click");
         table.Add("Interaction.Row.TrayChordWheel.Description", "Shows the device candidates first and applies the choice about 1.2 seconds after scrolling stops");
         table.Add("Interaction.Row.TrayClick.Description", "The right button always opens the menu; this sets the left-click behavior");

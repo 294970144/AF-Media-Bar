@@ -400,6 +400,8 @@ internal static class StringsZhHans
         table.Add("Interaction.Row.Modifier.Description", "媒体栏与托盘共用同一个按键");
         table.Add("Interaction.Row.Modifier.Title", "组合滚轮按键");
         table.Add("Interaction.Row.PrimaryWheel.Description", "不按组合键时的滚轮行为");
+        table.Add("Interaction.Row.WheelTooltip.Title", "显示滚轮提示");
+        table.Add("Interaction.Row.WheelTooltip.Description", "悬停封面或歌词时显示当前滚轮操作；未绑定的操作不显示提示");
         table.Add("Interaction.Row.TextClick.Title", "点击标题或歌词");
         table.Add("Interaction.Row.TrayChordWheel.Description", "先显示设备候选，停止滚动约 1.2 秒后应用");
         table.Add("Interaction.Row.TrayClick.Description", "右键始终打开菜单；此处设置左键单击行为");

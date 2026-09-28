@@ -400,6 +400,8 @@ internal static class StringsZhHant
         table.Add("Interaction.Row.Modifier.Description", "媒體列與托盤共用同一個按鍵");
         table.Add("Interaction.Row.Modifier.Title", "組合滾輪按鍵");
         table.Add("Interaction.Row.PrimaryWheel.Description", "不按組合鍵時的滾輪行為");
+        table.Add("Interaction.Row.WheelTooltip.Title", "顯示滾輪提示");
+        table.Add("Interaction.Row.WheelTooltip.Description", "懸停封面或歌詞時顯示目前滾輪操作；未綁定的操作不顯示提示");
         table.Add("Interaction.Row.TextClick.Title", "點擊標題或歌詞");
         table.Add("Interaction.Row.TrayChordWheel.Description", "先顯示裝置候選，停止捲動約 1.2 秒後套用");
         table.Add("Interaction.Row.TrayClick.Description", "右鍵始終開啟功能表；此處設定左鍵單擊行為");

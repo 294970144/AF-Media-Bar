@@ -426,6 +426,23 @@ namespace AFMediaBar.Components
         public void RefreshWheelTooltip()
         {
             var slot = ChordWheelHeld ? WheelGestureSlot.Chord : WheelGestureSlot.Primary;
+            var settings = SettingsManager.Current.Interaction.Normalize();
+            var action = slot == WheelGestureSlot.Chord ? settings.ChordWheelAction : settings.PrimaryWheelAction;
+            var showHint = settings.ShowWheelTooltips && action != WheelAction.Disabled;
+            var textOwner = showHint ? _wheelTooltip : null;
+            if (!ReferenceEquals(SongInfoStackPanel.ToolTip, textOwner))
+            {
+                CloseWheelTooltips();
+                SongInfoStackPanel.ToolTip = textOwner;
+            }
+            if (_isConnected)
+                SetArtworkTooltipOwner(showHint ? _artworkWheelTooltip : null);
+            if (!showHint)
+            {
+                CloseWheelTooltips();
+                _wheelResultShown = false;
+                return;
+            }
             // 刚滚过的结果要留在屏幕上：只有按键状态真正变了（用户准备用另一个槽位）或指针重新进入时才换回提示。
             // The result of the last scroll stays on screen: the hint only returns once the modifier state actually changed (the user
             // is preparing the other slot) or the pointer re-enters the bar.
@@ -434,18 +451,18 @@ namespace AFMediaBar.Components
 
             _appliedWheelSlot = slot;
             _wheelResultShown = false;
-            var settings = SettingsManager.Current.Interaction.Normalize();
             SetWheelTooltipText(WheelTooltipPolicy.BuildHint(
                 slot,
                 settings.Modifier,
-                WheelTooltipPolicy.BuildActionName(
-                    slot == WheelGestureSlot.Chord ? settings.ChordWheelAction : settings.PrimaryWheelAction)));
+                WheelTooltipPolicy.BuildActionName(action)));
         }
 
         /// <summary>把最近一次滚轮动作的结果写入提示。/ Writes the result of the most recent wheel action into the tooltip.</summary>
         /// <param name="result">滚轮手势结果。/ Wheel gesture result.</param>
         public void SetWheelResult(WheelTooltipResult result)
         {
+            if (!SettingsManager.Current.Interaction.ShowWheelTooltips)
+                return;
             _appliedWheelSlot = ChordWheelHeld ? WheelGestureSlot.Chord : WheelGestureSlot.Primary;
             _wheelResultShown = true;
             _wheelResult = result;
@@ -526,7 +543,8 @@ namespace AFMediaBar.Components
         /// </summary>
         private void ReassertChordWheelTooltip()
         {
-            if (!ChordWheelHeld || ResolveGlobalWheelSurface() is not { } surface)
+            if (!ChordWheelHeld || ResolveGlobalWheelSurface() is not { } surface ||
+                !ReferenceEquals(surface.Surface.ToolTip, surface.Tooltip))
                 return;
 
             surface.Tooltip.PlacementTarget = surface.Surface;
@@ -587,9 +605,17 @@ namespace AFMediaBar.Components
         /// </summary>
         private void ApplyArtworkTooltipOwner()
         {
+            var settings = SettingsManager.Current.Interaction.Normalize();
+            var action = ChordWheelHeld ? settings.ChordWheelAction : settings.PrimaryWheelAction;
             var owner = _isConnected
-                ? _artworkWheelTooltip
+                ? settings.ShowWheelTooltips && action != WheelAction.Disabled ? _artworkWheelTooltip : null
                 : _quickLaunchTooltip.Content is null ? null : _quickLaunchTooltip;
+            SetArtworkTooltipOwner(owner);
+            RefreshWheelTooltip();
+        }
+
+        private void SetArtworkTooltipOwner(ToolTip? owner)
+        {
             if (ReferenceEquals(SongImageBorder.ToolTip, owner))
                 return;
 
@@ -600,7 +626,6 @@ namespace AFMediaBar.Components
             // 否则悬停封面会先弹出一个空气泡。
             // The instance just swapped in may still be empty when nobody has scrolled yet, and the tooltip opens by itself on hover:
             // writing the current hint once keeps hovering the artwork from popping an empty bubble.
-            RefreshWheelTooltip();
         }
 
         /// <summary>
@@ -886,6 +911,7 @@ namespace AFMediaBar.Components
         /// </summary>
         public void ApplyTaskbarExperienceSettings(bool publishSize = true)
         {
+            RefreshWheelTooltip();
             var isHorizontalTaskbar = _currentMode == WindowMode.Taskbar && !_isVertical;
             var experience = SettingsManager.Current.TaskbarExperience.Normalize();
             var metrics = TaskbarDensityMetrics.From(experience.Density);

@@ -638,6 +638,9 @@ public readonly record struct GlobalInteractionSettings(
     TrayWheelBehavior TrayPrimaryWheelAction,
     TrayWheelBehavior TrayChordWheelAction)
 {
+    /// <summary>是否显示媒体栏封面与文字区的滚轮提示。/ Whether to show wheel hints over the media bar artwork and text.</summary>
+    public bool ShowWheelTooltips { get; init; } = true;
+
     public static GlobalInteractionSettings Default { get; } = new(
         PlayerClickAction.TogglePlayPause,
         PlayerClickAction.ActivateSource,

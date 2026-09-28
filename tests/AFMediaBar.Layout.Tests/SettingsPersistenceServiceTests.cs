@@ -98,7 +98,7 @@ public sealed class SettingsPersistenceServiceTests
                 WheelAction.PreviousNext,
                 TrayClickAction.OpenSettings,
                 TrayWheelBehavior.AdjustVolume,
-                TrayWheelBehavior.SwitchOutputDevice),
+                TrayWheelBehavior.SwitchOutputDevice) { ShowWheelTooltips = false },
             TaskbarSurface = new ModeSurfaceSettings(PlayerSurfaceStyle.ThemeTint, 72, 12),
             LyricsTextAlignment = LyricsTextAlignment.Right,
             TrackChangeNotification = new TrackChangeNotificationSettings(
@@ -143,6 +143,7 @@ public sealed class SettingsPersistenceServiceTests
         Assert.AreEqual(PlayerClickAction.ActivateSource, SettingsManager.Current.Interaction.ArtworkClickAction);
         Assert.AreEqual(WheelAction.SwitchMediaSource, SettingsManager.Current.Interaction.PrimaryWheelAction);
         Assert.AreEqual(InteractionModifier.RightMouseButton, SettingsManager.Current.Interaction.Modifier);
+        Assert.IsFalse(SettingsManager.Current.Interaction.ShowWheelTooltips);
         Assert.AreEqual(TaskbarInformationDensity.Information, SettingsManager.Current.TaskbarExperience.Density);
         Assert.AreEqual(new TaskbarFullPanelSettings(true, false, true, false), SettingsManager.Current.TaskbarExperience.FullPanel);
         Assert.AreEqual(TaskbarLengthMode.Fixed, SettingsManager.Current.TaskbarExperience.LengthMode);
