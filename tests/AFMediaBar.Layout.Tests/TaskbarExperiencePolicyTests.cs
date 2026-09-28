@@ -95,10 +95,10 @@ public sealed class TaskbarExperiencePolicyTests
     }
 
     [TestMethod]
-    public void ComponentSpacingChangesHoverMinimum()
+    public void HoverButtonSpacingChangesHoverMinimum()
     {
-        var compact = TaskbarExperiencePolicy.CalculateHoverLayerWidth(true, true, TaskbarInformationDensity.Balanced, 4);
-        var spacious = TaskbarExperiencePolicy.CalculateHoverLayerWidth(true, true, TaskbarInformationDensity.Balanced, 24);
+        var compact = TaskbarExperiencePolicy.CalculateHoverLayerWidth(true, true, TaskbarInformationDensity.Balanced, 0);
+        var spacious = TaskbarExperiencePolicy.CalculateHoverLayerWidth(true, true, TaskbarInformationDensity.Balanced, 16);
         Assert.IsTrue(spacious > compact);
     }
 

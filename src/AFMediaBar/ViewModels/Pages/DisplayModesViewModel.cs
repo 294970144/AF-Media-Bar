@@ -451,6 +451,13 @@ public partial class DisplayModesViewModel : ObservableObject
         set => UpdateExperience(SettingsManager.Current.TaskbarExperience with { ComponentSpacingDip = value });
     }
 
+    /// <summary>悬停层按钮之间的间距（DIP）。/ Gap between hover-layer buttons in DIP.</summary>
+    public double HoverButtonSpacingDip
+    {
+        get => SettingsManager.Current.TaskbarExperience.HoverButtonSpacingDip;
+        set => UpdateExperience(SettingsManager.Current.TaskbarExperience with { HoverButtonSpacingDip = value });
+    }
+
     public bool FollowMediaTextLength
     {
         get => SettingsManager.Current.TaskbarExperience.LengthMode == TaskbarLengthMode.FollowContent;
@@ -931,6 +938,7 @@ public partial class DisplayModesViewModel : ObservableObject
         OnPropertyChanged(nameof(HoverOutputDeviceVisible)); OnPropertyChanged(nameof(HoverAudioControlVisible));
         OnPropertyChanged(nameof(HoverProgressVisible));
         OnPropertyChanged(nameof(ComponentSpacingDip));
+        OnPropertyChanged(nameof(HoverButtonSpacingDip));
         OnPropertyChanged(nameof(FollowMediaTextLength)); OnPropertyChanged(nameof(UsesFixedTaskbarLength));
         OnPropertyChanged(nameof(FixedTaskbarLengthMinimum)); OnPropertyChanged(nameof(FixedTaskbarLengthMaximum));
         OnPropertyChanged(nameof(FixedTaskbarLengthDip)); OnPropertyChanged(nameof(FixedTaskbarLengthRangeText));

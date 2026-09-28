@@ -969,13 +969,20 @@ namespace AFMediaBar.Components
                     SongInfoStackPanel.IsMouseOver || TaskbarDirectFullPanelHandle.IsMouseOver,
                     immediate: true);
 
+            var hoverGap = experience.HoverButtonSpacingDip;
+            var visibleHoverButtons = 0;
             foreach (var button in FindVisualChildren<System.Windows.Controls.Button>(TaskbarHoverActions))
             {
                 if (ReferenceEquals(button, TaskbarFullPanelHandle))
                     continue;
                 button.Width = metrics.ButtonSize;
                 button.Height = metrics.ButtonSize;
+                if (button.Visibility == Visibility.Visible)
+                    button.Margin = new Thickness(visibleHoverButtons++ == 0 ? 0 : hoverGap, 0, 0, 0);
             }
+            TaskbarHoverProgress.Margin = new Thickness(
+                TaskbarHoverProgress.Visibility == Visibility.Visible && visibleHoverButtons > 0 ? hoverGap : 0,
+                0, 0, 0);
             TaskbarHoverProgress.Width = metrics.ProgressWidth;
             TaskbarHoverLayer.Height = metrics.HoverLayerHeight;
             ApplyTaskbarSectionGeometry(MainBorder.Width);
@@ -1859,7 +1866,7 @@ namespace AFMediaBar.Components
                         experience.HoverControls,
                         progressVisible,
                         experience.Density,
-                        experience.ComponentSpacingDip)
+                        experience.HoverButtonSpacingDip)
                     : 0;
                 double ContentWidth(double availableTextWidth) => TaskbarExperiencePolicy.CalculateRestWidth(
                     visibleComponents,

@@ -83,6 +83,7 @@ public sealed class SettingsPersistenceServiceTests
                 // only their type name, so only a real write-then-read proves they are serialized at all.
                 OutputDeviceVisible = true,
                 VolumeVisible = true,
+                HoverButtonSpacingDip = 7,
                 RestComponentOrder =
                 [
                     TaskbarRestComponent.Volume,
@@ -148,6 +149,7 @@ public sealed class SettingsPersistenceServiceTests
         Assert.AreEqual(new TaskbarFullPanelSettings(true, false, true, false), SettingsManager.Current.TaskbarExperience.FullPanel);
         Assert.AreEqual(TaskbarLengthMode.Fixed, SettingsManager.Current.TaskbarExperience.LengthMode);
         Assert.AreEqual(444, SettingsManager.Current.TaskbarExperience.FixedLengthDip);
+        Assert.AreEqual(7, SettingsManager.Current.TaskbarExperience.HoverButtonSpacingDip);
         Assert.AreEqual(TaskbarMediaTextAlignment.Right, SettingsManager.Current.TaskbarExperience.MediaTextAlignment);
         Assert.IsFalse(SettingsManager.Current.TaskbarExperience.SpectrumVisible);
         Assert.IsFalse(SettingsManager.Current.TaskbarExperience.PerformanceVisible);

@@ -462,6 +462,9 @@ public readonly record struct TaskbarExperienceSettings(
     /// <summary>任务栏组件之间的实际间距（DIP）。/ Actual gap between taskbar components in DIP.</summary>
     public double ComponentSpacingDip { get; init; } = 12;
 
+    /// <summary>悬停层按钮之间的间距（DIP）。/ Gap between hover-layer buttons in DIP.</summary>
+    public double HoverButtonSpacingDip { get; init; } = 2;
+
     /// <summary>标题和歌手文字的对齐方式。 / Alignment of title and artist text.</summary>
     public TaskbarMediaTextAlignment MediaTextAlignment { get; init; } = TaskbarMediaTextAlignment.Left;
 
@@ -544,6 +547,9 @@ public readonly record struct TaskbarExperienceSettings(
     /// <summary>组件间距的持久化安全上限。/ Persistence-safe upper bound for component spacing.</summary>
     public const double MaximumComponentSpacingDip = 32;
 
+    /// <summary>悬停层按钮间距的安全上限。/ Safe upper bound for the hover-button gap.</summary>
+    public const double MaximumHoverButtonSpacingDip = 16;
+
     /// <summary>静置层媒体文字字号缩放的持久化安全下限。/ Persistence-safe lower bound for the rest-layer media font-size scale.</summary>
     public const int MinimumMediaFontSizePercent = 80;
 
@@ -586,6 +592,9 @@ public readonly record struct TaskbarExperienceSettings(
             ComponentSpacingDip = double.IsFinite(ComponentSpacingDip)
                 ? Math.Clamp(ComponentSpacingDip, MinimumComponentSpacingDip, MaximumComponentSpacingDip)
                 : defaults.ComponentSpacingDip,
+            HoverButtonSpacingDip = double.IsFinite(HoverButtonSpacingDip)
+                ? Math.Clamp(HoverButtonSpacingDip, 0, MaximumHoverButtonSpacingDip)
+                : defaults.HoverButtonSpacingDip,
             // schema 7 及更早的设置文件没有该字段，反序列化得到 0；0 与任何合法值都不同，因此回退到默认值。
             // Settings files up to schema 7 lack this field and deserialize it as 0; 0 is outside every legal value, so it
             // falls back to the default instead of being clamped to the minimum.

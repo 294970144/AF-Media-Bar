@@ -366,8 +366,10 @@ internal static class StringsZhHant
         table.Add("DisplayModes.Rest.Order.Reset.Title", "恢復預設順序");
         table.Add("DisplayModes.Rest.Row.Alignment.Description", "設定媒體文字在媒體列內的對齊方式");
         table.Add("DisplayModes.Rest.Row.Alignment.Title", "標題與歌手對齊");
-        table.Add("DisplayModes.Rest.Row.Density.Description", "調整靜置層中各按鈕、進度條之間的間隔");
-        table.Add("DisplayModes.Rest.Row.Density.Title", "靜置層間隔");
+        table.Add("DisplayModes.Hover.Row.Size.Description", "調整懸停按鈕與進度條的尺寸級別，也影響靜置層的小按鈕");
+        table.Add("DisplayModes.Hover.Row.Size.Title", "控制項尺寸");
+        table.Add("DisplayModes.Hover.Row.Spacing.Description", "懸停層按鈕及進度條之間的水平間距");
+        table.Add("DisplayModes.Hover.Row.Spacing.Title", "懸停按鈕間距");
         table.Add("DisplayModes.Rest.Row.DeviceButton.Description", "點擊開啟輸出裝置選單，在它上面滾動切換裝置；常駐會佔掉媒體文字的位置");
         table.Add("DisplayModes.Rest.Row.DeviceButton.Title", "靜置層顯示輸出裝置按鈕");
         table.Add("DisplayModes.Rest.Row.Entry.Description", "滑鼠移入媒體列或點擊文字區頂部細槓時開啟完整層");

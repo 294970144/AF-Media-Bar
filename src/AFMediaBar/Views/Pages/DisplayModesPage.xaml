@@ -386,20 +386,6 @@
                             <components:SettingsDiagram Margin="0,0,0,12" Kind="LayerRest" />
 
                             <components:SettingsRow
-                                Description="{DynamicResource Loc.DisplayModes.Rest.Row.Density.Description}"
-                                Icon="{ui:SymbolIcon TextAlignJustify24}"
-                                Title="{DynamicResource Loc.DisplayModes.Rest.Row.Density.Title}">
-                                <ComboBox
-                                    MinWidth="200"
-                                    SelectedValue="{Binding ViewModel.Density, Mode=TwoWay}"
-                                    SelectedValuePath="Tag">
-                                    <ComboBoxItem Content="{DynamicResource Loc.DisplayModes.Rest.Density.Minimal}" Tag="{x:Static settings:TaskbarInformationDensity.Minimal}" />
-                                    <ComboBoxItem Content="{DynamicResource Loc.DisplayModes.Rest.Density.Balanced}" Tag="{x:Static settings:TaskbarInformationDensity.Balanced}" />
-                                    <ComboBoxItem Content="{DynamicResource Loc.DisplayModes.Rest.Density.Information}" Tag="{x:Static settings:TaskbarInformationDensity.Information}" />
-                                </ComboBox>
-                            </components:SettingsRow>
-
-                            <components:SettingsRow
                                 Description="{DynamicResource Loc.DisplayModes.Rest.Row.Layout.Description}"
                                 Icon="{ui:SymbolIcon LayoutColumnTwo24}"
                                 Title="{DynamicResource Loc.DisplayModes.Rest.Row.Layout.Title}">
@@ -597,6 +583,36 @@
                                 </ui:CardExpander.Header>
 
                                 <StackPanel>
+                                    <components:SettingsRow
+                                        Description="{DynamicResource Loc.DisplayModes.Hover.Row.Size.Description}"
+                                        Icon="{ui:SymbolIcon TextAlignJustify24}"
+                                        IsNested="True"
+                                        Title="{DynamicResource Loc.DisplayModes.Hover.Row.Size.Title}">
+                                        <ComboBox
+                                            MinWidth="200"
+                                            SelectedValue="{Binding ViewModel.Density, Mode=TwoWay}"
+                                            SelectedValuePath="Tag">
+                                            <ComboBoxItem Content="{DynamicResource Loc.DisplayModes.Rest.Density.Minimal}" Tag="{x:Static settings:TaskbarInformationDensity.Minimal}" />
+                                            <ComboBoxItem Content="{DynamicResource Loc.DisplayModes.Rest.Density.Balanced}" Tag="{x:Static settings:TaskbarInformationDensity.Balanced}" />
+                                            <ComboBoxItem Content="{DynamicResource Loc.DisplayModes.Rest.Density.Information}" Tag="{x:Static settings:TaskbarInformationDensity.Information}" />
+                                        </ComboBox>
+                                    </components:SettingsRow>
+                                    <components:SettingsRow
+                                        Description="{DynamicResource Loc.DisplayModes.Hover.Row.Spacing.Description}"
+                                        Icon="{ui:SymbolIcon PaddingLeft24}"
+                                        IsNested="True"
+                                        Title="{DynamicResource Loc.DisplayModes.Hover.Row.Spacing.Title}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Slider
+                                                Maximum="16"
+                                                Minimum="0"
+                                                Style="{StaticResource RowSliderStyle}"
+                                                IsSnapToTickEnabled="True"
+                                                TickFrequency="1"
+                                                Value="{Binding ViewModel.HoverButtonSpacingDip, Mode=TwoWay}" />
+                                            <TextBlock Style="{StaticResource RowValueStyle}" Text="{Binding ViewModel.HoverButtonSpacingDip, StringFormat={}{0:0} DIP}" />
+                                        </StackPanel>
+                                    </components:SettingsRow>
                                     <components:SettingsRow
                                         Icon="{ui:SymbolIcon Play24}"
                                         IsNested="True"

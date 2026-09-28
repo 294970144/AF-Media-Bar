@@ -366,8 +366,10 @@ internal static class StringsEn
         table.Add("DisplayModes.Rest.Order.Reset.Title", "Restore the default order");
         table.Add("DisplayModes.Rest.Row.Alignment.Description", "Sets how the media text is aligned inside the media bar");
         table.Add("DisplayModes.Rest.Row.Alignment.Title", "Title and artist alignment");
-        table.Add("DisplayModes.Rest.Row.Density.Description", "Adjusts the spacing between the buttons and the progress bar inside the rest layer");
-        table.Add("DisplayModes.Rest.Row.Density.Title", "Rest-layer spacing");
+        table.Add("DisplayModes.Hover.Row.Size.Description", "Sets hover button and progress sizes; also affects small rest-layer buttons");
+        table.Add("DisplayModes.Hover.Row.Size.Title", "Control size");
+        table.Add("DisplayModes.Hover.Row.Spacing.Description", "Horizontal gap between hover buttons and the progress bar");
+        table.Add("DisplayModes.Hover.Row.Spacing.Title", "Hover button spacing");
         table.Add("DisplayModes.Rest.Row.DeviceButton.Description", "Opens the output-device menu on click and switches devices on the wheel; keeping it there takes room from the media text");
         table.Add("DisplayModes.Rest.Row.DeviceButton.Title", "Show the output-device button in the rest layer");
         table.Add("DisplayModes.Rest.Row.Entry.Description", "Opens the full panel when the pointer enters the media bar or the thin bar above the text area is clicked");
