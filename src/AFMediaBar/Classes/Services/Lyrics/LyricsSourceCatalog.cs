@@ -3,15 +3,14 @@ using AFMediaBar.Resources;
 namespace AFMediaBar.Classes.Services.Lyrics;
 
 /// <summary>
-/// 歌词来源的词汇表：id、默认优先级顺序与显示名。
-/// The vocabulary of lyric sources: ids, the default priority order, and display names.
+/// 歌词来源的词汇表：稳定 id、目录顺序与显示名。
+/// The vocabulary of lyric sources: stable ids, catalog order, and display names.
 ///
 /// 来源 id 就是提供器的 <c>SourceName</c>，它们在设置文件里参与序列化，因此只能追加、不能改名；显示名一律走文案键，
-/// 界面因此不会出现内部 id。设置页的来源列表、取词链的顺序与完整层的来源显示都读这里，避免同一份顺序写两遍。
+/// 界面因此不会出现内部 id。设置页、备用源同分排序与完整层的来源显示都读这里；优先阶段另由取词策略决定。
 /// A source id is a provider's <c>SourceName</c>; ids take part in settings serialization, so they may only be appended and
 /// never renamed, while every display name goes through a text key so the interface never shows an internal id. The settings
-/// page's source list, the retrieval chain's order, and the full panel's source line all read this table, which keeps that one
-/// order from being written twice.
+/// page, fallback tie ordering, and full panel read this table; the preferred stage is owned by the retrieval policy.
 /// </summary>
 public static class LyricsSourceCatalog
 {
@@ -34,8 +33,8 @@ public static class LyricsSourceCatalog
     public const string SodaMusic = "SodaMusic";
 
     /// <summary>
-    /// 默认优先级顺序：精确来源在前，模糊搜索在后。
-    /// The default priority order: exact sources first, fuzzy searches last.
+    /// 来源展示与备用结果同分时的稳定顺序，不决定优先阶段。
+    /// Stable display and fallback tie order; does not determine the preferred stage.
     /// </summary>
     public static IReadOnlyList<string> DefaultOrder { get; } =
     [

@@ -50,19 +50,18 @@ public sealed class QQMusicLyricsProvider : ILyricsProvider
             .ConfigureAwait(false);
         if (cachedResult is not null)
         {
-            return cachedResult;
+            return cachedResult with { MatchScore = 100 };
         }
 
-        var track = LyricsSearch.ToTrackMetadata(request);
-        var minimumMatch = LyricsMatchPolicy.ToMinimumMatch(request.MatchStrictness);
-        var match = await LyricsSearch.MatchAsync(track, Searchers.QQMusic, minimumMatch, cancellationToken);
-        if (match is not QQMusicSearchResult qq)
+        var match = await LyricsSearch.MatchAsync(request, Searchers.QQMusic, cancellationToken);
+        if (match?.Candidate is not QQMusicSearchResult qq)
         {
             return null;
         }
 
         cancellationToken.ThrowIfCancellationRequested();
         var (main, translation) = await FetchLyricAsync(qq, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         if (string.IsNullOrWhiteSpace(main))
         {
             return null;
@@ -74,7 +73,7 @@ public sealed class QQMusicLyricsProvider : ILyricsProvider
             request: request,
             durationSeconds: request.DurationSeconds,
             filterInfoLines: request.FilterInfoLines);
-        return document.Lines.Count > 0 ? new LyricsResult(SourceName, document) : null;
+        return document.Lines.Count > 0 ? new LyricsResult(SourceName, document) { MatchScore = match!.Score } : null;
     }
 
     private static LyricsResult? TryReadCachedLyrics(LyricsRequest request, CancellationToken cancellationToken)

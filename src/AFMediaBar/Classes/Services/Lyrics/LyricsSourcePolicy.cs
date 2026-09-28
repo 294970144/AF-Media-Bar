@@ -4,18 +4,8 @@ using AFMediaBar.Classes.Settings;
 namespace AFMediaBar.Classes.Services.Lyrics;
 
 /// <summary>
-/// 按用户的来源设置挑出本次取词要用的提供器：启用了哪些、按什么顺序。
-/// Picks the providers one retrieval uses according to the user's source settings: which are enabled and in what order.
-///
-/// 三条规则：
-/// 1. 从未配置（null）表示"全部来源按默认顺序"——旧设置文件与新增来源都能自动生效；
-/// 2. 空数组表示用户明确关掉了全部来源，此时不返回任何提供器（一次网络请求都不发）；
-/// 3. 非空数组的顺序就是优先级，不做二次排序，用户把某个来源排到最前就是这个意思；未知 id 直接忽略（它来自旧设置文件或
-///    已删除的来源），因此它不会让整条链失效。
-/// Three rules: never configured (null) means every source in the default order, so an old settings file and a newly added source
-/// both keep working; an empty array means the user turned every source off, so no provider is returned and not a single request is
-/// sent; and a non-empty array's order is the priority and is never re-sorted, since putting a source first means exactly that,
-/// while an unknown id is ignored (it comes from an old settings file or a removed source) rather than invalidating the chain.
+/// 解析启用来源；null 表示全部、空数组表示全部关闭，未知来源忽略。
+/// 保留序列化列表顺序，但运行时阶段与同分顺序由 LyricsRetrievalPolicy/目录拥有。
 /// </summary>
 public static class LyricsSourcePolicy
 {

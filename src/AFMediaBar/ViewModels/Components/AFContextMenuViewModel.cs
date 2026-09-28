@@ -8,6 +8,7 @@ using static Lyricify.Lyrics.Providers.Web.Musixmatch.GetTokenResponse;
 
 namespace AFMediaBar.ViewModels.Components;
 
+/// <summary>维护托盘菜单的媒体选择与更新命令，不拥有媒体或更新服务。/ Tray menu state and commands; service lifetimes belong to the host.</summary>
 public partial class AFContextMenuViewModel : ObservableObject
 {
     private readonly MediaSessionService _mediaSessionService;

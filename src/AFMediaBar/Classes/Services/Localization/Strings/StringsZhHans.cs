@@ -453,39 +453,12 @@ internal static class StringsZhHans
         table.Add("Layout.WindowMode.Taskbar", "停靠任务栏");
 
         // ---- Lyrics ----
-        table.Add("Lyrics.Adoption.FirstArrival", "先到先得");
-        table.Add("Lyrics.Adoption.PreferDefaultSource", "偏心默认来源");
-        table.Add("Lyrics.Adoption.PreferDefaultSourceWithDeadline", "偏心默认来源（限时）");
-        table.Add("Lyrics.DefaultBindings.Add", "添加播放器");
-        table.Add("Lyrics.DefaultBindings.Remark.Placeholder", "备注名");
-        table.Add("Lyrics.DefaultBindings.Add.Placeholder", "输入 AppID");
-        table.Add("Lyrics.DefaultBindings.Expander.Description", "识别正在播放的播放器，并指定它的默认取词接口；未绑定的播放器没有默认接口");
-        table.Add("Lyrics.DefaultBindings.Expander.Title", "默认取词接口绑定");
-        table.Add("Lyrics.DefaultBindings.None", "不绑定（无默认接口）");
-        table.Add("Lyrics.DefaultBindings.Player.Kugou", "酷狗音乐");
-        table.Add("Lyrics.DefaultBindings.Player.Netease", "网易云音乐");
-        table.Add("Lyrics.DefaultBindings.Player.QQMusic", "QQ 音乐");
-        table.Add("Lyrics.DefaultBindings.Player.SodaMusic", "汽水音乐");
-        table.Add("Lyrics.DefaultBindings.Remove", "移除此行");
-        table.Add("Lyrics.DefaultBindings.Scan", "扫描正在播放");
-        table.Add("Lyrics.QueryStrategy.Concurrent", "同时查询");
-        table.Add("Lyrics.QueryStrategy.Sequential", "按序查询");
         table.Add("Lyrics.Callout.Display", "有歌词时，媒体栏显示歌词；没有歌词时显示标题与歌手。");
         table.Add("Lyrics.Header.Subtitle", "在任务栏静置层显示当前歌词");
-        table.Add("Lyrics.Row.QueryStrategy.Description", "按序逐个尝试来源，或同时发出（默认接口与优先级批次同时查询）；按序时只保留优先级顺序");
-        table.Add("Lyrics.Row.QueryStrategy.Title", "查询策略");
-        table.Add("Lyrics.Row.AdoptionMode.Description", "并发取词时如何采纳结果；「偏心默认来源」优先采用播放器对应的取词接口");
-        table.Add("Lyrics.Row.AdoptionMode.Title", "结果采纳策略");
-        table.Add("Lyrics.Row.BatchSize.Description", "每批同时取词的来源个数；当前批次全部未命中才会请求下一批");
-        table.Add("Lyrics.Row.BatchSize.Title", "优先级单次并发个数");
-        table.Add("Lyrics.Row.Deadline.Description", "优先级来源先返回结果后，再给默认接口这么长的时间；仅「偏心默认来源（限时）」时生效");
-        table.Add("Lyrics.Row.Deadline.Title", "默认接口倒计时");
         table.Add("Lyrics.Row.Alignment.Description", "歌词在静置层的对齐方式；标题与歌手的对齐在显示模式页");
         table.Add("Lyrics.Row.Alignment.Title", "歌词对齐");
         table.Add("Lyrics.Row.InfoLines.Description", "隐藏作者、作曲、制作等署名行");
         table.Add("Lyrics.Row.InfoLines.Title", "过滤署名行");
-        table.Add("Lyrics.Row.MatchStrictness.Description", "按曲名搜索歌词时要求的匹配程度；越严格越不容易匹配到同名的现场版或翻唱");
-        table.Add("Lyrics.Row.MatchStrictness.Title", "搜索匹配严格度");
         table.Add("Lyrics.Row.SecondLine.Description", "第二行显示当前句翻译、当前句音译或下一句歌词；顺序即优先级，缺失的来源自动跳过");
         table.Add("Lyrics.Row.SecondLine.Note", "顺序即优先级：排在上面的来源优先使用，没有内容时依次往下取");
         table.Add("Lyrics.Row.SecondLine.OrderRow.Description", "上移即提高优先级");
@@ -523,19 +496,15 @@ internal static class StringsZhHans
         table.Add("Lyrics.Source.SodaMusic", "汽水音乐");
         table.Add("Lyrics.Source.Unknown", "未知来源");
         table.Add("Lyrics.Sources.AllDisabled.Callout", "已关闭全部歌词来源：不会再发出任何歌词请求，媒体栏只显示标题与歌手。");
-        table.Add("Lyrics.Sources.Callout", "按下面的顺序向已启用的来源请求歌词，命中即停止；每个来源只发一次请求。");
-        table.Add("Lyrics.Sources.Expander.Description", "启用哪些来源，以及它们的优先顺序");
-        table.Add("Lyrics.Sources.Expander.Title", "备用来源优先级顺序");
-        table.Add("Lyrics.Sources.Expander.Title.Sequential", "优先级顺序");
+        table.Add("Lyrics.Sources.Callout", "先尝试已启用的 QQ 音乐（本地缓存优先）；未命中后并发查询其他已启用来源，采用匹配分最高的歌词。");
+        table.Add("Lyrics.Sources.Expander.Description", "选择允许获取歌词的来源；查询阶段与评分由应用统一管理。");
+        table.Add("Lyrics.Sources.Expander.Title", "歌词来源");
         table.Add("Lyrics.Sources.MoveDown", "下移");
         table.Add("Lyrics.Sources.MoveUp", "上移");
-        table.Add("Lyrics.Sources.Reset.Action", "恢复默认");
-        table.Add("Lyrics.Sources.Reset.Description", "重新启用全部来源，并按默认优先级排序");
-        table.Add("Lyrics.Sources.Reset.Title", "恢复默认顺序");
-        table.Add("Lyrics.Sources.Row.Description", "关闭后不再向该来源请求歌词");
-        table.Add("Lyrics.Strictness.Balanced", "均衡");
-        table.Add("Lyrics.Strictness.Exact", "精确");
-        table.Add("Lyrics.Strictness.Strict", "严格");
+        table.Add("Lyrics.Sources.Reset.Action", "启用全部来源");
+        table.Add("Lyrics.Sources.Reset.Description", "重新启用全部歌词来源。");
+        table.Add("Lyrics.Sources.Reset.Title", "恢复默认来源");
+        table.Add("Lyrics.Sources.Row.Description", "允许从此来源获取歌词。");
 
         // ---- Media ----
         table.Add("Media.Badge.EnableFirst", "需先启用");
@@ -667,7 +636,7 @@ internal static class StringsZhHans
         table.Add("Search.Interaction.TrayIcon.Description", "托盘图标的点击与滚轮行为");
         table.Add("Search.Lyrics.Alignment.Description", "歌词靠左、居中还是靠右");
         table.Add("Search.Lyrics.Display.Description", "显示歌词、显示两行、第二行显示什么、逐字擦亮与署名行过滤");
-        table.Add("Search.Lyrics.Sources.Description", "选择歌词来源、它们的优先顺序与搜索匹配严格度");
+        table.Add("Search.Lyrics.Sources.Description", "选择启用的歌词来源；取词顺序和评分由应用管理");
         table.Add("Search.MediaAndNotifications.MediaSource.Description", "来源允许列表与已检测来源");
         table.Add("Search.MediaAndNotifications.QuickLaunch.Description", "无媒体时从音符启动播放器");
         table.Add("Search.MediaAndNotifications.RestLayerComponents.Description", "叠加在静置层右侧的频谱与性能组件");

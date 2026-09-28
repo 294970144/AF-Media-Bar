@@ -33,10 +33,8 @@ public sealed class KugouLyricsProvider : ILyricsProvider
             return null;
         }
 
-        var track = LyricsSearch.ToTrackMetadata(request);
-        var minimumMatch = LyricsMatchPolicy.ToMinimumMatch(request.MatchStrictness);
-        var match = await LyricsSearch.MatchAsync(track, Searchers.Kugou, minimumMatch, cancellationToken);
-        if (match is not KugouSearchResult kugou || string.IsNullOrWhiteSpace(kugou.Hash))
+        var match = await LyricsSearch.MatchAsync(request, Searchers.Kugou, cancellationToken);
+        if (match?.Candidate is not KugouSearchResult kugou || string.IsNullOrWhiteSpace(kugou.Hash))
         {
             return null;
         }
@@ -65,6 +63,7 @@ public sealed class KugouLyricsProvider : ILyricsProvider
             return null;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         if (string.IsNullOrWhiteSpace(krc))
         {
             return null;
@@ -75,7 +74,7 @@ public sealed class KugouLyricsProvider : ILyricsProvider
             request: request,
             durationSeconds: request.DurationSeconds,
             filterInfoLines: request.FilterInfoLines);
-        return document.Lines.Count > 0 ? new LyricsResult(SourceName, document) : null;
+        return document.Lines.Count > 0 ? new LyricsResult(SourceName, document) { MatchScore = match!.Score } : null;
     }
 
     private async Task<SearchLyricsResponse.Candidate?> FindCandidateAsync(

@@ -25,10 +25,8 @@ public sealed class SodaMusicLyricsProvider : ILyricsProvider
             return null;
         }
 
-        var track = LyricsSearch.ToTrackMetadata(request);
-        var minimumMatch = LyricsMatchPolicy.ToMinimumMatch(request.MatchStrictness);
-        var match = await LyricsSearch.MatchAsync(track, Searchers.SodaMusic, minimumMatch, cancellationToken);
-        if (match is not SodaMusicSearchResult soda || string.IsNullOrWhiteSpace(soda.Id))
+        var match = await LyricsSearch.MatchAsync(request, Searchers.SodaMusic, cancellationToken);
+        if (match?.Candidate is not SodaMusicSearchResult soda || string.IsNullOrWhiteSpace(soda.Id))
         {
             return null;
         }
@@ -48,6 +46,7 @@ public sealed class SodaMusicLyricsProvider : ILyricsProvider
             return null;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         var main = detail?.Lyric?.Content;
         if (string.IsNullOrWhiteSpace(main))
         {
@@ -60,7 +59,7 @@ public sealed class SodaMusicLyricsProvider : ILyricsProvider
             request: request,
             durationSeconds: request.DurationSeconds,
             filterInfoLines: request.FilterInfoLines);
-        return document.Lines.Count > 0 ? new LyricsResult(SourceName, document) : null;
+        return document.Lines.Count > 0 ? new LyricsResult(SourceName, document) { MatchScore = match!.Score } : null;
     }
 
     /// <summary>

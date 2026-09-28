@@ -15,7 +15,7 @@
 - `Classes/Services/<领域>/`：媒体、歌词、音频、任务栏等领域服务与资源所有权，不把新服务直接放在 `Classes/Services/` 根目录；`Classes/Models/`、`Classes/Abstractions/`、`Classes/Interop/` 分别放数据契约、接口和原生互操作；`Classes/Settings/` 与 `Classes/Services/Settings/` 处理设置模型及读写。
 - `ViewModels/` 负责可绑定状态与命令；`Views/` 负责 WPF 页面和窗口；`Resources/` 负责共享 XAML、主题和本地化资源；`Web/Lyrics/` 负责 WebView2 歌词文档、样式与脚本。`tests/AFMediaBar.Layout.Tests/` 放纯策略与回归测试，`tools/` 放验证脚本，`installer/` 只处理安装分发。
 - 修改必须落在拥有该职责、状态和资源的文件中；保持高内聚、低耦合，不因“现有文件方便访问”就加入跨领域逻辑。确有独立职责或生命周期时，在对应目录新增文件或提取纯策略；不要仅因文件较长就拆分，也不要为一处简单逻辑新建抽象。
-- 新文件开头用一两句注释写明文件职责与边界；涉及外部资源时同时说明所有权或释放方式。注释解释原因和约束，不逐行复述实现；新增公开类型仍按项目约定写 XML 文档。
+- 新文件开头用一两句注释写明文件职责与边界；涉及外部资源时同时说明所有权或释放方式。注释解释原因和约束，不逐行复述实现；新增公开类型仍按项目约定写 XML 文档。双语仅是 README 与 CHANGELOG 的要求，代码注释（含 XML 文档）不要求双语，无需刻意配对中英文。
 
 ## 媒体来源与适配器
 
