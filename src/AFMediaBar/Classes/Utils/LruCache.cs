@@ -89,6 +89,12 @@ public sealed class LruCache<TKey, TValue> where TKey : notnull
     {
         lock (_sync)
         {
+            if (key is null)
+            {
+                value = default;
+                return false;
+            }
+
             if (_map.TryGetValue(key, out var node))
             {
                 _lruList.Remove(node);

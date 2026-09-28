@@ -3,14 +3,9 @@ using AFMediaBar.Classes.Settings;
 namespace AFMediaBar.Classes.Models;
 
 /// <summary>
-/// 歌词检索请求：曲目元数据加上两个取词选项。
-/// A lyric lookup request: track metadata plus the two retrieval options.
-///
-/// 两个选项由 <c>LyricsService</c> 在发起取词前按当前设置填入，因此提供器不需要读设置，保持无状态且可单测；
-/// 直接构造时它们是默认值（均衡匹配、过滤信息行），与升级前的行为一致。
-/// The service fills both options from the current settings before it starts retrieving, so providers never read the settings and
-/// stay stateless and testable; a request built directly keeps the defaults (balanced matching, filtered info lines), which match
-/// the behaviour that was in effect before these options existed.
+/// 歌词检索请求，保留播放器原始元数据；过滤选项由协调器在取词前填入。
+/// MatchStrictness 仅为旧调用兼容，不参与候选评分；门槛和权重由代码策略统一定义。
+/// Retains original player metadata; filtering is supplied by the coordinator and scoring belongs to the fixed policy.
 /// </summary>
 /// <param name="Title">曲名 / Track title.</param>
 /// <param name="Artist">歌手 / Artist.</param>
@@ -18,10 +13,9 @@ namespace AFMediaBar.Classes.Models;
 /// <param name="DurationSeconds">曲目时长（秒），未知为 null / Track duration in seconds, null when unknown.</param>
 /// <param name="NetEaseSongId">网易云歌曲 id；非空时按 id 精确取词 / NetEase song id; a non-null value retrieves by id.</param>
 /// <param name="SourceAppId">正在播放的来源应用的 SMTC 标识（SourceAppUserModelId 原文），未知为 null。
-/// 链路用它挑出该播放器的默认取词来源；原文保留，识别交给链路层的映射策略，本模型不做解释。
-/// The SMTC identifier (raw SourceAppUserModelId) of the playing source application, null when unknown. The retrieval chain uses it to
-/// pick that player's default lyric source; the raw value is kept as-is and interpretation belongs to the chain's mapping policy, not this model.</param>
-/// <param name="MatchStrictness">搜索型来源的匹配严格度 / Match strictness for search-based sources.</param>
+/// 原文保留作为请求上下文，不决定取词顺序。
+/// The raw SMTC identifier of the playing application, null when unknown; retained as context without controlling retrieval order.</param>
+/// <param name="MatchStrictness">旧调用兼容字段，运行时忽略 / Legacy compatibility field, ignored during retrieval.</param>
 /// <param name="FilterInfoLines">是否丢弃作者、作曲等信息行 / Whether credit lines such as writer and composer are dropped.</param>
 public sealed record LyricsRequest(
     string Title,

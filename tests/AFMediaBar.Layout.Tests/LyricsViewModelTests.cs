@@ -1,6 +1,3 @@
-using AFMediaBar.Classes.Abstractions;
-using AFMediaBar.Classes.Models;
-using AFMediaBar.Classes.Models;
 using AFMediaBar.Classes.Services.Localization;
 using AFMediaBar.Classes.Services.Lyrics;
 using AFMediaBar.Classes.Settings;
@@ -72,27 +69,10 @@ public sealed class LyricsViewModelTests
     }
 
     [TestMethod]
-    public void MovingASourceDownPersistsTheNewPriority()
-    {
-        var viewModel = CreateViewModel();
-        var first = viewModel.SourceEntries[0];
-        var second = viewModel.SourceEntries[1];
-
-        viewModel.MoveSourceDownCommand.Execute(first);
-
-        Assert.AreEqual(second.SourceId, viewModel.SourceEntries[0].SourceId);
-        Assert.AreEqual(first.SourceId, viewModel.SourceEntries[1].SourceId);
-        CollectionAssert.AreEqual(
-            new[] { second.SourceId, first.SourceId },
-            SettingsManager.Current.LyricsSource.EnabledSourceIds!.Take(2).ToArray());
-    }
-
-    [TestMethod]
     public void ResetOrderRestoresEverySourceAndTheUnconfiguredState()
     {
         var viewModel = CreateViewModel();
         viewModel.SourceEntries[0].IsEnabled = false;
-        viewModel.MoveSourceDownCommand.Execute(viewModel.SourceEntries[2]);
 
         viewModel.ResetSourceOrderCommand.Execute(null);
 
@@ -114,62 +94,10 @@ public sealed class LyricsViewModelTests
 
         var entries = viewModel.SourceEntries;
         Assert.AreEqual(LyricsSourceCatalog.DefaultOrder.Count, entries.Count);
-        Assert.AreEqual(LyricsSourceCatalog.Kugou, entries[0].SourceId);
-        Assert.IsTrue(entries[0].IsEnabled);
-        Assert.IsTrue(entries.Skip(1).All(entry => !entry.IsEnabled));
+        Assert.IsTrue(entries.Single(entry => entry.SourceId == LyricsSourceCatalog.Kugou).IsEnabled);
+        Assert.IsTrue(entries.Where(entry => entry.SourceId != LyricsSourceCatalog.Kugou).All(entry => !entry.IsEnabled));
         Assert.IsFalse(viewModel.IsEverySourceDisabled);
     }
 
-    private static LyricsViewModel CreateViewModel() => new(new LocalizationService(), new StubSessionScanner());
-
-    [DataTestMethod]
-    [DataRow(LyricsQueryStrategy.Sequential)]
-    [DataRow(LyricsQueryStrategy.Concurrent)]
-    public async Task QueryStrategyFlowsFromViewModelIntoProviderDispatch(LyricsQueryStrategy strategy)
-    {
-        var viewModel = CreateViewModel();
-        viewModel.ConcurrencyBatchSize = 3;
-        viewModel.QueryStrategy = strategy == LyricsQueryStrategy.Sequential
-            ? LyricsQueryStrategy.Concurrent : LyricsQueryStrategy.Sequential;
-        viewModel.QueryStrategy = strategy;
-        Assert.AreEqual(strategy, LyricsRetrievalOptions.FromSettings().QueryStrategy);
-
-        var releaseFirst = new TaskCompletionSource<LyricsResult?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var first = new DispatchProvider(LyricsSourceCatalog.QQMusic, () => releaseFirst.Task);
-        var second = new DispatchProvider(LyricsSourceCatalog.Kugou, () => Task.FromResult<LyricsResult?>(null));
-        SettingsManager.SetLyricsSourceSettings(new LyricsSourceSettings([first.SourceName, second.SourceName]));
-        var service = new LyricsService(first, second);
-        var retrieval = service.GetLyricsAsync(new LyricsRequest("Song", "Artist", "", null, null), CancellationToken.None);
-        try
-        {
-            Assert.IsTrue(first.Started);
-            Assert.AreEqual(strategy == LyricsQueryStrategy.Concurrent, second.Started,
-                "Only concurrent mode should dispatch the second provider before the first finishes.");
-        }
-        finally
-        {
-            releaseFirst.TrySetResult(null);
-            await retrieval;
-        }
-        Assert.IsTrue(second.Started);
-    }
-
-    private sealed class DispatchProvider(string name, Func<Task<LyricsResult?>> retrieve) : ILyricsProvider
-    {
-        public string SourceName => name;
-        public bool Started { get; private set; }
-        public Task<LyricsResult?> GetLyricsAsync(LyricsRequest request, CancellationToken cancellationToken)
-        {
-            Started = true;
-            return retrieve();
-        }
-    }
-
-    /// <summary>空会话扫描桩：绑定列表的刷新与来源列表共用全局设置，扫描本身另有并发测试覆盖。
-    /// An empty scanner stub: the binding list's refresh shares the global settings with the source list, while the scan
-    /// itself is covered by the concurrency tests.</summary>
-    private sealed class StubSessionScanner : IMediaSessionSourceScanner
-    {
-        public IReadOnlyList<MediaSessionOption> CurrentSessionOptions { get; } = [];
-    }
+    private static LyricsViewModel CreateViewModel() => new(new LocalizationService());
 }

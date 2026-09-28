@@ -1,3 +1,4 @@
+// 旧取词调度、严格度和绑定类型保留 JSON/schema 兼容；运行时固定策略不再读取这些字段。
 namespace AFMediaBar.Classes.Settings;
 
 /// <summary>

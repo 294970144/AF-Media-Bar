@@ -15,4 +15,8 @@ namespace AFMediaBar.Classes.Models;
 /// </summary>
 /// <param name="Source">歌词来源标识（如 "Netease"、"LRCLIB"），只用于诊断 / Source identifier such as "Netease" or "LRCLIB"; diagnostics only.</param>
 /// <param name="Document">该来源命中的歌词文档 / The lyric document this source matched.</param>
-public sealed record LyricsResult(string Source, LyricDocument Document);
+public sealed record LyricsResult(string Source, LyricDocument Document)
+{
+    /// <summary>获取侧计算的匹配分（0–100），用于备用结果排序。/ Retrieval-side metadata score for fallback ranking.</summary>
+    public int MatchScore { get; init; }
+}

@@ -284,7 +284,7 @@ public sealed class LyricsSettingsTests
     [DataRow("张三,李四", "张三")]
     [DataRow("  Taylor Swift  ", "Taylor Swift")]
     [DataRow("", "")]
-    public async Task EveryLyricsSourceReceivesOnlyTheFirstArtist(string artist, string expected)
+    public async Task EveryLyricsSourceReceivesTheFullOriginalArtist(string artist, string expected)
     {
         var providers = new[]
         {
@@ -300,7 +300,7 @@ public sealed class LyricsSettingsTests
         foreach (var provider in providers)
         {
             Assert.IsNotNull(provider.Request, provider.SourceName);
-            Assert.AreEqual(expected, provider.Request.Artist, provider.SourceName);
+            Assert.AreEqual(artist, provider.Request.Artist, provider.SourceName);
             Assert.AreEqual(request.Title, provider.Request.Title);
             Assert.AreEqual(request.DurationSeconds, provider.Request.DurationSeconds);
         }
@@ -317,20 +317,6 @@ public sealed class LyricsSettingsTests
             Request = request;
             return Task.FromResult<LyricsResult?>(null);
         }
-    }
-
-    [TestMethod]
-    public void MatchStrictnessMapsOntoTheLibraryLevels()
-    {
-        Assert.AreEqual(
-            Lyricify.Lyrics.Searchers.Helpers.CompareHelper.MatchType.High,
-            LyricsMatchPolicy.ToMinimumMatch(LyricsMatchStrictness.Balanced));
-        Assert.AreEqual(
-            Lyricify.Lyrics.Searchers.Helpers.CompareHelper.MatchType.VeryHigh,
-            LyricsMatchPolicy.ToMinimumMatch(LyricsMatchStrictness.Strict));
-        Assert.AreEqual(
-            Lyricify.Lyrics.Searchers.Helpers.CompareHelper.MatchType.Perfect,
-            LyricsMatchPolicy.ToMinimumMatch(LyricsMatchStrictness.Exact));
     }
 
     // ---- 占位文本 ----
@@ -364,7 +350,7 @@ public sealed class LyricsSettingsTests
     public void OnlyRetrievalSettingsClearTheLyricCache()
     {
         Assert.IsTrue(LyricsCacheInvalidationPolicy.ShouldClearCache(nameof(AppSettings.LyricsSource), null));
-        Assert.IsTrue(LyricsCacheInvalidationPolicy.ShouldClearCache(nameof(AppSettings.LyricsMatchStrictness), null));
+        Assert.IsFalse(LyricsCacheInvalidationPolicy.ShouldClearCache(nameof(AppSettings.LyricsMatchStrictness), null));
         Assert.IsTrue(LyricsCacheInvalidationPolicy.ShouldClearCache(nameof(AppSettings.LyricsInfoLineFilterEnabled), null));
         Assert.IsTrue(LyricsCacheInvalidationPolicy.ShouldClearCache(null, SettingsResetScope.Lyrics));
         Assert.IsTrue(LyricsCacheInvalidationPolicy.ShouldClearCache(null, SettingsResetScope.All));

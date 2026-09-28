@@ -72,8 +72,8 @@ internal static class QQMusicLocalCache
         // QQ 写缓存文件名时把文件名非法字符换成 "_"（例如 SAKURA*TRICK → SAKURA_TRICK），匹配前先同形清洗元数据。
         // QQ sanitizes filename-illegal characters into "_" when writing cache names (SAKURA*TRICK → SAKURA_TRICK), so the
         // metadata gets the same shape before matching.
-        title = SanitizeForMatch(title);
-        album = SanitizeForMatch(album);
+        title = SanitizeForMatch(LyricsSearchQueryPolicy.WithoutTranslation(title));
+        album = SanitizeForMatch(LyricsSearchQueryPolicy.WithoutTranslation(album));
 
         var directory = ResolveLyricDirectory();
         if (directory is null)
@@ -205,7 +205,8 @@ internal static class QQMusicLocalCache
                 samples.Add($"\"{info.Value.Title}\" / \"{info.Value.Album}\"");
             }
 
-            if (info.Value.Title == title && info.Value.Album == album)
+            if (LyricsSearchQueryPolicy.WithoutTranslation(info.Value.Title) == title &&
+                LyricsSearchQueryPolicy.WithoutTranslation(info.Value.Album) == album)
             {
                 found = path;
                 break;
