@@ -269,7 +269,7 @@ internal static class StringsEn
         table.Add("Diagram.TaskbarPlacement.Caption", "The media bar avoids the taskbar icons automatically; the edge offset adjusts the gap between it and the icon area.");
         table.Add("Diagram.TaskbarPlacement.Label.EdgeOffset", "Edge offset −20 ~ +20 px");
         table.Add("Diagram.TaskbarPlacement.Label.TaskbarIcons", "Taskbar icons");
-        table.Add("Diagram.TrayOverflow.Caption", "The highlighted square is this application; it sits in the hidden-icon area by default and has to be dragged out in Windows taskbar settings before tray clicks and the wheel work.");
+        table.Add("Diagram.TrayOverflow.Caption", "The highlighted square is this app. Clicks and wheel input work whether the icon is visible on the taskbar or in the hidden-icon area.");
         table.Add("Diagram.TrayOverflow.Label.OverflowArrow", "Collapsed into the arrow");
         table.Add("Diagram.TrayOverflow.Label.TrayArea", "Tray area");
         table.Add("Diagram.WheelGestures.Caption", "Up and down have no fixed meaning; the bound action decides. A device switch shows the candidates first and applies about 1.2 seconds after scrolling stops.");

@@ -18,6 +18,7 @@ public enum WheelAction
 /// <summary>单击通知区域图标时执行的动作。 / Action performed when the notification-area icon is clicked.</summary>
 public enum TrayClickAction
 {
+    /// <summary>禁用托盘左键单击动作。/ Disables the tray icon's left-click action.</summary>
     None = 0,
     OpenSettings = 1,
     OpenAudioControl = 2,
@@ -662,6 +663,7 @@ public readonly record struct GlobalInteractionSettings(
             Modifier = Enum.IsDefined(Modifier) ? Modifier : defaults.Modifier,
             ChordWheelAction = Enum.IsDefined(ChordWheelAction) ? ChordWheelAction : defaults.ChordWheelAction,
             TrayClickAction = TrayClickAction is TrayClickAction.OpenAudioControl
+                or TrayClickAction.None
                 or TrayClickAction.OpenSettings
                 or TrayClickAction.OpenContextMenu
                 or TrayClickAction.OpenOutputDeviceMenu
@@ -674,7 +676,7 @@ public readonly record struct GlobalInteractionSettings(
     }
 
     private static TrayWheelBehavior NormalizeTrayWheelAction(TrayWheelBehavior action, TrayWheelBehavior fallback) =>
-        action is TrayWheelBehavior.AdjustVolume or TrayWheelBehavior.SwitchOutputDevice ? action : fallback;
+        action is TrayWheelBehavior.AdjustVolume or TrayWheelBehavior.SwitchOutputDevice or TrayWheelBehavior.Disabled ? action : fallback;
 }
 
 /// <summary>一个显示模式的基础表面外观。 / Basic surface appearance for one display mode.</summary>

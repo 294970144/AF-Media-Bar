@@ -269,7 +269,7 @@ internal static class StringsZhHant
         table.Add("Diagram.TaskbarPlacement.Caption", "媒體列自動避開工作列圖示；邊緣位移用於調整它與圖示區之間的間距。");
         table.Add("Diagram.TaskbarPlacement.Label.EdgeOffset", "邊緣位移 −20 ~ +20 像素");
         table.Add("Diagram.TaskbarPlacement.Label.TaskbarIcons", "工作列圖示");
-        table.Add("Diagram.TrayOverflow.Caption", "高亮方塊為本程式，預設位於隱藏圖示區；需在 Windows 工作列設定中將其拖出，托盤點擊與滾輪才會生效。");
+        table.Add("Diagram.TrayOverflow.Caption", "高亮方塊為本程式。圖示位於工作列托盤或隱藏圖示區時，點擊與滾輪均可生效。");
         table.Add("Diagram.TrayOverflow.Label.OverflowArrow", "收進小箭頭");
         table.Add("Diagram.TrayOverflow.Label.TrayArea", "托盤區");
         table.Add("Diagram.WheelGestures.Caption", "向上與向下沒有固定含義，取決於繫結的動作。切換裝置時先顯示候選，停止捲動約 1.2 秒後套用。");

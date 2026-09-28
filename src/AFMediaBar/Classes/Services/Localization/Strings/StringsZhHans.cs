@@ -269,7 +269,7 @@ internal static class StringsZhHans
         table.Add("Diagram.TaskbarPlacement.Caption", "媒体栏自动避开任务栏图标；边缘偏移用于调整它与图标区之间的间距。");
         table.Add("Diagram.TaskbarPlacement.Label.EdgeOffset", "边缘偏移 −20 ~ +20 像素");
         table.Add("Diagram.TaskbarPlacement.Label.TaskbarIcons", "任务栏图标");
-        table.Add("Diagram.TrayOverflow.Caption", "高亮方块为本程序，默认位于隐藏图标区；需在 Windows 任务栏设置中将其拖出，托盘点击与滚轮才会生效。");
+        table.Add("Diagram.TrayOverflow.Caption", "高亮方块为本程序。图标位于任务栏托盘或隐藏图标区时，点击与滚轮均可生效。");
         table.Add("Diagram.TrayOverflow.Label.OverflowArrow", "收进小箭头");
         table.Add("Diagram.TrayOverflow.Label.TrayArea", "托盘区");
         table.Add("Diagram.WheelGestures.Caption", "向上与向下没有固定含义，取决于绑定的动作。切换设备时先显示候选，停止滚动约 1.2 秒后应用。");

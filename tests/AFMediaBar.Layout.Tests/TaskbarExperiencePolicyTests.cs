@@ -277,6 +277,23 @@ public sealed class TaskbarExperiencePolicyTests
     }
 
     [TestMethod]
+    public void DisabledTrayBindingsSurviveNormalization()
+    {
+        // 禁用值被归一化覆盖时，用户本来停用的托盘滚轮会再次控制音量或设备。
+        var settings = GlobalInteractionSettings.Default with
+        {
+            TrayClickAction = TrayClickAction.None,
+            TrayPrimaryWheelAction = TrayWheelBehavior.Disabled,
+            TrayChordWheelAction = TrayWheelBehavior.Disabled
+        };
+
+        var normalized = settings.Normalize();
+        Assert.AreEqual(TrayClickAction.None, normalized.TrayClickAction);
+        Assert.AreEqual(TrayWheelBehavior.Disabled, GlobalWheelGesturePolicy.ResolveTray(normalized, false, false, false));
+        Assert.AreEqual(TrayWheelBehavior.Disabled, GlobalWheelGesturePolicy.ResolveTray(normalized, true, false, false));
+    }
+
+    [TestMethod]
     public void MediaSourceWheelMovesCircularlyInBothDirections()
     {
         Assert.AreEqual(2, WheelInput.MoveCircular(0, -1, 3));
