@@ -1616,7 +1616,8 @@ namespace AFMediaBar.Components
                 // No media playing - show the placeholder text so the media bar stays visible
                 Dispatcher.Invoke(() =>
                 {
-                    if (_isConnected)
+                    var wasConnected = _isConnected;
+                    if (wasConnected)
                         _quickLaunchTooltip.Content = null;
                     _actualTitle = string.Empty;
                     _actualArtist = string.Empty;
@@ -1648,6 +1649,8 @@ namespace AFMediaBar.Components
                     HideTaskbarHoverLayer(immediate: true);
                     UpdateTaskbarProgress();
                     ApplyTaskbarExperienceSettings();
+                    if (wasConnected)
+                        AnimateArtworkConnectionTransition();
 
                     // 任务栏无媒体时保持完全透明；灵动岛保留布局定义的稳定背景。
                     // Keep the disconnected taskbar transparent; preserve the dynamic-island layout background.
@@ -1659,11 +1662,11 @@ namespace AFMediaBar.Components
                     }
 
                     Visibility = Visibility.Visible;
-                    RaiseDesiredSizeChanged(isForcedRefresh: true);
                 });
                 return;
             }
 
+            var wasConnected = _isConnected;
             _isPaused = !snapshot.IsPlaying;
             _isConnected = true;
             _canPlayPause = snapshot.CanPlayPause;
@@ -1677,12 +1680,9 @@ namespace AFMediaBar.Components
                     ? snapshot.Artist
                     : !string.IsNullOrWhiteSpace(snapshot.SourceName) ? snapshot.SourceName : "-";
 
-                // 标题或艺术家变化时触发入场动画
-                // Trigger entrance animation when title or artist changes
-                if (_actualTitle != newTitle || _actualArtist != newArtist)
+                var textChanged = _actualTitle != newTitle || _actualArtist != newArtist;
+                if (textChanged)
                 {
-                    AnimateEntrance();
-
                     _actualTitle = newTitle;
                     _actualArtist = newArtist;
 
@@ -1760,6 +1760,12 @@ namespace AFMediaBar.Components
                 TaskbarPlayPauseIcon.Symbol = _isPaused ? SymbolRegular.Play24 : SymbolRegular.Pause24;
                 UpdateTaskbarProgress();
                 ApplyTaskbarExperienceSettings();
+                // 入场放在布局显隐之后：无媒体时文字被折叠，提前启动会把动画消耗在不可见阶段。
+                // Start the entrance after layout restores visibility; while disconnected the text is collapsed.
+                if (!wasConnected)
+                    AnimateArtworkConnectionTransition();
+                if (textChanged)
+                    AnimateEntrance();
 
                 Visibility = Visibility.Visible;
                 RaiseDesiredSizeChanged();
