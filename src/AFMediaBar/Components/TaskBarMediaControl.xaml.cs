@@ -390,6 +390,7 @@ namespace AFMediaBar.Components
                 _quickLaunchTooltip.Content = text;
             }
 
+            ApplyArtworkTooltipOwner();
             ReassertQuickLaunchTooltip();
         }
 
@@ -586,7 +587,9 @@ namespace AFMediaBar.Components
         /// </summary>
         private void ApplyArtworkTooltipOwner()
         {
-            var owner = _isConnected ? _artworkWheelTooltip : _quickLaunchTooltip;
+            var owner = _isConnected
+                ? _artworkWheelTooltip
+                : _quickLaunchTooltip.Content is null ? null : _quickLaunchTooltip;
             if (ReferenceEquals(SongImageBorder.ToolTip, owner))
                 return;
 
@@ -1613,6 +1616,8 @@ namespace AFMediaBar.Components
                 // No media playing - show the placeholder text so the media bar stays visible
                 Dispatcher.Invoke(() =>
                 {
+                    if (_isConnected)
+                        _quickLaunchTooltip.Content = null;
                     _actualTitle = string.Empty;
                     _actualArtist = string.Empty;
                     _isConnected = false;
