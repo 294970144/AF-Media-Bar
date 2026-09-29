@@ -207,6 +207,7 @@ namespace AFMediaBar
                 services.AddSingleton<DisplayModesViewModel>();
                 services.AddSingleton<ExtraFeaturesPage>();
                 services.AddSingleton<ExtraFeaturesViewModel>();
+                services.AddSingleton<ComponentsSettingsPage>();
 
                 services.AddSingleton<InteractionPage>();
                 services.AddSingleton<InteractionViewModel>();

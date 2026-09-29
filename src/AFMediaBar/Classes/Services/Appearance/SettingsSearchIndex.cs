@@ -82,6 +82,7 @@ public static class SettingsSearchIndex
     {
         SettingsPageKey.DisplayModes => "Common.Page.DisplayModes",
         SettingsPageKey.MediaAndNotifications => "Common.Page.MediaAndNotifications",
+        SettingsPageKey.Components => "Common.Page.Components",
         SettingsPageKey.Interaction => "Common.Page.Interaction",
         SettingsPageKey.Lyrics => "Common.Page.Lyrics",
         SettingsPageKey.Appearance => "Common.Page.Appearance",
@@ -241,17 +242,19 @@ public static class SettingsSearchIndex
         Create(
             SettingsPageKey.MediaAndNotifications,
             2,
-            "Common.Group.RestLayerComponents",
-            "Search.MediaAndNotifications.RestLayerComponents.Description",
-            language,
-            ["频谱", "spectrum", "均衡", "柱", "柱数", "刷新率", "灵敏度", "性能", "performance", "内存", "cpu", "gpu", "指标", "任务管理器", "柱子数量", "刷新速度", "跳动幅度", "样式", "波形", "波形图", "像素", "像素柱状图", "点阵", "对称", "上下对称", "采样间隔", "刷新间隔", "秒", "毫秒", "ms"]),
-        Create(
-            SettingsPageKey.MediaAndNotifications,
-            3,
             "Common.Group.TrackChangeNotification",
             "Search.MediaAndNotifications.TrackChangeNotification.Description",
             language,
             ["通知", "notification", "切歌", "曲目", "track", "位置", "锚点", "停留", "时长", "duration", "全屏", "显示器", "停留时间", "目标显示器"]),
+
+        // ---- 组件设置 / Components ----
+        Create(
+            SettingsPageKey.Components,
+            0,
+            "Common.Group.RestLayerComponents",
+            "Search.Components.RestLayerComponents.Description",
+            language,
+            ["频谱", "spectrum", "均衡", "柱", "柱数", "刷新率", "灵敏度", "性能", "performance", "内存", "cpu", "gpu", "指标", "任务管理器", "柱子数量", "刷新速度", "跳动幅度", "样式", "波形", "波形图", "像素", "像素柱状图", "点阵", "对称", "上下对称", "采样间隔", "刷新间隔", "秒", "毫秒", "ms"]),
 
         // ---- 交互 / Interaction ----
         Create(

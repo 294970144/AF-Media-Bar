@@ -224,6 +224,7 @@ internal static class StringsZhHant
         table.Add("Common.Page.About", "關於");
         table.Add("Common.Page.Application", "應用程式");
         table.Add("Common.Page.Appearance", "外觀");
+        table.Add("Common.Page.Components", "元件設定");
         table.Add("Common.Page.DisplayModes", "顯示模式");
         table.Add("Common.Page.Interaction", "互動");
         table.Add("Common.Page.Lyrics", "歌詞");
@@ -362,7 +363,7 @@ internal static class StringsZhHant
         table.Add("DisplayModes.Rest.Idle.Expander.Description", "沒有媒體來源時媒體列上還留哪些元件；一個都不勾選時整條媒體列隱藏");
         table.Add("DisplayModes.Rest.Idle.Expander.Title", "沒有媒體時顯示");
         table.Add("DisplayModes.Rest.Idle.Notice", "封面與媒體文字不在這裡：沒有媒體時它們沒有任何內容可顯示，因此一定不顯示；只留小音符時仍可從它上面滾動挑選播放器。");
-        table.Add("DisplayModes.Rest.Notice", "頻譜與效能元件的開關和參數在「媒體與通知 → 靜置層元件」；媒體文字大小在「外觀 → 媒體列文字」。頻譜採集的是目前輸出裝置的全部聲音。");
+        table.Add("DisplayModes.Rest.Notice", "頻譜與效能元件的開關和參數在「元件設定」；媒體文字大小在「外觀 → 媒體列文字」。頻譜採集的是目前輸出裝置的全部聲音。");
         table.Add("DisplayModes.Rest.Order.Expander.Description", "順序即媒體列裡由左至右的排列；封面與媒體文字固定在最前面，其餘四個可以上下移動");
         table.Add("DisplayModes.Rest.Order.Expander.Title", "靜置層元件順序");
         table.Add("DisplayModes.Rest.Order.Notice", "封面與媒體文字固定在媒體列最前面，不參與排序（前兩行沒有上下移按鈕）。");
@@ -551,7 +552,8 @@ internal static class StringsZhHant
         table.Add("Media.Badge.EnableFirst", "需先啟用");
         table.Add("Media.Dialog.Browse.Filter", "應用程式和捷徑 (*.exe;*.lnk)|*.exe;*.lnk");
         table.Add("Media.Dialog.Browse.Title", "選擇媒體應用程式或捷徑");
-        table.Add("Media.Header.Subtitle", "媒體來源、快速啟動、靜置層元件與曲目通知");
+        table.Add("Media.Header.Subtitle", "媒體來源、快速啟動與曲目通知");
+        table.Add("Components.Header.Subtitle", "靜置層元件的顯示與參數");
         table.Add("Media.Metric.ProcessMemory.Title", "本程式記憶體");
         table.Add("Media.Metric.SystemMemory.Description", "至少保留一項，最後一項無法取消");
         table.Add("Media.Metric.SystemMemory.Title", "系統記憶體");
@@ -683,7 +685,7 @@ internal static class StringsZhHant
         table.Add("Search.Lyrics.Sources.Description", "選擇歌詞來源、它們的優先順序與搜尋符合嚴格度");
         table.Add("Search.MediaAndNotifications.MediaSource.Description", "來源允許清單與已偵測來源");
         table.Add("Search.MediaAndNotifications.QuickLaunch.Description", "沒有媒體時從音符啟動播放器");
-        table.Add("Search.MediaAndNotifications.RestLayerComponents.Description", "疊加在靜置層右側的頻譜與效能元件");
+        table.Add("Search.Components.RestLayerComponents.Description", "疊加在靜置層右側的頻譜與效能元件");
         table.Add("Search.MediaAndNotifications.TrackChangeNotification.Description", "曲目切換並開始播放時顯示目前曲目");
 
         // ---- Service ----

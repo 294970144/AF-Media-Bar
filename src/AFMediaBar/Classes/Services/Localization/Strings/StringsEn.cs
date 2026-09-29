@@ -224,6 +224,7 @@ internal static class StringsEn
         table.Add("Common.Page.About", "About");
         table.Add("Common.Page.Application", "Application");
         table.Add("Common.Page.Appearance", "Appearance");
+        table.Add("Common.Page.Components", "Components");
         table.Add("Common.Page.DisplayModes", "Display mode");
         table.Add("Common.Page.Interaction", "Interaction");
         table.Add("Common.Page.Lyrics", "Lyrics");
@@ -362,7 +363,7 @@ internal static class StringsEn
         table.Add("DisplayModes.Rest.Idle.Expander.Description", "Which components stay on the media bar while no media source exists; with nothing checked the whole bar is hidden");
         table.Add("DisplayModes.Rest.Idle.Expander.Title", "Shown without media");
         table.Add("DisplayModes.Rest.Idle.Notice", "The artwork and the media text are not listed here: with no media they have nothing to display and are therefore never shown. Keeping only the note still lets a player be picked by wheeling over it.");
-        table.Add("DisplayModes.Rest.Notice", "The spectrum and performance components are switched and tuned under \"Media and notifications → Rest-layer components\"; the media text size is under \"Appearance → Media bar text\". The spectrum captures everything the current output device plays.");
+        table.Add("DisplayModes.Rest.Notice", "The spectrum and performance components are switched and tuned under \"Components\"; the media text size is under \"Appearance → Media bar text\". The spectrum captures everything the current output device plays.");
         table.Add("DisplayModes.Rest.Order.Expander.Description", "The order is the left-to-right arrangement inside the bar; the artwork and the media text are pinned to the front and the other four can move up and down");
         table.Add("DisplayModes.Rest.Order.Expander.Title", "Rest-layer component order");
         table.Add("DisplayModes.Rest.Order.Notice", "The artwork and the media text are pinned to the front of the bar and take no part in ordering (their two rows carry no move buttons).");
@@ -551,7 +552,8 @@ internal static class StringsEn
         table.Add("Media.Badge.EnableFirst", "Enable first");
         table.Add("Media.Dialog.Browse.Filter", "Applications and shortcuts (*.exe;*.lnk)|*.exe;*.lnk");
         table.Add("Media.Dialog.Browse.Title", "Select a media application or shortcut");
-        table.Add("Media.Header.Subtitle", "Media sources, quick launch, rest-layer components, and track notifications");
+        table.Add("Media.Header.Subtitle", "Media sources, quick launch, and track notifications");
+        table.Add("Components.Header.Subtitle", "Visibility and options for rest-layer components");
         table.Add("Media.Metric.ProcessMemory.Title", "Memory used by this application");
         table.Add("Media.Metric.SystemMemory.Description", "At least one metric is required, so the last one cannot be turned off");
         table.Add("Media.Metric.SystemMemory.Title", "System memory");
@@ -683,7 +685,7 @@ internal static class StringsEn
         table.Add("Search.Lyrics.Sources.Description", "Choose the lyric sources, their priority order, and the search match strictness");
         table.Add("Search.MediaAndNotifications.MediaSource.Description", "Source allow list and detected sources");
         table.Add("Search.MediaAndNotifications.QuickLaunch.Description", "Launching a player from the note glyph when no media is playing");
-        table.Add("Search.MediaAndNotifications.RestLayerComponents.Description", "Spectrum and performance components overlaid on the right of the rest layer");
+        table.Add("Search.Components.RestLayerComponents.Description", "Spectrum and performance components overlaid on the right of the rest layer");
         table.Add("Search.MediaAndNotifications.TrackChangeNotification.Description", "Showing the current track when a new track starts playing");
 
         // ---- Service ----

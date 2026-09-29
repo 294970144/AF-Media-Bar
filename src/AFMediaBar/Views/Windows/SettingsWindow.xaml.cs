@@ -35,6 +35,7 @@ namespace AFMediaBar.Views.Windows
             {
                 [SettingsPageKey.DisplayModes] = typeof(DisplayModesPage),
                 [SettingsPageKey.MediaAndNotifications] = typeof(ExtraFeaturesPage),
+                [SettingsPageKey.Components] = typeof(ComponentsSettingsPage),
                 [SettingsPageKey.Interaction] = typeof(InteractionPage),
                 [SettingsPageKey.Lyrics] = typeof(LyricsPage),
                 [SettingsPageKey.Appearance] = typeof(AppearancePage),

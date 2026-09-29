@@ -718,12 +718,17 @@ public sealed class SettingsPersistenceServiceTests
         SettingsManager.Current.SmtcSourceFilter = new SmtcSourceFilterSettings(true, ["player"]);
         SettingsManager.Current.QuickLaunch = new QuickLaunchSettings([
             new QuickLaunchEntry("player", "Player", QuickLaunchTargetKind.AppUserModelId, "Player.App!App")]);
-        SettingsManager.Current.SpectrumComponent = new SpectrumComponentSettings(3, 8, 250);
+        SettingsManager.Current.SpectrumComponent = new SpectrumComponentSettings(12, 8, 250);
         SettingsManager.Current.PerformanceComponent = new PerformanceComponentSettings([MetricKind.SystemGpu], 900, true);
         SettingsManager.ResetExtraFeatures();
         Assert.AreEqual(TrackChangeNotificationSettings.Default, SettingsManager.Current.TrackChangeNotification);
         Assert.AreEqual(SmtcSourceFilterSettings.Default, SettingsManager.Current.SmtcSourceFilter);
         Assert.AreEqual(0, SettingsManager.Current.QuickLaunch.Entries!.Count);
+        Assert.AreEqual(12, SettingsManager.Current.SpectrumComponent.BandCount);
+        CollectionAssert.AreEqual(
+            new[] { MetricKind.SystemGpu },
+            SettingsManager.Current.PerformanceComponent.Metrics!.ToArray());
+        SettingsManager.ResetComponents();
         Assert.AreEqual(SpectrumComponentSettings.Default, SettingsManager.Current.SpectrumComponent);
         CollectionAssert.AreEqual(
             PerformanceComponentSettings.Default.Metrics!.ToArray(),

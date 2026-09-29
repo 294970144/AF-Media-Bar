@@ -18,6 +18,9 @@ public enum SettingsPageKey
     /// <summary>媒体与通知页。/ Media and notifications page.</summary>
     MediaAndNotifications,
 
+    /// <summary>静置层组件设置页。/ Rest-layer component settings page.</summary>
+    Components,
+
     /// <summary>交互页。/ Interaction page.</summary>
     Interaction,
 

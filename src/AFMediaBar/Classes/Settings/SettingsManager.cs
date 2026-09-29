@@ -343,7 +343,7 @@ public sealed class AppSettings : INotifyPropertyChanged
 }
 
 /// <summary>设置重置范围。 / Settings reset scope.</summary>
-public enum SettingsResetScope { General, Appearance, Layout, DisplayModes, ExtraFeatures, Interaction, Lyrics, All }
+public enum SettingsResetScope { General, Appearance, Layout, DisplayModes, ExtraFeatures, Interaction, Lyrics, All, Components }
 
 /// <summary>设置变更通知参数。 / Settings change notification arguments.</summary>
 public sealed class SettingsChangedEventArgs(SettingsResetScope? resetScope = null, string? propertyName = null) : EventArgs
@@ -494,9 +494,14 @@ public static class SettingsManager
         next.TrackChangeNotification = defaults.TrackChangeNotification;
         next.SmtcSourceFilter = defaults.SmtcSourceFilter;
         next.QuickLaunch = QuickLaunchSettings.Default;
+        Replace(next, SettingsResetScope.ExtraFeatures);
+    }
+    public static void ResetComponents()
+    {
+        var next = Current.Clone(); var defaults = Defaults;
         next.SpectrumComponent = defaults.SpectrumComponent;
         next.PerformanceComponent = defaults.PerformanceComponent;
-        Replace(next, SettingsResetScope.ExtraFeatures);
+        Replace(next, SettingsResetScope.Components);
     }
     public static void ResetInteraction()
     {
