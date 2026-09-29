@@ -139,9 +139,9 @@ Thank you to all the developers who have contributed to AF Media Bar.
 
 Thanks to the following open-source projects:
 
-- [FluentFlyout](https://github.com/unchihugo/FluentFlyout)
-- [Lyricify-Lyrics-Helper](https://github.com/WXRIW/Lyricify-Lyrics-Helper)
-- [TaskbarLyrics](https://github.com/ANYNC/TaskbarLyrics)
+- [FluentFlyout](https://github.com/unchihugo/FluentFlyout): A simple, modern Windows volume flyout.
+- [Lyricify-Lyrics-Helper](https://github.com/WXRIW/Lyricify-Lyrics-Helper): A Lyricify lyrics library for parsing, generating, searching, decrypting, and refining lyrics.
+- [TaskbarLyrics](https://github.com/ANYNC/TaskbarLyrics): A Windows taskbar lyrics tool.
 
 
 ## License

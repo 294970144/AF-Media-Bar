@@ -140,9 +140,9 @@ AF-Media-Bar/
 
 感谢以下开源项目：
 
-- [FluentFlyout](https://github.com/unchihugo/FluentFlyout)
-- [Lyricify-Lyrics-Helper](https://github.com/WXRIW/Lyricify-Lyrics-Helper)
-- [TaskbarLyrics](https://github.com/ANYNC/TaskbarLyrics)
+- [FluentFlyout](https://github.com/unchihugo/FluentFlyout)：简单、现代的 Windows 音量控制弹窗软件。
+- [Lyricify-Lyrics-Helper](https://github.com/WXRIW/Lyricify-Lyrics-Helper)：Lyricify 歌词库，提供歌词解析、生成、搜索、解密和优化处理。
+- [TaskbarLyrics](https://github.com/ANYNC/TaskbarLyrics)：Windows 任务栏歌词工具。
 
 
 ## License

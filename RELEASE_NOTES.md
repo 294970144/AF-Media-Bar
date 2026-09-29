@@ -1,81 +1,67 @@
-> The English release notes are provided in the second half of this document.
+> English release notes follow the Chinese section.
 
-# AF Media Bar 1.2.1
+# AF Media Bar 1.2.2
 
-1.2.0 的修复版本：任务栏自动隐藏动画、截图错位与多显示器显示。
+本次以稳定性和使用体验修复为主，并补充少量设置选项。
 
-## 本次修复
+## 新增
 
-- 任务栏自动隐藏动画：触边收起时的卡顿与跳位。
-- 截图或录屏时媒体栏不再错位、不再折叠。
-- 可在所有已启用的任务栏上同时显示。
-- 新增「逐字高亮」开关：关闭后歌词仍按时间轴滚动，轨迹不变。
-- 修复切换显示器后性能监测组件失效。
-- 修复后台内存整理与日志队列释放的竞争。
-- 修复设置页在说明条资源缺失时崩溃，以及若干窗口稳定性问题。
-- 滚轮手势与提示收窄到封面与文字区；完整层不再省略信息。
-- 网易云私人 FM 取词、静置层组件顺序与无媒体播放时的显示调整。
+- 歌词改用 WebView2 显示，呈现更美观；可分别调整行距、字距和显示区域长度。
+- 新增滚轮操作提示开关、交互按钮大小调节和独立的组件设置页。
+
+## 修复
+
+- 媒体出现或消失时，音符、封面、歌词和信息区的切换更流畅；调整媒体栏宽度时减少组件抖动、裁切和位置跳动。
+- 关闭浏览器媒体后更及时地收起旧画面；修复无媒体时的空白提示，以及任务栏图标减少后固定宽度上限不更新的问题。
+- 改进媒体会话恢复、歌词进度和封面匹配；修复低音量时频谱不动，以及托盘提示未及时反映输出设备或音量变化的问题。
+- 优化歌词查找，能匹配到更多歌曲
 
 ## 下载与安装
 
-系统要求、两种安装方式与更新说明：请见 [README](https://github.com/Fervent-Tempo/AF-Media-Bar#readme)（安装程序与便携版都自带 .NET 运行时，无需另装）。
+系统要求与安装方式见 [README](https://github.com/Fervent-Tempo/AF-Media-Bar#readme)。安装包和便携版均自带 .NET 运行时。
 
-- `AFMediaBar-Setup-v1.2.1-win-x64.exe`：安装程序，支持程序内静默更新。
-- `AFMediaBar-v1.2.1-win-x64.zip`：便携版，解压即用。
+- `AFMediaBar-Setup-v1.2.2-win-x64.exe`：安装版。
+- `AFMediaBar-v1.2.2-win-x64.zip`：便携版，解压即用。
 
-请勿使用 GitHub 自动生成的 Source code 压缩包；可用同一 Release 的 `SHA256SUMS.txt` 校验。
-
-## 国内下载镜像
-
-- 夸克网盘：[下载地址](https://pan.quark.cn/s/6987e4945b16)
-- 百度网盘：[下载地址](https://pan.baidu.com/s/1zUQtZ_N1tnRTjJKd9kKREA?pwd=6ddc)，提取码：`6ddc`
-- 蓝奏云：[下载地址](https://amorfate.lanzoue.com/b01eupanbg)，密码：`zzzz`
+请使用同一 Release 的 `SHA256SUMS.txt` 核对下载文件，不要使用 GitHub 自动生成的 Source code 压缩包。
 
 ## 已知限制
 
-- 竖向任务栏与悬浮模式仍未实现，设置中的对应入口是占位选项。
-- **从 1.1.1 及更早版本升级会重置设置**（旧文件改名留档为 `settings.json.unsupported-<时间戳>`，可手工找回）；1.2.0 → 1.2.1 不受影响。
-- 隐私说明与卸载方式：请见 [README](https://github.com/Fervent-Tempo/AF-Media-Bar#readme)。
-
-本版本没有已确认的阻断性问题。
+- 目前仅发布 `win-x64`；竖向任务栏与悬浮模式尚未实现。
+- 排列方向目前仅支持横向；托盘组合滚轮设置暂时禁用。
+- 1.2.1 → 1.2.2 保留现有设置。1.1.1 及更早版本的旧 schema 设置文件仍会改名留档，设置回到默认值。
+- 隐私说明与卸载方式见 [README](https://github.com/Fervent-Tempo/AF-Media-Bar#readme)。
 
 ---
 
-# AF Media Bar 1.2.1
+# AF Media Bar 1.2.2
 
-A fix release on top of 1.2.0: the taskbar auto-hide animation, misplacement while capturing the screen, and multi-monitor display.
+This release focuses on reliability and everyday polish, with a few new settings.
 
-## Fixes
+## Added
 
-- Taskbar auto-hide animation: stutter and jumping when the bar hides against the screen edge.
-- The bar no longer moves or collapses while a screenshot or screen recorder is open.
-- The bar can be shown on every enabled taskbar at once.
-- A new syllable-highlight switch: turning it off keeps lyrics scrolling on the same timeline and trajectory.
-- Fixed the performance-metrics component going dead after switching displays.
-- Fixed a race between background memory pruning and releasing the log queue.
-- Fixed the settings page crashing when a callout resource is missing, plus several window-stability issues.
-- Wheel gestures and their tooltip are scoped to the artwork and text region; the full layer no longer trims information.
-- NetEase private-FM metadata, rest-layer component order, and what is shown while nothing is playing.
+- Lyrics now use WebView2 for a more polished display. Adjust line spacing, character spacing, and display width;
+- Control wheel-gesture hints and interaction button size, with a separate page for component settings.
+
+## Fixed
+
+- Smoother transitions between the idle note, artwork, lyrics, and playback details, with less jitter, clipping, and jumping when resizing the bar.
+- Browser media clears sooner after closing; the empty tooltip while idle is gone, and the fixed-width limit updates when taskbar icons leave.
+- More reliable media-session recovery, lyric timing, and artwork matching; the spectrum responds at low volume, and the tray tooltip reflects current output device and volume.
+- Optimize lyrics search to match more songs
 
 ## Download and install
 
-Requirements, both installation options, and updating: see the [README](https://github.com/Fervent-Tempo/AF-Media-Bar/blob/main/README.en-US.md#readme) (both files are self-contained and need no separate .NET runtime).
+See the [English README](https://github.com/Fervent-Tempo/AF-Media-Bar/blob/main/README.en-US.md#readme) for requirements and installation. Both packages include the .NET runtime.
 
-- `AFMediaBar-Setup-v1.2.1-win-x64.exe` — the installer, with in-app silent updates.
-- `AFMediaBar-v1.2.1-win-x64.zip` — the portable build, unzip and run.
+- `AFMediaBar-Setup-v1.2.2-win-x64.exe` — installer.
+- `AFMediaBar-v1.2.2-win-x64.zip` — portable build.
 
-Do not use GitHub's generated source archives; verify against the `SHA256SUMS.txt` in the same release.
-
-## Mirrors in mainland China
-
-- Quark: [download](https://pan.quark.cn/s/6987e4945b16)
-- Baidu: [download](https://pan.baidu.com/s/1zUQtZ_N1tnRTjJKd9kKREA?pwd=6ddc), code `6ddc`
-- Lanzou: [download](https://amorfate.lanzoue.com/b01eupanbg), password `zzzz`
+Verify downloads against `SHA256SUMS.txt` from the same Release. Do not use GitHub's generated source archives.
 
 ## Known limitations
 
-- Vertical taskbars and floating mode are still not implemented; the matching entries in settings are placeholders.
-- **Upgrading from 1.1.1 or earlier resets your settings** (the old file is renamed to `settings.json.unsupported-<timestamp>` and kept, recoverable by hand); 1.2.0 → 1.2.1 is unaffected.
-- Privacy and uninstalling: see the [English README](https://github.com/Fervent-Tempo/AF-Media-Bar/blob/main/README.en-US.md#readme).
-
-No blocking issues are currently known.
+- Only `win-x64` is published; vertical taskbars and floating modes are not implemented yet.
+- Layout orientation is currently horizontal only; the tray modifier-wheel setting is temporarily disabled.
+- Settings are retained when upgrading from 1.2.1 to 1.2.2. Files from 1.1.1 or earlier use an older schema and are archived while settings return to defaults.
+- See the [English README](https://github.com/Fervent-Tempo/AF-Media-Bar/blob/main/README.en-US.md#readme) for privacy and uninstalling.

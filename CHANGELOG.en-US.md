@@ -6,47 +6,42 @@ All notable changes to AF Media Bar are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.2.2] - 2026-09-30
 
-Reliability fixes: media-session self-healing, spectrum level calibration, and lyric advancement.
-
-### Changed
-
-- Removed QQ Music local lyric-cache scanning, file reads, and decryption; QQ retrieval now uses online search with the 85-point threshold.
-
-- QQ Music online lyric downloads now require a match score of 85. Fallback selection trusts the highest score, including confirmed absence of lyrics, so instrumental tracks are not replaced by lower-scoring lyrics. Logs distinguish song matching, provider results, and final selection.
-
-- Media artwork now comes only from SMTC. Removed artwork URL downloads and caching from the independent NetEase source; when no same-track SMTC artwork is available, no artwork is shown. Memory reading still supplies track information, progress, and lyrics.
-
-- Lyrics now try enabled QQ Music online first, then query other enabled sources in parallel and choose the highest matching score. Independent scoring reduces preview-duration influence and supplies search variants for translated names. Strictness, dispatch, adoption, batch, player-binding, and source-order controls and their obsolete settings fields are removed; old files with the same schema remain readable, but saving drops those fields.
-
-- Replaced custom device enumeration, application-volume access, capture-endpoint discovery and loopback capture with NAudio.Wasapi 3.1.0, removing duplicated Core Audio COM declarations and manual PCM decoding. Spectrum capture runs on demand in a hosted worker and is released during host shutdown. Default-device switching retains a minimal PolicyConfig adapter; spatial audio continues to use Windows APIs.
+This release focuses on reliability and everyday polish, with additional lyric, appearance, and interaction settings.
 
 ### Added
 
-- Lyric spacing: the lyrics page gains a "line gap" and a "character spacing" setting. The line gap adds extra spacing on top of the existing two-row layout (0–24% of the font size in two-percent steps, default 0 meaning the look is unchanged); it scales with the font, tightens automatically when space runs short, and never clips or shrinks the text. The character spacing widens the gap between characters as a percentage of the font size (0–20% in one-percent steps, default 0), scales with the font, applies to CJK and Latin alike, and never breaks words apart. Both are native CSS layout inside the web lyrics view, so they are continuous and take effect immediately.
-- Fixed lyric-box length: the lyrics page gains a switch and a length slider (80–600 DIP, 240 by default). While enabled the lyric box keeps a fixed length instead of resizing with every line and keeps every line's alignment stable; it is off by default (the box follows the content).
-- Instant line resizing: when the lyric line changes the bar now lands on the new length immediately instead of animating into it, so no brief ellipsis appears right after a line change.
+- Lyric line spacing, character spacing, and fixed display width. The bar now updates its length promptly when the lyric line changes, avoiding a brief ellipsis or clipped text.
+- An opt-in switch for fetching lyrics from browsers and video apps. Changing it clears results fetched under the previous choice.
+- NetEase Cloud Music track information and lyrics through memory reading without SMTC, including the Store version. Kugou memory reading now provides progress with a shorter polling interval.
+- A separate Components page for idle widgets, with visual controls such as bar width, spacing, and interaction button size in Appearance. Hover-button spacing now has a slider.
+- A wheel-hint switch and disabled choices for tray actions. Installed fonts now have previews and Chinese names; Latin and Chinese font selections apply to their respective scripts.
+
+### Changed
+
+- Rebuilt lyric display with a WebView2 view for syllable highlighting, translations, romanization, and styling; the view releases its resources when lyrics are unavailable or turned off.
+- Added a two-way transition between playback and the idle note, moving artwork, text, and right-side widgets together. Notification artwork follows the bar artwork's aspect ratio. Missing browser media starts leaving the screen after about 500 ms while the backend session-rebuild grace remains in place.
+- Lyric retrieval tries enabled QQ Music online first (downloading only matches scoring at least 85), then queries other enabled sources concurrently and adopts the highest score, including a confirmed no-lyrics result. Translated-title search and short-preview scoring are improved. QQ local-cache reading and the obsolete strictness, dispatch, adoption, player-binding, and source-order controls and settings fields were removed.
+- Independent NetEase artwork URL downloads were removed; artwork comes from the same-track SMTC session. Matching tolerates guest-artist differences while rejecting artwork from another track.
+- Spectrum analysis adapts FFT length to the sample rate, improves band integration and high-frequency balance, shows relative levels at low volume, and follows the endpoint that is actually audible.
+- Reorganized Settings navigation, descriptions, and About content. Project information appears first, two sponsors were added, and Afdian links were removed. The unimplemented orientation option and tray modifier-wheel setting are temporarily disabled.
 
 ### Fixed
 
-- NetEase artwork no longer disappears on featured tracks when SMTC reports only the primary artist while client metadata includes guests. Primary-artist matching still requires the same title and source, and rejects other tracks, guest-only names, and name substrings.
+- Fixed-width limits update when taskbar space grows. Rapid width adjustments no longer briefly clip right-side widgets, shift a left-anchored bar, or jitter its components.
+- Fixed jumps, twitching, and invalid visual coordinates when media closes; the idle note no longer shows an empty tooltip and idle widgets regain hover feedback.
+- Fixed a startup crash after resizing, stale browser media after closing a video, and tray tooltips that did not follow system output-device or volume changes. Hiding wheel-gesture hints keeps the current status and operation-result hints.
+- Media sessions recover after missed events. Catalog rebuilds now cool down after repeated failures instead of looping during situations such as exclusive fullscreen games.
+- Lyrics advance when a player's timeline stalls, the first line appears after a track change, missing album metadata no longer causes a false match, and QRC parsing and QQ Music empty translations are handled correctly.
+- WebView2 graphics faults no longer exit the app; zero-size lyric layouts no longer crash it, and the hidden web spectrum stops consuming CPU in lyric mode.
 
-- LRU rejects negative costs and accounting overflow, and evaluates costs outside its lock. Inconclusive lyric lookups and failed avatar loads are cached for 30 seconds without extending the cooldown on reads. SMTC lyric keys include the session and complete matching metadata, fallback lookups can retry failures, and artwork-color keys include the theme and extraction parameters.
+### Internal and compatibility
 
-- NetEase Cloud Music can appear in the source menu and display track information and lyrics through memory reading without SMTC, including the Store version. Both channels share one source: memory information takes priority and SMTC supplies controls. Hiding the source stops reading; allowing it resumes reading. Transient failures have a three-second grace period, while player exit removes the memory source.
-- Losing media sessions permanently after a single missed SMTC event (for example at a track change): an auto-reconcile watchdog now heals on a one-second cadence for thirty seconds after a session closes and falls back to five seconds, and it rebuilds the media catalog when the third-party library is stuck beyond what ForceUpdate can fix.
-- The spectrum standing still at its minimum bar height while listening at low volume: the level mapping now uses a relative-dB window around a reference peak, so bar heights no longer shrink with the system volume; the capture also follows the device that is actually audible (an application stream outranks the system mixer's echo, and the current endpoint is kept within one rank), so a virtual audio driver routing music to a non-default endpoint no longer leaves the spectrum silent (the target is checked every two seconds and the capture is rebuilt on a change).
-- Lyrics not advancing when a player stops reporting playback progress (its timeline stays at the track start): lyric line selection now uses the same extrapolated position as the progress bar and is advanced by the existing 250 ms progress timer.
-- Lyrics stuck on title/artist after a track change: when the player's timeline for a new track stalls at zero and is never refreshed (measured with Ceru Music), the hidden "waiting for the first line" frame stopped the lyric frame timer, so nothing re-projected with the wall clock afterwards; the timer now keeps running whenever media is playing with lyrics loaded, so the first line shows up on time without a pause and resume.
-- The web spectrum kept running its infinite pulse animation while hidden in lyrics mode (animating `height`, which lays out every frame): the WebView renderer burned 16%–25% of a core continuously, and the animation now only runs in the spectrum scene.
-- The watchdog rebuilt the media catalog without bound while the OS reported sessions it could not read: with a fullscreen exclusive game blocking the query it kept rebuilding every few seconds (a real log held 14 rebuilds in 75 s); after three rapid rebuilds it now falls back to ForceUpdate and allows another rebuild only after a two-minute cooldown. The counter resets on recovery.
-- The WebView2 composition control null-referenced on its resize path while the D3D device was unavailable, crashing the whole application (twice in the field log): the fault is now intercepted globally and the lyrics view is rebuilt automatically (up to three times), after which the bar falls back to title/artist instead of exiting.
-
-### Improved
-
-- Taskbar UIA probes reuse one persistent MTA worker to reduce thread creation and teardown overhead. Probes run serially with a bounded queue that coalesces requests per taskbar. A rare stuck UIA call delays subsequent probes until it returns; the existing timeout fallback remains in effect, and shutdown does not wait for the call.
-- Spectrum resolution and look: the FFT size now follows the sample rate (96 kHz goes from 512 to 4096 points), band values integrate power with fractional-bin linear interpolation (low bands no longer share one bin with their neighbour, so the leading columns stop sharing one height), and a +3 dB/octave tilt in the power domain compensates the natural roll-off for a more balanced look.
+- Replaced custom audio-device, app-volume, and spectrum capture code with NAudio.Wasapi. Spectrum capture, metrics sampling, media snapshots, and some player-memory reads run off the UI thread and release their resources on shutdown.
+- Taskbar UIA probes reuse one background MTA worker and coalesce pending work per taskbar. Media adapters and source arbitration use shared contracts.
+- LRU caches validate size and cost; transient failures expire. SMTC lyric cache keys include complete matching metadata, fallback lookups can retry, and artwork-color keys include theme and extraction parameters.
+- Moved all three interface languages into `Resources/*.resx` while retaining runtime language switching. Removed inactive Dynamic Island runtime code and raised the log retention limit to the latest 2,000 entries.
 
 ## [1.2.1] - 2026-09-21
 
@@ -183,6 +178,7 @@ The first release of the rebuilt interface and interaction model: taskbar lyrics
 - Restricted native library lookup to System32.
 - Removed generic execution of media-provided `.exe` source identifiers.
 
+[1.2.2]: https://github.com/Fervent-Tempo/AF-Media-Bar/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/Fervent-Tempo/AF-Media-Bar/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Fervent-Tempo/AF-Media-Bar/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/Fervent-Tempo/AF-Media-Bar/compare/v1.1.0...v1.1.1
