@@ -50,7 +50,7 @@ public sealed class NetEaseSourcePolicy : IMediaSourcePolicy
         var sameTrack = baseline.IsConnected &&
             !string.IsNullOrWhiteSpace(memory.Title) &&
             string.Equals(memory.Title.Trim(), baseline.Title.Trim(), StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(memory.Artist.Trim(), baseline.Artist.Trim(), StringComparison.OrdinalIgnoreCase);
+            ArtistsDescribeTheSameTrack(memory.Artist, baseline.Artist);
         return memory with
         {
             SourceId = SourceId,
@@ -63,5 +63,21 @@ public sealed class NetEaseSourcePolicy : IMediaSourcePolicy
             CanChangeRepeat = baseline.CanChangeRepeat,
             RepeatMode = baseline.RepeatMode
         };
+    }
+
+    private static bool ArtistsDescribeTheSameTrack(string memoryArtist, string smtcArtist)
+    {
+        if (string.IsNullOrWhiteSpace(memoryArtist) || string.IsNullOrWhiteSpace(smtcArtist))
+            return false;
+
+        var artists = memoryArtist.Trim();
+        var reported = smtcArtist.Trim();
+        if (string.Equals(artists, reported, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Client metadata joins artists with commas, while SMTC can report only the primary artist.
+        // Accept that first artist only; a guest or a name substring cannot identify the track by itself.
+        var separator = artists.IndexOf(',');
+        return separator > 0 && string.Equals(artists[..separator].Trim(), reported, StringComparison.OrdinalIgnoreCase);
     }
 }
