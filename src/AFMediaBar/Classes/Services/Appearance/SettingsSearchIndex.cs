@@ -376,37 +376,37 @@ public static class SettingsSearchIndex
         Create(
             SettingsPageKey.About,
             0,
+            "Common.Group.ProjectInfo",
+            "Search.About.ProjectInfo.Description",
+            language,
+            ["版本", "version", "关于", "about", "github", "反馈", "issue", "star", "仓库", "repository"]),
+        Create(
+            SettingsPageKey.About,
+            1,
             "Common.Group.Developers",
             "Search.About.Developers.Description",
             language,
             ["开发", "developer", "贡献者", "contributor", "名单", "人员", "github", "感谢", "credits"]),
         Create(
             SettingsPageKey.About,
-            1,
+            2,
             "Common.Group.Sponsors",
             "Search.About.Sponsors.Description",
             language,
             ["赞助", "sponsor", "支持", "捐赠", "donate", "名单", "感谢"]),
         Create(
             SettingsPageKey.About,
-            2,
+            3,
             "Common.Group.Support",
             "Search.About.Support.Description",
             language,
             ["赞助我", "请我喝咖啡", "打赏", "二维码", "微信", "wechat", "支付宝", "alipay", "爱发电", "afdian", "支持"]),
         Create(
             SettingsPageKey.About,
-            3,
+            4,
             "Common.Group.Licenses",
             "Search.About.Licenses.Description",
             language,
             ["开源", "许可", "license", "licence", "许可证", "第三方", "依赖", "package", "apache", "mit", "gpl"]),
-        Create(
-            SettingsPageKey.About,
-            4,
-            "Common.Group.ProjectInfo",
-            "Search.About.ProjectInfo.Description",
-            language,
-            ["版本", "version", "关于", "about", "github", "反馈", "issue", "star", "仓库", "repository"]),
     ];
 }

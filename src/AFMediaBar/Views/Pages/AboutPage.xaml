@@ -41,6 +41,25 @@
                 MaxWidth="{StaticResource AfSettingsContentMaxWidth}"
                 Loaded="OnPageLoaded">
 
+                <components:SettingsGroup Header="{DynamicResource Loc.Common.Group.ProjectInfo}" Icon="{ui:SymbolIcon Info24}">
+                    <components:SettingsRow
+                        Description="{DynamicResource Loc.About.Row.Project.Description}"
+                        Icon="{ui:SymbolIcon Info24}"
+                        Title="AF Media Bar">
+                        <WrapPanel>
+                            <ui:Anchor
+                                Margin="0,0,10,0"
+                                Content="{DynamicResource Loc.About.Row.Project.Star}"
+                                Icon="{ui:SymbolIcon Star24}"
+                                NavigateUri="{Binding ViewModel.RepositoryUrl}" />
+                            <ui:Anchor
+                                Content="{DynamicResource Loc.About.Row.Project.Issues}"
+                                Icon="{ui:SymbolIcon Bug24}"
+                                NavigateUri="{Binding ViewModel.IssuesUrl}" />
+                        </WrapPanel>
+                    </components:SettingsRow>
+                </components:SettingsGroup>
+
                 <!--
                     名单状态：正在取或取失败时才出现。取失败时给一个重试按钮——名单是联网取的，而用户看到"暂时无法获取"
                     时唯一想做的事就是再试一次，让他去重启程序是说不过去的。
@@ -275,24 +294,6 @@
                     </ItemsControl>
                 </components:SettingsGroup>
 
-                <components:SettingsGroup Header="{DynamicResource Loc.Common.Group.ProjectInfo}" Icon="{ui:SymbolIcon Info24}">
-                    <components:SettingsRow
-                        Description="{DynamicResource Loc.About.Row.Project.Description}"
-                        Icon="{ui:SymbolIcon Info24}"
-                        Title="AF Media Bar">
-                        <WrapPanel>
-                            <ui:Anchor
-                                Margin="0,0,10,0"
-                                Content="{DynamicResource Loc.About.Row.Project.Star}"
-                                Icon="{ui:SymbolIcon Star24}"
-                                NavigateUri="{Binding ViewModel.RepositoryUrl}" />
-                            <ui:Anchor
-                                Content="{DynamicResource Loc.About.Row.Project.Issues}"
-                                Icon="{ui:SymbolIcon Bug24}"
-                                NavigateUri="{Binding ViewModel.IssuesUrl}" />
-                        </WrapPanel>
-                    </components:SettingsRow>
-                </components:SettingsGroup>
             </StackPanel>
         </ScrollViewer>
     </Grid>

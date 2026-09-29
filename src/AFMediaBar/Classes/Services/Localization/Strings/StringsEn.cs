@@ -52,7 +52,7 @@ internal static class StringsEn
         table.Add("About.Row.Portable.Description", "This is not an installed build, so files cannot be replaced automatically; get the installer from the download page or replace the program files by hand");
         table.Add("About.Row.Portable.Title", "Automatic updates are unavailable");
         table.Add("About.Row.Progress.Title", "Download progress");
-        table.Add("About.Row.Project.Description", "Media experience for the Windows taskbar · version 1.0.0");
+        table.Add("About.Row.Project.Description", "The project is actively developed. Please report any issues you encounter");
         table.Add("About.Row.Project.Issues", "Report an issue");
         table.Add("About.Row.Project.Star", "Star it on GitHub");
         table.Add("About.Row.ResetAll.Button", "Reset everything");

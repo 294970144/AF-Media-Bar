@@ -52,7 +52,7 @@ internal static class StringsZhHant
         table.Add("About.Row.Portable.Description", "目前不是安裝版本，無法自動取代檔案；請從下載頁取得安裝程式或手動取代程式檔案");
         table.Add("About.Row.Portable.Title", "自動更新無法使用");
         table.Add("About.Row.Progress.Title", "下載進度");
-        table.Add("About.Row.Project.Description", "Windows 工作列媒體體驗 · 版本 1.0.0");
+        table.Add("About.Row.Project.Description", "專案仍在積極開發中，遇到問題歡迎回報");
         table.Add("About.Row.Project.Issues", "問題回報");
         table.Add("About.Row.Project.Star", "在 GitHub 按 Star");
         table.Add("About.Row.ResetAll.Button", "重設全部");
