@@ -1,6 +1,7 @@
 using AFMediaBar.Classes.Services.Localization;
-using AFMediaBar.Classes.Services.Localization.Strings;
+using System.Collections;
 using System.Globalization;
+using System.Resources;
 
 namespace AFMediaBar.Resources;
 
@@ -14,10 +15,8 @@ namespace AFMediaBar.Resources;
 ///    <see cref="CultureInfo.CurrentUICulture"/> 同类），因此这里是有意的静态入口，唯一写入方是
 ///    <c>LocalizationService</c>。
 ///
-/// 文案本身按语言存放：<c>Classes/Services/Localization/Strings</c> 下每种语言一个文件
-/// （<c>StringsZhHans</c> / <c>StringsZhHant</c> / <c>StringsEn</c>），三份文件的键顺序完全一致，同一行号指的是
-/// 同一条文案；翻译、校对与"再加一门语言"都只碰一个文件。三份文件由 <see cref="BuildTable"/> 合并，缺一条时
-/// 该语言取空值并回退简体中文——漏一句翻译只表现为该语言少一句，不会让程序打不开。
+/// 文案按语言放在 <c>Resources/Strings*.resx</c>，作为三个独立的中性资源嵌入主程序集，不产生卫星程序集。
+/// <see cref="BuildTable"/> 合并三份资源；单条译文缺失时回退简体中文。
 /// The single authority for interface text.
 ///
 /// The interface reads it through three entries that all resolve against one table, so a split such as "the settings page
@@ -29,11 +28,9 @@ namespace AFMediaBar.Resources;
 ///    active language is process-wide state of the same kind as <see cref="CultureInfo.CurrentUICulture"/>. This static
 ///    entry is therefore deliberate, and <c>LocalizationService</c> is its only writer.
 ///
-/// The text itself is stored per language: one file per language under <c>Classes/Services/Localization/Strings</c>
-/// (<c>StringsZhHans</c>, <c>StringsZhHant</c>, <c>StringsEn</c>) with an identical key order, so the same line number means
-/// the same string and translating, proofreading, or adding one more language touches exactly one file. The three files are
-/// merged by <see cref="BuildTable"/>, and a language missing an entry reads as empty and falls back to simplified Chinese —
-/// a gap shows up as one untranslated string rather than an application that will not start.
+/// Text lives in one <c>Resources/Strings*.resx</c> file per language. The three neutral resources are embedded in the main
+/// assembly, avoiding satellite assemblies in the single-file release. <see cref="BuildTable"/> merges them, and a missing
+/// translation falls back to simplified Chinese.
 /// </summary>
 public static class Translations
 {
@@ -80,10 +77,10 @@ public static class Translations
             return value;
         }
 
-        // 某一语言缺这条文案时回退到简体中文，而不是在界面上留下空白；简体中文也缺（只可能来自手写的语言文件不一致）
+        // 某一语言缺这条文案时回退到简体中文，而不是在界面上留下空白；简体中文也缺时
         // 时返回键本身，让缺的那一条在界面上一眼可见。
         // A language missing this entry falls back to simplified Chinese instead of leaving a blank, and when simplified
-        // Chinese is missing too — which only an inconsistent hand-written language file can produce — the key itself is
+        // Chinese is missing too, the key itself is
         // returned so the gap is visible in the interface.
         return string.IsNullOrEmpty(text.SimplifiedChinese) ? key : text.SimplifiedChinese;
     }
@@ -128,24 +125,20 @@ public static class Translations
     internal static void RaiseLanguageChanged() => LanguageChanged?.Invoke(null, EventArgs.Empty);
 
     /// <summary>
-    /// 把三份语言文件合并成一张"键 → 三种语言"的表。
+    /// 把三份 resx 资源合并成一张"键 → 三种语言"的表。
     ///
     /// 键取三份文件的并集并按序排列：只有这样"某一语言漏了一条"才是可表示的（那一份取空值、取值时回退简体中文、
-    /// 由完整性测试判失败），而不是让静态初始化直接崩掉——崩掉的话用户看到的是程序打不开，而不是少一句翻译。
-    /// 语言文件的键顺序与此处一致（都由键排序），因此同一行号在三份文件里指的是同一条文案。
-    /// Merges the three language files into one "key to three languages" table.
+    /// 由完整性测试判失败），而不是让静态初始化直接崩掉。
+    /// Merges the three resx resources into one "key to three languages" table.
     ///
     /// The keys are the union of the three files, in order: that is what makes "one language is missing an entry" representable
-    /// — the missing language reads as empty, falls back to simplified Chinese at lookup time, and is failed by the completeness
-    /// test — instead of letting static initialization crash, where the user would see an application that does not start rather
-    /// than one string that is not translated. The language files carry the same key order as this table (all key-sorted), so the
-    /// same line number means the same string in every one of them.
+    /// — the missing language reads as empty and falls back to simplified Chinese at lookup time. Completeness tests flag it.
     /// </summary>
     private static Dictionary<string, LocalizedText> BuildTable()
     {
-        var simplifiedChinese = Build(StringsZhHans.Register);
-        var traditionalChinese = Build(StringsZhHant.Register);
-        var english = Build(StringsEn.Register);
+        var simplifiedChinese = Load("StringsZhHans");
+        var traditionalChinese = Load("StringsZhHant");
+        var english = Load("StringsEn");
 
         var keys = new SortedSet<string>(simplifiedChinese.Keys, StringComparer.Ordinal);
         keys.UnionWith(traditionalChinese.Keys);
@@ -163,12 +156,37 @@ public static class Translations
         return table;
     }
 
-    /// <summary>让一份语言文件登记进它自己的表。/ Lets one language file register into its own table.</summary>
-    /// <param name="register">该语言文件的登记方法。/ The registration method of that language file.</param>
-    private static IReadOnlyDictionary<string, string> Build(Action<LanguageTable> register)
+    /// <summary>从主程序集读取一份中性 resx 资源；缺失时留空，供取值回退。/ Loads one neutral resx from the main assembly, leaving a missing resource empty for lookup fallback.</summary>
+    /// <param name="name">资源文件名，不含扩展名。/ Resource filename without its extension.</param>
+    private static IReadOnlyDictionary<string, string> Load(string name)
     {
-        var table = new LanguageTable();
-        register(table);
-        return table.Build();
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        var manager = new ResourceManager($"AFMediaBar.Resources.{name}", typeof(Translations).Assembly);
+        ResourceSet? resources;
+        try
+        {
+            resources = manager.GetResourceSet(CultureInfo.InvariantCulture, createIfNotExists: true, tryParents: false);
+        }
+        catch (MissingManifestResourceException)
+        {
+            return result;
+        }
+
+        if (resources is null)
+            return result;
+
+        foreach (DictionaryEntry entry in resources)
+        {
+            if (entry.Key is string key && entry.Value is string value && !string.IsNullOrEmpty(value))
+                result.Add(key, value);
+        }
+
+        return result;
     }
 }
+
+/// <summary>一条界面文案的三种语言取值。/ The three language values of one interface string.</summary>
+/// <param name="SimplifiedChinese">简体中文，兼作回退。/ Simplified Chinese, also the fallback.</param>
+/// <param name="TraditionalChinese">繁体中文。/ Traditional Chinese.</param>
+/// <param name="English">英文。/ English.</param>
+internal readonly record struct LocalizedText(string SimplifiedChinese, string TraditionalChinese, string English);

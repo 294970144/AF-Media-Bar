@@ -164,6 +164,4 @@ Buy me a coffee. **Sponsorships above 10 CNY can join the sponsor list — pleas
 | :---: | :---: |
 | <img src="src/AFMediaBar/Assets/Sponsor/wechat-pay.png" alt="WeChat payment code" width="220"> | <img src="src/AFMediaBar/Assets/Sponsor/alipay-pay.png" alt="Alipay payment code" width="220"> |
 
-My Afdian: [Afdian](https://ifdian.net/a/amorfate)
-
 </div>

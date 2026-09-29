@@ -143,6 +143,7 @@ namespace AFMediaBar.Components
                 _marqueeTimer.Stop();
                 StopWebLyrics();
                 StopMarqueeAnimations();
+                StopRestTransitions();
             };
 
             // 计时器必须先于布局初始化；布局会立即应用已持久化的悬停层开关。
@@ -243,17 +244,18 @@ namespace AFMediaBar.Components
         /// 媒体栏现在是否应当整个隐藏：当前没有媒体，且静置层的组件一个都不显示。
         ///
         /// 这里没有开关：没有媒体时媒体栏本来就没有内容可显示，要不要留、留哪几个由"没有媒体时保留的组件"那一份列表回答
-        /// （它的默认值是快速启动小音符）。宿主只在任务栏横向模式下读它；灵动岛与竖向任务栏不参与这条规则。
+        /// （它的默认值是快速启动小音符）。宿主只在任务栏横向模式下读它；竖向任务栏不参与这条规则。
         /// Whether the media bar should be hidden entirely: there is no media right now and the rest layer shows no component at all.
         ///
         /// There is no switch for this: without media the bar has nothing to show anyway, and whether anything stays — and which components —
         /// is answered by the "components kept without media" list (whose default is the quick-launch note). The host reads it in the horizontal
-        /// taskbar mode only; the dynamic island and a vertical taskbar are outside this rule.
+        /// horizontal taskbar mode only; a vertical taskbar is outside this rule.
         /// </summary>
         public bool ShouldHideTaskbarWindow =>
             SettingsManager.Current.TaskbarBarEnabled &&
             !_isConnected &&
-            _isRestLayerEmpty;
+            _isRestLayerEmpty &&
+            !_restTransitionDefersHide;
 
         /// <summary>
         /// 最近一次应用设置时频谱是否可见。宿主的频谱采样按它决定是否继续采集：静置层显隐的唯一判据在
@@ -390,6 +392,7 @@ namespace AFMediaBar.Components
                 _quickLaunchTooltip.Content = text;
             }
 
+            ApplyArtworkTooltipOwner();
             ReassertQuickLaunchTooltip();
         }
 
@@ -425,6 +428,23 @@ namespace AFMediaBar.Components
         public void RefreshWheelTooltip()
         {
             var slot = ChordWheelHeld ? WheelGestureSlot.Chord : WheelGestureSlot.Primary;
+            var settings = SettingsManager.Current.Interaction.Normalize();
+            var action = slot == WheelGestureSlot.Chord ? settings.ChordWheelAction : settings.PrimaryWheelAction;
+            var showHint = settings.ShowWheelTooltips && action != WheelAction.Disabled;
+            var textOwner = showHint ? _wheelTooltip : null;
+            if (!ReferenceEquals(SongInfoStackPanel.ToolTip, textOwner))
+            {
+                CloseWheelTooltips();
+                SongInfoStackPanel.ToolTip = textOwner;
+            }
+            if (_isConnected)
+                SetArtworkTooltipOwner(showHint ? _artworkWheelTooltip : null);
+            if (!showHint)
+            {
+                CloseWheelTooltips();
+                _wheelResultShown = false;
+                return;
+            }
             // 刚滚过的结果要留在屏幕上：只有按键状态真正变了（用户准备用另一个槽位）或指针重新进入时才换回提示。
             // The result of the last scroll stays on screen: the hint only returns once the modifier state actually changed (the user
             // is preparing the other slot) or the pointer re-enters the bar.
@@ -433,18 +453,18 @@ namespace AFMediaBar.Components
 
             _appliedWheelSlot = slot;
             _wheelResultShown = false;
-            var settings = SettingsManager.Current.Interaction.Normalize();
             SetWheelTooltipText(WheelTooltipPolicy.BuildHint(
                 slot,
                 settings.Modifier,
-                WheelTooltipPolicy.BuildActionName(
-                    slot == WheelGestureSlot.Chord ? settings.ChordWheelAction : settings.PrimaryWheelAction)));
+                WheelTooltipPolicy.BuildActionName(action)));
         }
 
         /// <summary>把最近一次滚轮动作的结果写入提示。/ Writes the result of the most recent wheel action into the tooltip.</summary>
         /// <param name="result">滚轮手势结果。/ Wheel gesture result.</param>
         public void SetWheelResult(WheelTooltipResult result)
         {
+            if (!SettingsManager.Current.Interaction.ShowWheelTooltips)
+                return;
             _appliedWheelSlot = ChordWheelHeld ? WheelGestureSlot.Chord : WheelGestureSlot.Primary;
             _wheelResultShown = true;
             _wheelResult = result;
@@ -525,7 +545,8 @@ namespace AFMediaBar.Components
         /// </summary>
         private void ReassertChordWheelTooltip()
         {
-            if (!ChordWheelHeld || ResolveGlobalWheelSurface() is not { } surface)
+            if (!ChordWheelHeld || ResolveGlobalWheelSurface() is not { } surface ||
+                !ReferenceEquals(surface.Surface.ToolTip, surface.Tooltip))
                 return;
 
             surface.Tooltip.PlacementTarget = surface.Surface;
@@ -586,7 +607,17 @@ namespace AFMediaBar.Components
         /// </summary>
         private void ApplyArtworkTooltipOwner()
         {
-            var owner = _isConnected ? _artworkWheelTooltip : _quickLaunchTooltip;
+            var settings = SettingsManager.Current.Interaction.Normalize();
+            var action = ChordWheelHeld ? settings.ChordWheelAction : settings.PrimaryWheelAction;
+            var owner = _isConnected
+                ? settings.ShowWheelTooltips && action != WheelAction.Disabled ? _artworkWheelTooltip : null
+                : _quickLaunchTooltip.Content is null ? null : _quickLaunchTooltip;
+            SetArtworkTooltipOwner(owner);
+            RefreshWheelTooltip();
+        }
+
+        private void SetArtworkTooltipOwner(ToolTip? owner)
+        {
             if (ReferenceEquals(SongImageBorder.ToolTip, owner))
                 return;
 
@@ -597,7 +628,6 @@ namespace AFMediaBar.Components
             // 否则悬停封面会先弹出一个空气泡。
             // The instance just swapped in may still be empty when nobody has scrolled yet, and the tooltip opens by itself on hover:
             // writing the current hint once keeps hovering the artwork from popping an empty bubble.
-            RefreshWheelTooltip();
         }
 
         /// <summary>
@@ -786,7 +816,7 @@ namespace AFMediaBar.Components
         /// 应用布局：根据窗口模式和方向选择并应用对应的布局配置。
         /// Apply layout: select and apply corresponding layout config based on window mode and orientation.
         /// </summary>
-        /// <param name="mode">窗口模式（任务栏/灵动岛）/ Window mode (taskbar/dynamic island)</param>
+        /// <param name="mode">窗口模式；旧值按任务栏处理 / Window mode; legacy values use taskbar layout</param>
         /// <param name="orientation">布局方向（横向/竖向）/ Layout orientation (horizontal/vertical)</param>
         public void ApplyLayout(WindowMode mode, LayoutOrientation orientation)
         {
@@ -811,13 +841,20 @@ namespace AFMediaBar.Components
             double lengthScalePercent,
             double thicknessScalePercent)
         {
+            var previousLayout = _layoutEngine?.CurrentLayout;
+            var previousPrimary = previousLayout is null
+                ? 0
+                : previousLayout.Orientation == LayoutOrientation.Horizontal
+                    ? previousLayout.Canvas.Width
+                    : previousLayout.Canvas.Height;
+            var preservePrimary = previousLayout?.Orientation == orientation && previousPrimary > 0;
             _currentMode = mode;
 
             // 从预设中获取布局
             // Get layout from presets
             var layout = LayoutPresets.GetLayout(mode, orientation);
 
-            // 字号设置只作用于任务栏静置层的媒体文字；灵动岛沿用预设字号。
+            // 字号设置只作用于任务栏静置层的媒体文字。
             // The font-size setting only scales taskbar rest-layer media text; the island keeps its preset sizes.
             var mediaFontScale = mode == WindowMode.Taskbar
                 ? SettingsManager.Current.TaskbarExperience.Normalize().MediaFontSizePercent / 100.0
@@ -834,9 +871,11 @@ namespace AFMediaBar.Components
             // 更新内部状态标志以保持兼容
             // Update internal state flags to maintain compatibility
             _isVertical = orientation == LayoutOrientation.Vertical;
-            ApplyTaskbarExperienceSettings();
-            ApplyTaskbarSectionGeometry(MainBorder.Width);
-            RaiseDesiredSizeChanged();
+            ApplyTaskbarExperienceSettings(publishSize: false);
+            // The host computes the new target after this call. Keep the displayed length until then,
+            // so a layout-setting change cannot overwrite the animation's starting geometry.
+            if (preservePrimary)
+                ApplyPrimaryLength(previousPrimary);
         }
 
         /// <summary>
@@ -847,22 +886,9 @@ namespace AFMediaBar.Components
 
         /// <summary>
         /// 应用自动计算的主轴长度。
-        ///
-        /// 布局引擎在这里也会写一遍封面与文字区的 `Visibility`（`LayoutRenderEngine.ApplyArtworkLayout` / `ApplySongInfoLayout`
-        /// 按预设的 `IsVisible` 写，而预设里它恒为 true——预设不知道用户在"没有媒体时显示"里怎么选），并且宿主每次尺寸动画的
-        /// 每一帧、位置计时器的每次重放都会走到这里。因此显隐 MUST 由紧随其后的 `ApplyTaskbarSectionGeometry` 重新断言：
-        /// 漏掉它时，用户关掉小音符之后它会被下一帧尺寸动画显示回来，而断开时的快照是一个常量
-        /// （`MediaSnapshot.Disconnected`）不会重新发布，那次撤销要等到下一次设置变化才被纠正——表现正是"关掉小音符、
-        /// 保持其它组件时音符还在"。
         /// Applies an auto-calculated primary length.
-        ///
-        /// The layout engine writes the artwork's and the text region's `Visibility` here as well (`LayoutRenderEngine.ApplyArtworkLayout` /
-        /// `ApplySongInfoLayout` write the preset's `IsVisible`, which is always true — the preset knows nothing about the user's "shown without
-        /// media" choices), and the host reaches this method on every frame of a size animation and on every replay by the position timer. The
-        /// visibility therefore MUST be asserted again by the `ApplyTaskbarSectionGeometry` that follows: without it, turning the note off is
-        /// undone by the next size-animation frame, and since the disconnected snapshot is a constant (`MediaSnapshot.Disconnected`) that is never
-        /// republished, the undo survives until the next settings change — which is exactly "the note stays after turning it off while other
-        /// components are kept".
+        /// 横向任务栏的组件位置和显隐由紧随其后的节几何统一写入。
+        /// On a horizontal taskbar, the following section geometry owns component positions and visibility.
         /// </summary>
         public void ApplyPrimaryLength(double primaryLength)
         {
@@ -885,8 +911,9 @@ namespace AFMediaBar.Components
         /// 应用横向任务栏的层级和交互设置，不改变原有封面、文字或布局引擎。
         /// Applies horizontal-taskbar layer and interaction settings without replacing the original artwork, text, or layout engine.
         /// </summary>
-        public void ApplyTaskbarExperienceSettings()
+        public void ApplyTaskbarExperienceSettings(bool publishSize = true)
         {
+            RefreshWheelTooltip();
             var isHorizontalTaskbar = _currentMode == WindowMode.Taskbar && !_isVertical;
             var experience = SettingsManager.Current.TaskbarExperience.Normalize();
             var metrics = TaskbarDensityMetrics.From(experience.Density);
@@ -907,6 +934,13 @@ namespace AFMediaBar.Components
             TaskbarOutputDeviceSurface.Height = metrics.ButtonSize;
             TaskbarVolumeSurface.Width = metrics.ButtonSize;
             TaskbarVolumeSurface.Height = metrics.ButtonSize;
+            TaskbarOutputDeviceGlyph.FontSize = metrics.IconSize;
+            TaskbarVolumeGlyph.FontSize = metrics.IconSize;
+            TaskbarPreviousIcon.FontSize = metrics.IconSize;
+            TaskbarPlayPauseIcon.FontSize = metrics.IconSize;
+            TaskbarNextIcon.FontSize = metrics.IconSize;
+            TaskbarHoverDeviceGlyph.FontSize = metrics.IconSize;
+            TaskbarHoverVolumeGlyph.FontSize = metrics.IconSize;
             // 静置层进度条只在媒体报告了时长、且开关打开时显示；开关是用户对"静置层要不要这条进度"的回答。
             // The rest-layer progress bar appears only while the session reports a duration and the switch is on; the switch is the
             // user's answer to "should the rest layer carry this progress line at all".
@@ -944,13 +978,20 @@ namespace AFMediaBar.Components
                     SongInfoStackPanel.IsMouseOver || TaskbarDirectFullPanelHandle.IsMouseOver,
                     immediate: true);
 
+            var hoverGap = experience.HoverButtonSpacingDip;
+            var visibleHoverButtons = 0;
             foreach (var button in FindVisualChildren<System.Windows.Controls.Button>(TaskbarHoverActions))
             {
                 if (ReferenceEquals(button, TaskbarFullPanelHandle))
                     continue;
                 button.Width = metrics.ButtonSize;
                 button.Height = metrics.ButtonSize;
+                if (button.Visibility == Visibility.Visible)
+                    button.Margin = new Thickness(visibleHoverButtons++ == 0 ? 0 : hoverGap, 0, 0, 0);
             }
+            TaskbarHoverProgress.Margin = new Thickness(
+                TaskbarHoverProgress.Visibility == Visibility.Visible && visibleHoverButtons > 0 ? hoverGap : 0,
+                0, 0, 0);
             TaskbarHoverProgress.Width = metrics.ProgressWidth;
             TaskbarHoverLayer.Height = metrics.HoverLayerHeight;
             ApplyTaskbarSectionGeometry(MainBorder.Width);
@@ -971,7 +1012,9 @@ namespace AFMediaBar.Components
             ApplyConfiguredTextAlignment(SongTitle, metadataAlignment);
             ApplyConfiguredTextAlignment(SongArtist, metadataAlignment);
             ApplyWebLyricsStyle();
-            if (isHorizontalTaskbar && SongMetadataPanel.Visibility == Visibility.Visible)
+            // Keep the outgoing live metadata and lyrics until their reveal clip has retracted.
+            if (!_restTransitionKeepsOutgoingText &&
+                isHorizontalTaskbar && SongMetadataPanel.Visibility == Visibility.Visible)
             {
                 if (experience.ContentLayout == TaskbarContentLayout.CompactInline &&
                     !string.IsNullOrEmpty(_actualArtist))
@@ -989,7 +1032,7 @@ namespace AFMediaBar.Components
                         : Visibility.Collapsed;
                 }
             }
-            else if (!isHorizontalTaskbar)
+            else if (!_restTransitionKeepsOutgoingText && !isHorizontalTaskbar)
             {
                 SongTitle.Text = _actualTitle;
             }
@@ -1004,7 +1047,8 @@ namespace AFMediaBar.Components
                 AnimateComponentHover(TaskbarSpectrumHoverSurface, false);
             }
 
-            RaiseDesiredSizeChanged();
+            if (publishSize)
+                RaiseDesiredSizeChanged();
 
             // 跑马灯 MUST 放在本方法所有文字写入之后重跑：上面按内容布局写的标题会把正在滚动的窗口顶掉，而
             // ApplyTaskbarSectionGeometry（以及它内部的跑马灯配置）发生在那之前，于是屏幕上会先留下原文开头，
@@ -1014,7 +1058,7 @@ namespace AFMediaBar.Components
             // before that. The head of the content would then stay on screen until the next advance frame snaps back to the window's
             // position, which is one visible jump each time the pointer enters the text area (hover entry calls this method too) and on
             // every snapshot poll.
-            if (isHorizontalTaskbar)
+            if (isHorizontalTaskbar && !_restTransitionKeepsOutgoingText)
                 ApplyMarqueeLayout(Math.Max(0, SongInfoStackPanel.Width));
         }
 
@@ -1045,13 +1089,8 @@ namespace AFMediaBar.Components
             var experience = SettingsManager.Current.TaskbarExperience.Normalize();
             var layout = ResolveRestLayout(experience, primaryLength);
             _isRestLayerEmpty = layout.IsEmpty;
-            // 显隐必须在这里落地，而不是只在 ApplyTaskbarExperienceSettings 里：布局引擎会在每次 ApplyPrimaryLength
-            // （尺寸动画的每一帧、位置计时器的每次重放）把封面的 Visibility 按预设写回 Visible，而几何是那些路径上唯一
-            // 紧随其后的调用。布局本身已经表达了"谁可见"（不可见的组件不在 placements 里），因此这里不再判一次显隐。
-            // Visibility has to land here rather than only inside ApplyTaskbarExperienceSettings: the layout engine writes the artwork's
-            // Visibility back to Visible (from the preset) on every ApplyPrimaryLength — each frame of a size animation and each replay by the
-            // position timer — and the geometry is the only call that follows it on those paths. The layout already expresses who is visible
-            // (an invisible component is absent from the placements), so the decision is not made a second time here.
+            // 布局本身表达了谁可见；这里统一落地显隐，避免设置与尺寸路径的判据漂移。
+            // The layout owns visibility; asserting it here keeps settings and size paths in sync.
             ApplyRestComponentVisibility(layout);
 
             var textLeft = layout.TextLeft;
@@ -1071,6 +1110,15 @@ namespace AFMediaBar.Components
             SongTitleContainer.Width = textWidth;
             SongArtistContainer.Width = textWidth;
             SongLyricsPanel.Width = textWidth;
+            if (_restTransitionKeepsOutgoingText)
+            {
+                Canvas.SetLeft(SongInfoStackPanel, _outgoingTextLeft);
+                SongInfoStackPanel.Width = _outgoingTextWidth;
+                SongInfoSurface.Width = _outgoingTextWidth;
+                SongTitleContainer.Width = _outgoingTextWidth;
+                SongArtistContainer.Width = _outgoingTextWidth;
+                SongLyricsPanel.Width = _outgoingTextWidth;
+            }
 
             // 任务栏的媒体文字宽度由本节几何唯一决定：布局引擎按布局 schema 写入的 TextBlock 宽度仍包含
             // 频谱与性能组件占用的区间，比真实文字区更宽，会让标题按错误宽度裁剪、在容器边缘被硬切；
@@ -1079,8 +1127,8 @@ namespace AFMediaBar.Components
             // schema, which still covers the widget reserve and is wider than the real text area, so the title trims against
             // the wrong width and is hard-cut at the container edge. The hover path rewrites the correct width through the
             // marquee configuration, which is why the defect only shows up after a settings change.
-            SongTitle.Width = textWidth;
-            SongArtist.Width = textWidth;
+            SongTitle.Width = _restTransitionKeepsOutgoingText ? _outgoingTextWidth : textWidth;
+            SongArtist.Width = _restTransitionKeepsOutgoingText ? _outgoingTextWidth : textWidth;
 
             var textTop = Canvas.GetTop(SongInfoStackPanel);
             if (!double.IsFinite(textTop))
@@ -1117,12 +1165,12 @@ namespace AFMediaBar.Components
             TaskbarDirectFullPanelHandle.Margin = new Thickness(textLeft, 1, 0, 0);
             if (HoverRevealHost.Visibility == Visibility.Visible)
             {
-                HoverRevealClip.BeginAnimation(RectangleGeometry.RectProperty, null);
-                HoverRevealHost.Width = textWidth;
-                HoverRevealClip.Rect = new Rect(0, 0, textWidth, HoverRevealHost.Height);
+                if (Math.Abs(HoverRevealHost.Width - textWidth) > 0.01)
+                    RetargetHoverRevealWidth(textWidth);
             }
 
-            ApplyMarqueeLayout(textWidth);
+            if (!_restTransitionKeepsOutgoingText)
+                ApplyMarqueeLayout(textWidth);
         }
 
         /// <summary>
@@ -1131,22 +1179,22 @@ namespace AFMediaBar.Components
         /// 判据就是布局本身：某个组件不在 <paramref name="layout"/> 的 placements 里，说明这次它不可见（判据只有
         /// <see cref="TaskbarRestLayoutPolicy.IsVisible"/> 一处，这里 MUST NOT 再判一次，否则两处会漂）。
         ///
-        /// 单独一个方法是因为布局引擎也会写这些元素的 `Visibility`（`LayoutRenderEngine.ApplyArtworkLayout` 按预设的
-        /// `IsVisible` 写，而预设里它恒为 true），因此每次几何计算都必须重新断言一次，否则一次尺寸动画就会把用户的选择撤销。
         /// Writes the visibility of the rest-layer components and the artwork into the visual tree from the layout just computed.
         ///
         /// The layout is the decision: a component absent from <paramref name="layout"/>'s placements is not visible this time (the only rule is
         /// <see cref="TaskbarRestLayoutPolicy.IsVisible"/>, and it MUST NOT be judged a second time here or the two would drift).
         ///
-        /// It is a method of its own because the layout engine writes these elements' `Visibility` as well (`LayoutRenderEngine.ApplyArtworkLayout`
-        /// writes the preset's `IsVisible`, which is always true), so every geometry pass has to assert it again, otherwise one size animation
-        /// undoes the user's choice.
         /// </summary>
         /// <param name="layout">这次算出的静置层布局。/ The rest-layer layout computed this time.</param>
         private void ApplyRestComponentVisibility(TaskbarRestLayout layout)
         {
             bool Visible(TaskbarRestComponent component) => layout.Find(component) is not null;
 
+            var wasSpectrumVisible = TaskbarSpectrumHoverSurface.Visibility == Visibility.Visible;
+            var wasPerformanceVisible = TaskbarPerformanceHoverSurface.Visibility == Visibility.Visible;
+            var wasOutputDeviceVisible = TaskbarOutputDeviceHoverSurface.Visibility == Visibility.Visible;
+            var wasVolumeVisible = TaskbarVolumeHoverSurface.Visibility == Visibility.Visible;
+            var wasArtworkVisible = SongImageBorder.Visibility == Visibility.Visible;
             var spectrumVisible = Visible(TaskbarRestComponent.Spectrum);
             IsSpectrumComponentVisible = spectrumVisible;
             // 性能组件与频谱同样由"外层悬停表面 + 内层外观"组成：显隐、命中测试与 hover 都落在外层，
@@ -1171,13 +1219,13 @@ namespace AFMediaBar.Components
             // Only the outer hover surfaces get the hover wind-down: the inner looks (the performance chip and the two round buttons)
             // carry a background of their own, and running the hover animation on them fades that background to transparent, leaving a
             // blank spot the next time they are shown.
-            if (!spectrumVisible)
+            if (wasSpectrumVisible && !spectrumVisible)
                 AnimateComponentHover(TaskbarSpectrumHoverSurface, false);
-            if (!performanceVisible)
+            if (wasPerformanceVisible && !performanceVisible)
                 AnimateComponentHover(TaskbarPerformanceHoverSurface, false);
-            if (!outputDeviceVisible)
+            if (wasOutputDeviceVisible && !outputDeviceVisible)
                 AnimateComponentHover(TaskbarOutputDeviceHoverSurface, false);
-            if (!volumeVisible)
+            if (wasVolumeVisible && !volumeVisible)
                 AnimateComponentHover(TaskbarVolumeHoverSurface, false);
 
             // 封面与媒体文字按布局里的那一项决定；"没有媒体时显示"列表里没有勾音符时，封面框整块收起（不留空白框）。
@@ -1185,8 +1233,11 @@ namespace AFMediaBar.Components
             // box is collapsed rather than left blank.
             var artworkVisible = Visible(TaskbarRestComponent.Artwork);
             SetRestComponentVisible(SongImageBorder, artworkVisible);
-            SetRestComponentVisible(SongInfoStackPanel, Visible(TaskbarRestComponent.MediaText));
-            if (!artworkVisible)
+            SetRestComponentVisible(SongInfoStackPanel,
+                Visible(TaskbarRestComponent.MediaText) || _restTransitionKeepsOutgoingText);
+            if (_restTransitionKeepsOutgoingText)
+                SongInfoStackPanel.IsHitTestVisible = false;
+            if (wasArtworkVisible && !artworkVisible)
                 AnimateComponentHover(SongImageHoverOverlay, false);
         }
 
@@ -1305,11 +1356,11 @@ namespace AFMediaBar.Components
         /// <summary>
         /// 按封面自身的宽高比调整封面框：高度取布局引擎给的尺寸，宽度按比例算，因此视频类宽封面不再被裁掉左右两边、
         /// 竖版封面也不再被裁掉上下两边。比例超出允许范围时改用 <see cref="Stretch.Uniform"/>（留白也不裁切）。
-        /// 只作用于任务栏横向模式：其余模式（竖向任务栏、灵动岛）的封面尺寸仍由布局引擎唯一决定。
+        /// 只作用于任务栏横向模式：竖向任务栏的封面尺寸仍由布局引擎唯一决定。
         /// Adjusts the artwork box to the artwork's own aspect: the height comes from the layout engine and the width follows the ratio, so a
         /// wide video cover is no longer cropped left and right and a portrait cover is no longer cropped top and bottom. Beyond the allowed
         /// range it switches to <see cref="Stretch.Uniform"/>, which letterboxes instead of cropping. This only applies to the horizontal
-        /// taskbar: in the other modes (vertical taskbar, dynamic island) the artwork size stays the layout engine's decision alone.
+        /// taskbar: on a vertical taskbar the artwork size stays the layout engine's decision alone.
         /// </summary>
         private void ApplyTaskbarArtworkAspect()
         {
@@ -1505,8 +1556,8 @@ namespace AFMediaBar.Components
         }
 
         /// <summary>
-        /// 应用播放器文字和灵动岛背景设置。
-        /// Applies player text and dynamic-island background settings.
+        /// 应用任务栏播放器文字和透明背景。
+        /// Applies taskbar player text and its transparent background.
         /// </summary>
         public void ApplyAppearanceSettings()
         {
@@ -1552,24 +1603,9 @@ namespace AFMediaBar.Components
             SongInfoStackPanel.Background = Brushes.Transparent;
             SetWebLyricsAppearance(foreground, needsContrastShadow: false, usesLightText: presentation.UsesLightText);
 
-            if (_currentMode == WindowMode.Taskbar)
-            {
-                MainBorder.Background = new SolidColorBrush(Colors.Transparent);
-                TopBorder.BorderBrush = Brushes.Transparent;
-                BackgroundImage.Visibility = Visibility.Collapsed;
-                return;
-            }
-
-            if (_currentMode != WindowMode.DynamicIsland)
-                return;
-
-            MainBorder.Background = SettingsManager.Current.DynamicIslandBackgroundMode == DynamicIslandBackgroundMode.Transparent
-                ? new SolidColorBrush(Color.FromArgb(1, 0, 0, 0))
-                : SystemParameters.HighContrast
-                    ? SystemColors.WindowBrush
-                    : new SolidColorBrush(isDark
-                        ? Color.FromArgb(0xFF, 0x20, 0x20, 0x20)
-                        : Color.FromArgb(0xFF, 0xF3, 0xF3, 0xF3));
+            MainBorder.Background = new SolidColorBrush(Colors.Transparent);
+            TopBorder.BorderBrush = Brushes.Transparent;
+            BackgroundImage.Visibility = Visibility.Collapsed;
         }
 
         private void ApplyTaskbarHoverAppearance(Brush foreground)
@@ -1613,6 +1649,15 @@ namespace AFMediaBar.Components
                 // No media playing - show the placeholder text so the media bar stays visible
                 Dispatcher.Invoke(() =>
                 {
+                    var wasConnected = _isConnected;
+                    if (!wasConnected && _restTransitionKeepsOutgoingText)
+                        return;
+                    var restBefore = wasConnected ? CaptureRestVisuals(targetConnected: false) : null;
+                    if (wasConnected)
+                        PrepareRestConnectionTransition(restBefore, entering: false);
+                    var keepOutgoingText = _restTransitionKeepsOutgoingText;
+                    if (wasConnected)
+                        _quickLaunchTooltip.Content = null;
                     _actualTitle = string.Empty;
                     _actualArtist = string.Empty;
                     _isConnected = false;
@@ -1620,13 +1665,16 @@ namespace AFMediaBar.Components
                     _canSkipPrevious = false;
                     _canSkipNext = false;
 
-                    SongTitle.Text = _actualTitle;
-                    SongMetadataPanel.Visibility = Visibility.Visible;
-                    SongLyricsPanel.Opacity = 0;
-                    SongLyricsPanel.IsHitTestVisible = false;
-                    UpdateWebLyricsPresentation(allowTransition: false);
-                    SongArtist.Text = _actualArtist;
-                    SongInfoStackPanel.Visibility = Visibility.Collapsed;
+                    if (!keepOutgoingText)
+                    {
+                        SongTitle.Text = string.Empty;
+                        SongMetadataPanel.Visibility = Visibility.Visible;
+                        SongLyricsPanel.Opacity = 0;
+                        SongLyricsPanel.IsHitTestVisible = false;
+                        UpdateWebLyricsPresentation(allowTransition: false);
+                        SongArtist.Text = string.Empty;
+                        SongInfoStackPanel.Visibility = Visibility.Collapsed;
+                    }
                     SongInfoStackPanel.IsHitTestVisible = false;
                     // 封面这一格此刻画的是快速启动小音符，它有自己的滚轮语义与提示。
                     // The artwork slot now draws the quick-launch note, which has wheel semantics and a tooltip of its own.
@@ -1642,9 +1690,14 @@ namespace AFMediaBar.Components
                     TaskbarNextButton.IsEnabled = false;
                     HideTaskbarHoverLayer(immediate: true);
                     UpdateTaskbarProgress();
-                    ApplyTaskbarExperienceSettings();
+                    ApplyTaskbarExperienceSettings(publishSize: restBefore is null);
+                    if (restBefore is not null)
+                    {
+                        PublishRestTransitionTargetSize();
+                        AnimateRestConnectionChange(restBefore);
+                    }
 
-                    // 任务栏无媒体时保持完全透明；灵动岛保留布局定义的稳定背景。
+                    // 任务栏无媒体时保持完全透明。
                     // Keep the disconnected taskbar transparent; preserve the dynamic-island layout background.
                     if (_currentMode == WindowMode.Taskbar)
                     {
@@ -1654,11 +1707,11 @@ namespace AFMediaBar.Components
                     }
 
                     Visibility = Visibility.Visible;
-                    RaiseDesiredSizeChanged(isForcedRefresh: true);
                 });
                 return;
             }
 
+            var wasConnected = _isConnected;
             _isPaused = !snapshot.IsPlaying;
             _isConnected = true;
             _canPlayPause = snapshot.CanPlayPause;
@@ -1667,17 +1720,17 @@ namespace AFMediaBar.Components
 
             Dispatcher.Invoke(() =>
             {
+                var restBefore = !wasConnected ? CaptureRestVisuals(targetConnected: true) : null;
+                if (!wasConnected)
+                    PrepareRestConnectionTransition(restBefore, entering: true);
                 string newTitle = !string.IsNullOrEmpty(snapshot.Title) ? snapshot.Title : "-";
                 string newArtist = !string.IsNullOrWhiteSpace(snapshot.Artist)
                     ? snapshot.Artist
                     : !string.IsNullOrWhiteSpace(snapshot.SourceName) ? snapshot.SourceName : "-";
 
-                // 标题或艺术家变化时触发入场动画
-                // Trigger entrance animation when title or artist changes
-                if (_actualTitle != newTitle || _actualArtist != newArtist)
+                var textChanged = _actualTitle != newTitle || _actualArtist != newArtist;
+                if (textChanged)
                 {
-                    AnimateEntrance();
-
                     _actualTitle = newTitle;
                     _actualArtist = newArtist;
 
@@ -1745,7 +1798,7 @@ namespace AFMediaBar.Components
                     : Visibility.Collapsed;
                 SongInfoStackPanel.Visibility = _isVertical ? Visibility.Collapsed : Visibility.Visible;
                 SongInfoStackPanel.IsHitTestVisible = !_isVertical;
-                // 任务栏主体保持透明；灵动岛继续沿用布局引擎已有背景行为。
+                // 任务栏主体保持透明。
                 // Keep the taskbar body transparent; the island retains its existing layout-engine background behavior.
                 BackgroundImage.Visibility = Visibility.Collapsed;
 
@@ -1754,10 +1807,21 @@ namespace AFMediaBar.Components
                 TaskbarNextButton.IsEnabled = _canSkipNext;
                 TaskbarPlayPauseIcon.Symbol = _isPaused ? SymbolRegular.Play24 : SymbolRegular.Pause24;
                 UpdateTaskbarProgress();
-                ApplyTaskbarExperienceSettings();
+                ApplyTaskbarExperienceSettings(publishSize: restBefore is null);
+                if (!wasConnected)
+                {
+                    if (restBefore is not null)
+                    {
+                        PublishRestTransitionTargetSize();
+                        AnimateRestConnectionChange(restBefore);
+                    }
+                }
+                if (textChanged && wasConnected)
+                    AnimateEntrance();
 
                 Visibility = Visibility.Visible;
-                RaiseDesiredSizeChanged();
+                if (restBefore is null)
+                    RaiseDesiredSizeChanged();
             });
         }
 
@@ -1765,15 +1829,18 @@ namespace AFMediaBar.Components
         /// <param name="isForcedRefresh">是否绕过内容指纹去重。/ Whether the content-fingerprint dedupe is bypassed.</param>
         private void RaiseDesiredSizeChanged(bool isForcedRefresh = false, bool skipTransition = false)
         {
+            if (_restTransitionPreparing || _restTransitionActive && _restTransitionTargetPublished)
+                return;
+
             if (_layoutEngine?.CurrentOrientation is not { } orientation)
                 return;
 
             var lyricsVisible = SongLyricsPanel.Opacity > 0;
-            var visibleText = lyricsVisible ? _lyricsFrame.Current : SongTitle.Text;
-            var secondaryText = lyricsVisible
+            var visibleText = !_isConnected ? string.Empty : lyricsVisible ? _lyricsFrame.Current : SongTitle.Text;
+            var secondaryText = _isConnected && lyricsVisible
                 ? string.IsNullOrEmpty(_lyricsFrame.CurrentTranslation) ? _lyricsFrame.Next : _lyricsFrame.CurrentTranslation
                 : string.Empty;
-            var artist = !lyricsVisible && SongArtistContainer.Visibility == Visibility.Visible ? _actualArtist : string.Empty;
+            var artist = _isConnected && !lyricsVisible && SongArtistContainer.Visibility == Visibility.Visible ? _actualArtist : string.Empty;
             // Spectrum tuning and metric selection never change their reserved widths. Keeping
             // those values (or play/pause) in the fingerprint causes redundant host size
             // animations and visibly nudges title/artist/lyrics while sliders are adjusted.
@@ -1846,7 +1913,7 @@ namespace AFMediaBar.Components
                         experience.HoverControls,
                         progressVisible,
                         experience.Density,
-                        experience.ComponentSpacingDip)
+                        experience.HoverButtonSpacingDip)
                     : 0;
                 double ContentWidth(double availableTextWidth) => TaskbarExperiencePolicy.CalculateRestWidth(
                     visibleComponents,

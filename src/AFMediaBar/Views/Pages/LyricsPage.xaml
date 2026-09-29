@@ -369,6 +369,13 @@
                 <components:SettingsGroup Header="{DynamicResource Loc.Common.Group.LyricsSources}"
                                           Icon="{ui:SymbolIcon CloudArrowDown24}">
                     <StackPanel>
+                        <components:SettingsRow
+                            Description="{DynamicResource Loc.Lyrics.Row.BrowserVideo.Description}"
+                            Icon="{ui:SymbolIcon Video24}"
+                            Title="{DynamicResource Loc.Lyrics.Row.BrowserVideo.Title}">
+                            <ui:ToggleSwitch IsChecked="{Binding ViewModel.AllowBrowserAndVideoLyrics, Mode=TwoWay}" />
+                        </components:SettingsRow>
+
                         <!-- 固定 QQ 优先/并发最高分策略由代码拥有；不再暴露严格度、调度或播放器绑定。 -->
                         <ui:CardExpander
                             Style="{StaticResource AfSettingsExpanderStyle}"

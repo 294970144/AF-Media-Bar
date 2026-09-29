@@ -68,6 +68,10 @@ public partial class TaskBarMediaControl
 
     private void UpdateWebLyricsPresentation(bool allowTransition = true)
     {
+        // Keep the outgoing live lyrics until the connection clip has fully retracted.
+        if (_restTransitionKeepsOutgoingText)
+            return;
+
         var previous = _lyricsFrame;
         var next = LyricsPresentationProjector.Project(_snapshot, SettingsManager.Current, DateTimeOffset.UtcNow);
         _lyricsFrame = next;

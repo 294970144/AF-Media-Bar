@@ -320,6 +320,7 @@ public partial class ExtraFeaturesViewModel : ObservableObject
     }
 
     public void ResetExtraFeatures() => SettingsManager.ResetExtraFeatures();
+    public void ResetComponents() => SettingsManager.ResetComponents();
 
     /// <summary>
     /// 写状态行。参数是文案键而不是拼好的句子，因此语言变化后这一行会自己跟着换语言。

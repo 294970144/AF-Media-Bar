@@ -19,11 +19,10 @@ public enum DisplayModeSelection
     FloatingBall = 3
 }
 
-/// <summary>四种显示模式及任务栏轻度自定义。 / Four display modes and light taskbar customization.</summary>
+/// <summary>四种显示模式及各层功能开关。 / Four display modes and their layer feature switches.</summary>
 public partial class DisplayModesViewModel : ObservableObject
 {
     private readonly IDisplayMonitorService _displayMonitorService;
-    private readonly TaskbarLengthConstraintsService _taskbarLengthConstraints;
     private readonly LocalizationService _localization;
     private bool _isRefreshing;
     private DisplayModeSelection _selectedMode = DisplayModeSelection.Taskbar;
@@ -140,25 +139,6 @@ public partial class DisplayModesViewModel : ObservableObject
         set => UpdateExperience(SettingsManager.Current.TaskbarExperience with { FullLayerEnabled = value });
     }
 
-    public TaskbarInformationDensity Density
-    {
-        get => SettingsManager.Current.TaskbarExperience.Density;
-        set => UpdateExperience(SettingsManager.Current.TaskbarExperience with { Density = value });
-    }
-
-    public TaskbarContentLayout ContentLayout
-    {
-        get => SettingsManager.Current.TaskbarExperience.ContentLayout;
-        set => UpdateExperience(SettingsManager.Current.TaskbarExperience with { ContentLayout = value });
-    }
-
-    /// <summary>任务栏标题和歌手文字的对齐方式。 / Alignment of taskbar title and artist text.</summary>
-    public TaskbarMediaTextAlignment MediaTextAlignment
-    {
-        get => SettingsManager.Current.TaskbarExperience.MediaTextAlignment;
-        set => UpdateExperience(SettingsManager.Current.TaskbarExperience with { MediaTextAlignment = value });
-    }
-
     /// <summary>
     /// 静置层与悬停层是否提供进入完整层的入口（文字区顶部细杠与悬停层按钮）。界面开关在本页静置层分区，
     /// 关闭后两个入口一起消失；完整层本身与托盘、菜单入口不受影响。
@@ -208,18 +188,6 @@ public partial class DisplayModesViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 静置层顺序列表：前两行是固定在最前面的封面与媒体文字（不提供上下移），其后是可排序的频谱、性能、输出设备、音量。
-    ///
-    /// 封面与媒体文字不参与排序是刻意的：它们是这条媒体栏的主干，此前允许移动时界面会错乱，因此现在固定在开头。
-    /// The rest-layer order list: the first two rows are the artwork and the media text pinned to the front (with no move buttons), followed by the
-    /// reorderable spectrum, performance, output device, and volume.
-    ///
-    /// The artwork and the media text deliberately take no part in ordering: they are the backbone of the bar, and allowing them to move broke the
-    /// layout, so they are pinned to the front.
-    /// </summary>
-    public ObservableCollection<TaskbarRestComponentSettingItem> RestOrderEntries { get; } = [];
-
-    /// <summary>
     /// "没有媒体时显示"列表：快速启动小音符（默认开）、频谱、性能监控、输出设备按钮、音量按钮。
     ///
     /// 封面与媒体文字不在这个列表里、也不提供开关：没有媒体时它们没有任何内容可显示，因此一定不显示；一个都不勾选时整条媒体栏隐藏。
@@ -232,35 +200,17 @@ public partial class DisplayModesViewModel : ObservableObject
     public ObservableCollection<TaskbarRestComponentSettingItem> IdleComponentEntries { get; } = [];
 
     /// <summary>
-    /// 重建两张静置层列表（顺序按设置、显隐按"没有媒体时保留"的取值）。
-    ///
-    /// 顺序与显隐没有变化时只重取显示名（语言可能刚换过）：列表里没有任何变化时重建它，会让 ItemsControl 重新生成全部行，
-    /// 拖动一个无关的滑杆也会把这两份列表闪一下。
-    /// Rebuilds both rest-layer lists (the order from the settings, the switches from the "kept without media" value).
-    ///
-    /// When neither the order nor the switches changed, only the display names are re-read (the language may have just changed): rebuilding a list in
-    /// which nothing changed makes the ItemsControl regenerate every row and flashes both lists even while an unrelated slider is dragged.
+    /// "没有媒体时显示"列表使用固定顺序：快速启动小音符在最前，其余小组件随后。
+    /// The "shown without media" list uses a fixed order: quick-launch note first, followed by the other widgets.
     /// </summary>
-    private void RefreshRestComponentEntries()
+    private void RefreshIdleComponentEntries()
     {
-        var experience = SettingsManager.Current.TaskbarExperience.Normalize();
-        var order = TaskbarRestLayoutPolicy.ResolveOrder(experience.RestComponentOrder);
-        var kept = TaskbarRestLayoutPolicy.ResolveIdleComponents(experience.IdleComponents);
-
-        var orderUnchanged = RestOrderEntries.Count == order.Count &&
-                             RestOrderEntries.Select(entry => entry.Component).SequenceEqual(order);
-        var idleUnchanged = IdleComponentEntries.Count == IdleVisibilityOrder.Count &&
-                            IdleComponentEntries.Select(entry => entry.Component).SequenceEqual(IdleVisibilityOrder) &&
-                            IdleComponentEntries.All(entry => entry.IsVisible == kept.Contains(entry.Component));
-
-        if (orderUnchanged && idleUnchanged)
+        var kept = TaskbarRestLayoutPolicy.ResolveIdleComponents(SettingsManager.Current.TaskbarExperience.IdleComponents);
+        var unchanged = IdleComponentEntries.Count == IdleVisibilityOrder.Count &&
+                        IdleComponentEntries.Select(entry => entry.Component).SequenceEqual(IdleVisibilityOrder) &&
+                        IdleComponentEntries.All(entry => entry.IsVisible == kept.Contains(entry.Component));
+        if (unchanged)
         {
-            foreach (var entry in RestOrderEntries)
-            {
-                entry.DisplayName = Translations.Get(TaskbarRestComponentSettingItem.ResolveNameKey(entry.Component));
-                entry.Description = Translations.Get(TaskbarRestComponentSettingItem.ResolveDescriptionKey(entry.Component));
-            }
-
             foreach (var entry in IdleComponentEntries)
             {
                 var isNote = entry.Component == TaskbarRestComponent.Artwork;
@@ -271,49 +221,24 @@ public partial class DisplayModesViewModel : ObservableObject
                     ? TaskbarRestComponentSettingItem.QuickLaunchNoteDescriptionKey
                     : TaskbarRestComponentSettingItem.ResolveDescriptionKey(entry.Component));
             }
-
             return;
         }
 
-        foreach (var entry in RestOrderEntries)
-        {
-            entry.VisibilityChanged -= OnRestComponentVisibilityChanged;
-        }
-
         foreach (var entry in IdleComponentEntries)
-        {
             entry.VisibilityChanged -= OnRestComponentVisibilityChanged;
-        }
-
-        RestOrderEntries.Clear();
-        foreach (var component in order)
-        {
-            RestOrderEntries.Add(new TaskbarRestComponentSettingItem(
-                component,
-                canMove: !TaskbarRestLayoutPolicy.FixedOrder.Contains(component),
-                isVisible: true));
-        }
 
         IdleComponentEntries.Clear();
         foreach (var component in IdleVisibilityOrder)
         {
             var entry = new TaskbarRestComponentSettingItem(
-                component,
-                canMove: false,
-                isVisible: kept.Contains(component),
+                component, canMove: false, isVisible: kept.Contains(component),
                 useQuickLaunchName: component == TaskbarRestComponent.Artwork);
             entry.VisibilityChanged += OnRestComponentVisibilityChanged;
             IdleComponentEntries.Add(entry);
         }
-
-        OnPropertyChanged(nameof(RestOrderEntries));
         OnPropertyChanged(nameof(IdleComponentEntries));
     }
 
-    /// <summary>
-    /// "没有媒体时显示"列表的条目集合与顺序：快速启动小音符在最前，其余按顺序列表里排出来的先后。
-    /// The set and order of the "shown without media" list: the quick-launch note first, the rest in the order the order list arranged them.
-    /// </summary>
     private static IReadOnlyList<TaskbarRestComponent> IdleVisibilityOrder { get; } =
     [
         TaskbarRestComponent.Artwork,
@@ -343,72 +268,6 @@ public partial class DisplayModesViewModel : ObservableObject
         {
             IdleComponents = isDefault ? null : selected
         });
-    }
-
-    [RelayCommand]
-    private void MoveRestComponentUp(TaskbarRestComponentSettingItem? entry) => MoveRestComponent(entry, -1);
-
-    [RelayCommand]
-    private void MoveRestComponentDown(TaskbarRestComponentSettingItem? entry) => MoveRestComponent(entry, 1);
-
-    /// <summary>
-    /// 在顺序列表里移动一行。只有可排序组件会被写入设置：封面与媒体文字虽然在列表里（用户要看得见自己在排序什么），
-    /// 但它们的位置不参与排序，也不会被写进设置文件。
-    /// Moves one row inside the order list. Only reorderable components reach the settings file: the artwork and the media text are listed (the user
-    /// has to see what they are ordering around) but their position takes no part in ordering and is never stored.
-    /// </summary>
-    private void MoveRestComponent(TaskbarRestComponentSettingItem? entry, int offset)
-    {
-        if (entry is null || !entry.CanMove)
-        {
-            return;
-        }
-
-        var index = RestOrderEntries.IndexOf(entry);
-        var target = index + offset;
-        // 固定头占着列表最前面几行，可排序组件的目标位置不能越过它们。
-        // The pinned head occupies the first rows, and a reorderable component must not move past them.
-        if (index < 0 || target < TaskbarRestLayoutPolicy.FixedOrder.Count || target >= RestOrderEntries.Count)
-        {
-            return;
-        }
-
-        RestOrderEntries.Move(index, target);
-        SaveRestComponentOrder();
-    }
-
-    /// <summary>把可排序段的顺序写回设置：恰好等于默认顺序时写回"未配置"，与歌词来源列表同一处理。/ Writes the reorderable order back into the settings: an order exactly equal to the default is stored as "never configured", the same handling as the lyric-source list.</summary>
-    private void SaveRestComponentOrder()
-    {
-        var ordered = RestOrderEntries
-            .Where(entry => entry.CanMove)
-            .Select(entry => entry.Component)
-            .ToArray();
-        var isDefault = ordered.SequenceEqual(TaskbarRestLayoutPolicy.DefaultTailOrder);
-        UpdateExperience(SettingsManager.Current.TaskbarExperience with
-        {
-            RestComponentOrder = isDefault ? null : ordered
-        });
-    }
-
-    [RelayCommand]
-    private void ResetRestComponentOrder()
-    {
-        var ordered = RestOrderEntries
-            .OrderBy(entry => entry.CanMove
-                ? TaskbarRestLayoutPolicy.DefaultTailOrder.ToList().IndexOf(entry.Component) + TaskbarRestLayoutPolicy.FixedOrder.Count
-                : TaskbarRestLayoutPolicy.FixedOrder.ToList().IndexOf(entry.Component))
-            .ToArray();
-        for (var i = 0; i < ordered.Length; i++)
-        {
-            var current = RestOrderEntries.IndexOf(ordered[i]);
-            if (current != i)
-            {
-                RestOrderEntries.Move(current, i);
-            }
-        }
-
-        SaveRestComponentOrder();
     }
 
     public bool HoverPlayPauseVisible
@@ -443,48 +302,6 @@ public partial class DisplayModesViewModel : ObservableObject
 
     private TaskbarHoverControlsSettings HoverControls =>
         SettingsManager.Current.TaskbarExperience.HoverControls;
-
-    /// <summary>当前模式的组件间距（DIP）。/ Component gap for the current mode in DIP.</summary>
-    public double ComponentSpacingDip
-    {
-        get => SettingsManager.Current.TaskbarExperience.ComponentSpacingDip;
-        set => UpdateExperience(SettingsManager.Current.TaskbarExperience with { ComponentSpacingDip = value });
-    }
-
-    public bool FollowMediaTextLength
-    {
-        get => SettingsManager.Current.TaskbarExperience.LengthMode == TaskbarLengthMode.FollowContent;
-        set => UpdateExperience(SettingsManager.Current.TaskbarExperience with
-        {
-            LengthMode = value ? TaskbarLengthMode.FollowContent : TaskbarLengthMode.Fixed,
-            FixedLengthDip = value
-                ? SettingsManager.Current.TaskbarExperience.FixedLengthDip
-                : Math.Clamp(
-                    SettingsManager.Current.TaskbarExperience.FixedLengthDip,
-                    FixedTaskbarLengthMinimum,
-                    FixedTaskbarLengthMaximum)
-        });
-    }
-
-    public bool UsesFixedTaskbarLength => !FollowMediaTextLength;
-    public double FixedTaskbarLengthMinimum => Math.Ceiling(_taskbarLengthConstraints.MinimumLengthDip);
-    public double FixedTaskbarLengthMaximum => Math.Max(FixedTaskbarLengthMinimum, Math.Floor(_taskbarLengthConstraints.MaximumLengthDip));
-
-    public double FixedTaskbarLengthDip
-    {
-        get => Math.Clamp(
-            SettingsManager.Current.TaskbarExperience.FixedLengthDip,
-            FixedTaskbarLengthMinimum,
-            FixedTaskbarLengthMaximum);
-        set => UpdateExperience(SettingsManager.Current.TaskbarExperience with
-        {
-            FixedLengthDip = Math.Clamp(value, FixedTaskbarLengthMinimum, FixedTaskbarLengthMaximum)
-        });
-    }
-
-    /// <summary>固定宽度的可用范围提示，随任务栏长度约束变化；单位与默认值一样放在括号与数字里。/ Tooltip for the fixed width's available range, which follows the taskbar length constraints; the unit sits with the numbers as it does for every default value.</summary>
-    public string FixedTaskbarLengthRangeText =>
-        Translations.Format("DisplayModes.Width.RangeText", FixedTaskbarLengthMinimum, FixedTaskbarLengthMaximum);
 
     public bool FullPanelMediaInfoVisible
     {
@@ -606,32 +423,27 @@ public partial class DisplayModesViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 创建显示模式页的视图模型并订阅设置、显示器与长度约束三处变化。
+    /// 创建显示模式页的视图模型并订阅设置、显示器与语言变化。
     /// 三个订阅源都是单例，因此订阅与进程同寿命，不需要退订。
-    /// Creates the display-mode view model and subscribes to settings, monitor, and length-constraint changes.
+    /// Creates the display-mode view model and subscribes to settings, monitor, and language changes.
     /// All three sources are singletons, so the subscriptions live as long as the process and never need cancelling.
     /// </summary>
     /// <param name="displayMonitorService">显示器目录，供目标显示器下拉框使用。/ Display catalog behind the target-monitor drop-down.</param>
-    /// <param name="taskbarLengthConstraints">任务栏可用长度约束，决定固定宽度的取值范围。/ Taskbar length constraints that bound the fixed width.</param>
     /// <param name="localization">
-    /// 界面语言。本页有三处文案由代码拼出（页头状态芯片、固定宽度可用范围、显示器名称），语言变化时必须重新取值。
+    /// 界面语言。本页由代码拼出的页头状态、显示器名称和组件名在语言变化时重新取值。
     /// 它是必填依赖：可省略的依赖会留下一条"忘记注入就静默不刷新"的路径，而这里没有合理的缺省语言。
-    /// Interface language. Three strings on this page are composed in code (the header status chip, the fixed-width
-    /// available range, and the monitor names) and have to be re-read when the language changes. It is a required dependency:
+    /// Interface language. The composed header status, monitor names, and component names must refresh when the language changes. It is a required dependency:
     /// an omittable one leaves a path where forgetting to inject it silently skips the refresh, and there is no sensible
     /// default language here.
     /// </param>
     public DisplayModesViewModel(
         IDisplayMonitorService displayMonitorService,
-        TaskbarLengthConstraintsService taskbarLengthConstraints,
         LocalizationService localization)
     {
         _displayMonitorService = displayMonitorService;
-        _taskbarLengthConstraints = taskbarLengthConstraints;
         _localization = localization;
         SettingsManager.SettingsChanged += OnSettingsChanged;
         _displayMonitorService.MonitorsChanged += OnMonitorsChanged;
-        _taskbarLengthConstraints.Changed += OnTaskbarLengthConstraintsChanged;
 
         // 代码拼出来的文案不会随 XAML 的动态资源一起更新，因此在语言变化时重新通知一遍。
         // Text composed in code does not follow the XAML dynamic resources, so it is announced again when the language
@@ -640,12 +452,9 @@ public partial class DisplayModesViewModel : ObservableObject
 
         _displayMonitorService.Refresh();
         RefreshMonitorOptions();
-        // 静置层组件列表是代码构建的（顺序与保留状态来自设置），构造函数里必须先填一次：本页其余属性都是直接读设置的
-        // getter，只有它为空的唯一表现就是"打开设置页看到一份空列表"。
-        // The rest-layer component list is built in code (its order and kept switches come from the settings), so it has to be filled once
-        // here: every other property on this page is a getter that reads the settings directly, and leaving this one empty would show up
-        // only as an empty list when the settings page is opened.
-        RefreshRestComponentEntries();
+        // 无媒体时保留组件列表由代码构建，首次打开页面前必须填充。
+        // The idle-component list is built in code and must be populated before the page first opens.
+        RefreshIdleComponentEntries();
     }
 
     /// <summary>
@@ -663,7 +472,7 @@ public partial class DisplayModesViewModel : ObservableObject
         // The component names and descriptions are a language snapshot taken while the items were built and do not follow the empty-property
         // notification on their own (the list instance is unchanged and so are the items' properties), so this has to refresh explicitly;
         // otherwise the column would keep the previous language after a switch.
-        RefreshRestComponentEntries();
+        RefreshIdleComponentEntries();
         OnPropertyChanged(string.Empty);
     }
 
@@ -767,14 +576,6 @@ public partial class DisplayModesViewModel : ObservableObject
     }
 
     private void OnMonitorsChanged(object? sender, EventArgs e) => RefreshMonitorOptions();
-
-    private void OnTaskbarLengthConstraintsChanged(object? sender, EventArgs e)
-    {
-        OnPropertyChanged(nameof(FixedTaskbarLengthMinimum));
-        OnPropertyChanged(nameof(FixedTaskbarLengthMaximum));
-        OnPropertyChanged(nameof(FixedTaskbarLengthDip));
-        OnPropertyChanged(nameof(FixedTaskbarLengthRangeText));
-    }
 
     private void RefreshMonitorOptions()
     {
@@ -922,23 +723,14 @@ public partial class DisplayModesViewModel : ObservableObject
     private void RaiseExperience()
     {
         OnPropertyChanged(nameof(HoverLayerEnabled)); OnPropertyChanged(nameof(FullLayerEnabled));
-        OnPropertyChanged(nameof(Density)); OnPropertyChanged(nameof(ContentLayout));
-        OnPropertyChanged(nameof(MediaTextAlignment));
         OnPropertyChanged(nameof(FullPanelEntryVisible));
         OnPropertyChanged(nameof(RestProgressVisible));
         OnPropertyChanged(nameof(SpectrumVisible)); OnPropertyChanged(nameof(PerformanceVisible));
         OnPropertyChanged(nameof(HoverPlayPauseVisible)); OnPropertyChanged(nameof(HoverPreviousNextVisible));
         OnPropertyChanged(nameof(HoverOutputDeviceVisible)); OnPropertyChanged(nameof(HoverAudioControlVisible));
         OnPropertyChanged(nameof(HoverProgressVisible));
-        OnPropertyChanged(nameof(ComponentSpacingDip));
-        OnPropertyChanged(nameof(FollowMediaTextLength)); OnPropertyChanged(nameof(UsesFixedTaskbarLength));
-        OnPropertyChanged(nameof(FixedTaskbarLengthMinimum)); OnPropertyChanged(nameof(FixedTaskbarLengthMaximum));
-        OnPropertyChanged(nameof(FixedTaskbarLengthDip)); OnPropertyChanged(nameof(FixedTaskbarLengthRangeText));
         OnPropertyChanged(nameof(RestOutputDeviceVisible)); OnPropertyChanged(nameof(RestVolumeVisible));
-        // 顺序列表与"没有媒体时显示"列表是两份内容，重建它们同时刷新了两者（也在语言变化后重取显示名）。
-        // The order list and the "shown without media" list are the two contents, and rebuilding them refreshes both (and re-reads the display
-        // names after a language change).
-        RefreshRestComponentEntries();
+        RefreshIdleComponentEntries();
         RaiseFullPanel();
     }
 

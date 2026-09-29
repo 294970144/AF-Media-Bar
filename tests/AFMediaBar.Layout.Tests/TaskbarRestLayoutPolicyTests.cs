@@ -17,6 +17,30 @@ namespace AFMediaBar.Layout.Tests;
 [TestClass]
 public sealed class TaskbarRestLayoutPolicyTests
 {
+    [TestMethod]
+    public void ConnectionRevealNeverCrossesWidgetsWhenArtworkWidthChangesOrNoteIsHidden()
+    {
+        const double textLeft = 80;
+        const double fullTextWidth = 160;
+        foreach (var (widgetStart, widgetEnd, textStart, textEnd) in new[]
+        {
+            (52d, 250d, 0d, fullTextWidth), // a wide cover replaces the idle note
+            (250d, 10d, fullTextWidth, 0d)  // no idle note: widgets move left past the old text slot
+        })
+        {
+            for (var step = 0; step <= 20; step++)
+            {
+                var progress = step / 20d;
+                var widgetLeft = RestConnectionTransitionPolicy.WidgetLeft(widgetStart, widgetEnd, progress);
+                var visibleWidth = RestConnectionTransitionPolicy.VisibleTextWidth(
+                    textStart, textEnd, progress, textLeft, widgetLeft, fullTextWidth);
+                Assert.IsTrue(visibleWidth >= 0 && visibleWidth <= fullTextWidth);
+                Assert.IsTrue(visibleWidth == 0 || textLeft + visibleWidth <= widgetLeft + 0.001,
+                    $"Text crossed the widget at progress {progress}.");
+            }
+        }
+    }
+
     private static double WidthOf(TaskbarRestComponent component) => component switch
     {
         TaskbarRestComponent.Artwork => 40,

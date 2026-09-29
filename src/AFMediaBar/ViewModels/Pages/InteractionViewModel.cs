@@ -38,6 +38,12 @@ public partial class InteractionViewModel : ObservableObject
         set => Update(Current with { ChordWheelAction = value });
     }
 
+    public bool ShowWheelTooltips
+    {
+        get => Current.ShowWheelTooltips;
+        set => Update(Current with { ShowWheelTooltips = value });
+    }
+
     public TrayClickAction TrayClickAction
     {
         get => Current.TrayClickAction;
@@ -100,6 +106,7 @@ public partial class InteractionViewModel : ObservableObject
         OnPropertyChanged(nameof(PrimaryWheelAction));
         OnPropertyChanged(nameof(Modifier));
         OnPropertyChanged(nameof(ChordWheelAction));
+        OnPropertyChanged(nameof(ShowWheelTooltips));
         OnPropertyChanged(nameof(TrayClickAction));
         OnPropertyChanged(nameof(TrayPrimaryWheelAction));
         OnPropertyChanged(nameof(TrayChordWheelAction));

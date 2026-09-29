@@ -24,9 +24,6 @@ namespace AFMediaBar.ViewModels.Pages
         private LayoutOrientationMode _currentLayoutOrientationMode = LayoutOrientationMode.Auto;
 
         [ObservableProperty]
-        private DynamicIslandBackgroundMode _currentDynamicIslandBackgroundMode = DynamicIslandBackgroundMode.SystemTheme;
-
-        [ObservableProperty]
         private double _layoutLengthScalePercent = 100;
 
         [ObservableProperty]
@@ -44,15 +41,12 @@ namespace AFMediaBar.ViewModels.Pages
 
         public bool IsTaskbarMode => CurrentWindowMode == WindowMode.Taskbar;
 
-        public bool IsDynamicIslandMode => CurrentWindowMode == WindowMode.DynamicIsland;
-
         public LayoutViewModel()
         {
             // 从设置管理器加载当前设置
             // Load current settings from settings manager
             _currentWindowMode = SettingsManager.Current.WindowMode;
             _currentLayoutOrientationMode = SettingsManager.Current.LayoutOrientationMode;
-            _currentDynamicIslandBackgroundMode = SettingsManager.Current.DynamicIslandBackgroundMode;
             _layoutLengthScalePercent = SettingsManager.Current.LayoutLengthScalePercent;
             _layoutThicknessScalePercent = SettingsManager.Current.LayoutThicknessScalePercent;
             _taskbarCrossAxisOffsetDip = SettingsManager.Current.TaskbarBarCrossAxisOffsetDip;
@@ -64,7 +58,6 @@ namespace AFMediaBar.ViewModels.Pages
         partial void OnCurrentWindowModeChanged(WindowMode value)
         {
             OnPropertyChanged(nameof(IsTaskbarMode));
-            OnPropertyChanged(nameof(IsDynamicIslandMode));
         }
 
         partial void OnLayoutLengthScalePercentChanged(double value)
@@ -107,23 +100,6 @@ namespace AFMediaBar.ViewModels.Pages
 
             // 触发布局设置变更事件
             // Trigger layout settings changed event
-            SettingsManager.RaiseLayoutSettingsChanged(
-                SettingsManager.Current.WindowMode,
-                SettingsManager.Current.LayoutOrientationMode);
-        }
-
-        /// <summary>
-        /// 切换到灵动岛模式命令。
-        /// Switches to dynamic island mode.
-        /// </summary>
-        [RelayCommand]
-        private void OnSwitchToDynamicIslandMode()
-        {
-            if (CurrentWindowMode == WindowMode.DynamicIsland)
-                return;
-
-            CurrentWindowMode = WindowMode.DynamicIsland;
-            SettingsManager.Current.WindowMode = WindowMode.DynamicIsland;
             SettingsManager.RaiseLayoutSettingsChanged(
                 SettingsManager.Current.WindowMode,
                 SettingsManager.Current.LayoutOrientationMode);
@@ -190,30 +166,6 @@ namespace AFMediaBar.ViewModels.Pages
         }
 
         [RelayCommand]
-        private void OnSwitchToSystemThemeBackground()
-        {
-            SetDynamicIslandBackgroundMode(DynamicIslandBackgroundMode.SystemTheme);
-        }
-
-        [RelayCommand]
-        private void OnSwitchToTransparentBackground()
-        {
-            SetDynamicIslandBackgroundMode(DynamicIslandBackgroundMode.Transparent);
-        }
-
-        private void SetDynamicIslandBackgroundMode(DynamicIslandBackgroundMode mode)
-        {
-            if (CurrentDynamicIslandBackgroundMode == mode)
-                return;
-
-            CurrentDynamicIslandBackgroundMode = mode;
-            SettingsManager.Current.DynamicIslandBackgroundMode = mode;
-            SettingsManager.RaiseLayoutSettingsChanged(
-                SettingsManager.Current.WindowMode,
-                SettingsManager.Current.LayoutOrientationMode);
-        }
-
-        [RelayCommand]
         private void OnResetTaskbarPosition()
         {
             SettingsManager.Current.Position = TaskbarBarPosition.Start;
@@ -245,14 +197,12 @@ namespace AFMediaBar.ViewModels.Pages
             {
                 CurrentWindowMode = SettingsManager.Current.WindowMode;
                 CurrentLayoutOrientationMode = SettingsManager.Current.LayoutOrientationMode;
-                CurrentDynamicIslandBackgroundMode = SettingsManager.Current.DynamicIslandBackgroundMode;
                 LayoutLengthScalePercent = SettingsManager.Current.LayoutLengthScalePercent;
                 LayoutThicknessScalePercent = SettingsManager.Current.LayoutThicknessScalePercent;
                 TaskbarCrossAxisOffsetDip = SettingsManager.Current.TaskbarBarCrossAxisOffsetDip;
                 IsTaskbarPositionLocked = SettingsManager.Current.TaskbarBarPositionLocked;
                 IsTaskbarAvoidingIcons = SettingsManager.Current.TaskbarBarAvoidIcons;
                 OnPropertyChanged(nameof(IsTaskbarMode));
-                OnPropertyChanged(nameof(IsDynamicIslandMode));
             }
             finally { _isRefreshing = false; }
         }

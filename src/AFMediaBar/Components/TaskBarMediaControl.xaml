@@ -433,7 +433,7 @@
                                             Style="{StaticResource TaskbarHoverButton}"
                                             ToolTip="{DynamicResource Loc.Common.PreviousTrack}"
                                             Click="TaskbarPreviousButton_Click">
-                                        <ui:SymbolIcon Symbol="Previous24" FontSize="14" />
+                                        <ui:SymbolIcon x:Name="TaskbarPreviousIcon" Symbol="Previous24" FontSize="14" />
                                     </Button>
                                     <Button x:Name="TaskbarPlayPauseButton"
                                             Style="{StaticResource TaskbarHoverButton}"
@@ -445,7 +445,7 @@
                                             Style="{StaticResource TaskbarHoverButton}"
                                             ToolTip="{DynamicResource Loc.Common.NextTrack}"
                                             Click="TaskbarNextButton_Click">
-                                        <ui:SymbolIcon Symbol="Next24" FontSize="14" />
+                                        <ui:SymbolIcon x:Name="TaskbarNextIcon" Symbol="Next24" FontSize="14" />
                                     </Button>
                                 </StackPanel>
                                 <Button x:Name="TaskbarDeviceButton"
@@ -456,7 +456,7 @@
                                         Click="TaskbarDeviceButton_Click"
                                         MouseEnter="TaskbarDeviceButton_MouseEnter"
                                         PreviewMouseWheel="TaskbarDeviceButton_PreviewMouseWheel">
-                                    <TextBlock Text="&#xE7F5;" FontFamily="{DynamicResource AppIconFontFamily}" FontSize="14" />
+                                    <TextBlock x:Name="TaskbarHoverDeviceGlyph" Text="&#xE7F5;" FontFamily="{DynamicResource AppIconFontFamily}" FontSize="14" />
                                 </Button>
                                 <Button x:Name="TaskbarVolumeButton"
                                         Style="{StaticResource TaskbarHoverButton}"
@@ -465,7 +465,7 @@
                                         Click="TaskbarVolumeButton_Click"
                                         MouseEnter="TaskbarVolumeButton_MouseEnter"
                                         PreviewMouseWheel="TaskbarVolumeButton_PreviewMouseWheel">
-                                    <TextBlock Text="&#xE767;" FontFamily="{DynamicResource AppIconFontFamily}" FontSize="14" />
+                                    <TextBlock x:Name="TaskbarHoverVolumeGlyph" Text="&#xE767;" FontFamily="{DynamicResource AppIconFontFamily}" FontSize="14" />
                                 </Button>
                                 <!-- 悬停层进度只展示播放位置：没有滑块、不可拖动，只用强调色段表示进度。 -->
                                 <!-- The hover-layer progress only displays playback position: no thumb, no dragging, accent color only. -->

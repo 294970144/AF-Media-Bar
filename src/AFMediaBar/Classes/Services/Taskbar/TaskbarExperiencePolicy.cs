@@ -6,15 +6,16 @@ namespace AFMediaBar.Classes.Services;
 /// <summary>信息密度对应的实际组件尺寸。 / Actual component sizes for an information-density preset.</summary>
 public readonly record struct TaskbarDensityMetrics(
     double ButtonSize,
+    double IconSize,
     double ProgressWidth,
     double HoverLayerHeight,
     double SectionGap)
 {
     public static TaskbarDensityMetrics From(TaskbarInformationDensity density) => density switch
     {
-        TaskbarInformationDensity.Minimal => new(22, 76, 36, 6),
-        TaskbarInformationDensity.Information => new(28, 118, 42, 10),
-        _ => new(24, 96, 40, 8)
+        TaskbarInformationDensity.Minimal => new(22, 12, 76, 36, 6),
+        TaskbarInformationDensity.Information => new(28, 18, 118, 42, 10),
+        _ => new(24, 14, 96, 40, 8)
     };
 }
 
@@ -40,7 +41,8 @@ public static class TaskbarExperiencePolicy
         double? componentSpacingDip = null,
         bool performanceVisible = false,
         double performanceWidth = 0,
-        TaskbarHoverControlsSettings? hoverControls = null)
+        TaskbarHoverControlsSettings? hoverControls = null,
+        double? hoverButtonSpacingDip = null)
     {
         var sectionGap = ResolveSectionGap(TaskbarDensityMetrics.From(density), componentSpacingDip);
         var hoverMinimum = hoverLayerEnabled
@@ -53,7 +55,7 @@ public static class TaskbarExperiencePolicy
                     progressVisible),
                 progressVisible,
                 density,
-                componentSpacingDip)
+                hoverButtonSpacingDip)
             : 0;
 
         // 媒体文字自己就是列表里的一个组件，宽度取"量出的文字"与"悬停层下限"的较大者；断开时文字组件整块不在列表里，
@@ -194,10 +196,10 @@ public static class TaskbarExperiencePolicy
         bool transportVisible,
         bool progressVisible,
         TaskbarInformationDensity density,
-        double? componentSpacingDip = null)
+        double? hoverButtonSpacingDip = null)
     {
         var metrics = TaskbarDensityMetrics.From(density);
-        var sectionGap = ResolveSectionGap(metrics, componentSpacingDip);
+        var sectionGap = ResolveHoverButtonGap(metrics, hoverButtonSpacingDip);
         var buttonCount = transportVisible ? 5 : 2;
         var buttons = buttonCount * metrics.ButtonSize + Math.Max(0, buttonCount - 1) * sectionGap;
         var progress = progressVisible ? sectionGap + metrics.ProgressWidth : 0;
@@ -209,10 +211,10 @@ public static class TaskbarExperiencePolicy
         TaskbarHoverControlsSettings controls,
         bool progressAvailable,
         TaskbarInformationDensity density,
-        double? componentSpacingDip = null)
+        double? hoverButtonSpacingDip = null)
     {
         var metrics = TaskbarDensityMetrics.From(density);
-        var sectionGap = ResolveSectionGap(metrics, componentSpacingDip);
+        var sectionGap = ResolveHoverButtonGap(metrics, hoverButtonSpacingDip);
         var buttonCount = (controls.PlayPauseVisible ? 1 : 0) +
                           (controls.PreviousNextVisible ? 2 : 0) +
                           (controls.OutputDeviceVisible ? 1 : 0) +
@@ -234,6 +236,11 @@ public static class TaskbarExperiencePolicy
     private static double ResolveSectionGap(TaskbarDensityMetrics metrics, double? componentSpacingDip) =>
         componentSpacingDip is { } value && double.IsFinite(value)
             ? Math.Clamp(value, TaskbarExperienceSettings.MinimumComponentSpacingDip, TaskbarExperienceSettings.MaximumComponentSpacingDip)
+            : metrics.SectionGap;
+
+    private static double ResolveHoverButtonGap(TaskbarDensityMetrics metrics, double? spacingDip) =>
+        spacingDip is { } value && double.IsFinite(value)
+            ? Math.Clamp(value, 0, TaskbarExperienceSettings.MaximumHoverButtonSpacingDip)
             : metrics.SectionGap;
 
     public static double GetPosition(MediaSnapshot snapshot, DateTimeOffset now)

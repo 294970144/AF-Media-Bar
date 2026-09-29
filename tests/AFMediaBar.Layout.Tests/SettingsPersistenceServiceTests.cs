@@ -83,6 +83,7 @@ public sealed class SettingsPersistenceServiceTests
                 // only their type name, so only a real write-then-read proves they are serialized at all.
                 OutputDeviceVisible = true,
                 VolumeVisible = true,
+                HoverButtonSpacingDip = 7,
                 RestComponentOrder =
                 [
                     TaskbarRestComponent.Volume,
@@ -98,7 +99,7 @@ public sealed class SettingsPersistenceServiceTests
                 WheelAction.PreviousNext,
                 TrayClickAction.OpenSettings,
                 TrayWheelBehavior.AdjustVolume,
-                TrayWheelBehavior.SwitchOutputDevice),
+                TrayWheelBehavior.SwitchOutputDevice) { ShowWheelTooltips = false },
             TaskbarSurface = new ModeSurfaceSettings(PlayerSurfaceStyle.ThemeTint, 72, 12),
             LyricsTextAlignment = LyricsTextAlignment.Right,
             TrackChangeNotification = new TrackChangeNotificationSettings(
@@ -121,7 +122,8 @@ public sealed class SettingsPersistenceServiceTests
                 LastCheckSucceeded: false),
             // 刻意取一个非默认的选项：默认值（跟随系统）即使序列化失败也会"看起来正确"。
             // A deliberately non-default option: the default (follow the system) would look correct even if serialization failed.
-            InterfaceLanguage = InterfaceLanguage.TraditionalChinese
+            InterfaceLanguage = InterfaceLanguage.TraditionalChinese,
+            AllowBrowserAndVideoLyrics = true
         };
         using (var writer = new SettingsPersistenceService(_directory)) { writer.Initialize(); SettingsManager.Replace(settings); writer.Flush(); }
         SettingsManager.ResetAll();
@@ -129,6 +131,7 @@ public sealed class SettingsPersistenceServiceTests
         reader.Initialize();
 
         Assert.AreEqual(TrayWheelBehavior.Disabled, SettingsManager.Current.TrayWheelBehavior);
+        Assert.IsTrue(SettingsManager.Current.AllowBrowserAndVideoLyrics);
         CollectionAssert.AreEqual(
             new[] { LyricsSecondaryLineMode.Romanization, LyricsSecondaryLineMode.Translation },
             SettingsManager.Current.LyricsSecondaryLine.Order!.ToArray());
@@ -141,10 +144,12 @@ public sealed class SettingsPersistenceServiceTests
         Assert.AreEqual(PlayerClickAction.ActivateSource, SettingsManager.Current.Interaction.ArtworkClickAction);
         Assert.AreEqual(WheelAction.SwitchMediaSource, SettingsManager.Current.Interaction.PrimaryWheelAction);
         Assert.AreEqual(InteractionModifier.RightMouseButton, SettingsManager.Current.Interaction.Modifier);
+        Assert.IsFalse(SettingsManager.Current.Interaction.ShowWheelTooltips);
         Assert.AreEqual(TaskbarInformationDensity.Information, SettingsManager.Current.TaskbarExperience.Density);
         Assert.AreEqual(new TaskbarFullPanelSettings(true, false, true, false), SettingsManager.Current.TaskbarExperience.FullPanel);
         Assert.AreEqual(TaskbarLengthMode.Fixed, SettingsManager.Current.TaskbarExperience.LengthMode);
         Assert.AreEqual(444, SettingsManager.Current.TaskbarExperience.FixedLengthDip);
+        Assert.AreEqual(7, SettingsManager.Current.TaskbarExperience.HoverButtonSpacingDip);
         Assert.AreEqual(TaskbarMediaTextAlignment.Right, SettingsManager.Current.TaskbarExperience.MediaTextAlignment);
         Assert.IsFalse(SettingsManager.Current.TaskbarExperience.SpectrumVisible);
         Assert.IsFalse(SettingsManager.Current.TaskbarExperience.PerformanceVisible);
@@ -556,7 +561,7 @@ public sealed class SettingsPersistenceServiceTests
     public void UnimplementedDisplayModeSelectionDoesNotChangeRuntimeModeOrTaskbarSettings()
     {
         SettingsManager.Replace(new AppSettings());
-        var viewModel = new DisplayModesViewModel(new FakeDisplayMonitorService(), new TaskbarLengthConstraintsService(), new LocalizationService());
+        var viewModel = new DisplayModesViewModel(new FakeDisplayMonitorService(), new LocalizationService());
         var original = SettingsManager.Current.TaskbarExperience;
 
         viewModel.SwitchToFloatingBallModeCommand.Execute(null);
@@ -578,7 +583,7 @@ public sealed class SettingsPersistenceServiceTests
                 FullPanel = new TaskbarFullPanelSettings(true, false, false, false)
             }
         });
-        var viewModel = new DisplayModesViewModel(new FakeDisplayMonitorService(), new TaskbarLengthConstraintsService(), new LocalizationService());
+        var viewModel = new DisplayModesViewModel(new FakeDisplayMonitorService(), new LocalizationService());
 
         viewModel.FullPanelMediaInfoVisible = false;
         Assert.IsTrue(viewModel.FullPanelMediaInfoVisible);
@@ -605,7 +610,7 @@ public sealed class SettingsPersistenceServiceTests
     public void DisplayModesUpdatesIndependentNotificationAndTaskbarTargets()
     {
         SettingsManager.Replace(new AppSettings());
-        var viewModel = new DisplayModesViewModel(new FakeDisplayMonitorService(), new TaskbarLengthConstraintsService(), new LocalizationService());
+        var viewModel = new DisplayModesViewModel(new FakeDisplayMonitorService(), new LocalizationService());
 
         viewModel.TrackChangeNotificationEnabled = true;
         viewModel.ShowTrackChangeNotificationWhenFullscreen = true;
@@ -639,12 +644,12 @@ public sealed class SettingsPersistenceServiceTests
     }
 
     [TestMethod]
-    public void DisplayModesClampsFixedLengthToLiveTaskbarRange()
+    public void AppearanceClampsFixedLengthToLiveTaskbarRange()
     {
         SettingsManager.Replace(new AppSettings());
         var constraints = new TaskbarLengthConstraintsService();
         constraints.Update(280, 520);
-        var viewModel = new DisplayModesViewModel(new FakeDisplayMonitorService(), constraints, new LocalizationService());
+        var viewModel = new AppearanceViewModel(new LocalizationService(), constraints);
 
         viewModel.FollowMediaTextLength = false;
         viewModel.FixedTaskbarLengthDip = 900;
@@ -675,8 +680,17 @@ public sealed class SettingsPersistenceServiceTests
         SettingsManager.ResetLayout();
         Assert.AreEqual(WindowMode.Taskbar, SettingsManager.Current.WindowMode);
         Assert.AreEqual(700, SettingsManager.Current.Appearance.FontWeight);
+        SettingsManager.Current.TaskbarExperience = TaskbarExperienceSettings.Default with
+        {
+            Density = TaskbarInformationDensity.Information,
+            HoverButtonSpacingDip = 12,
+            SpectrumVisible = false
+        };
         SettingsManager.ResetAppearance();
         Assert.AreEqual(AppearanceSettings.Default, SettingsManager.Current.Appearance);
+        Assert.AreEqual(TaskbarExperienceSettings.Default.Density, SettingsManager.Current.TaskbarExperience.Density);
+        Assert.AreEqual(TaskbarExperienceSettings.Default.HoverButtonSpacingDip, SettingsManager.Current.TaskbarExperience.HoverButtonSpacingDip);
+        Assert.IsFalse(SettingsManager.Current.TaskbarExperience.SpectrumVisible);
 
         SettingsManager.Current.Interaction = GlobalInteractionSettings.Default with
         {
@@ -689,23 +703,32 @@ public sealed class SettingsPersistenceServiceTests
 
         SettingsManager.Current.TaskbarExperience = TaskbarExperienceSettings.Default with
         {
-            FullPanel = TaskbarFullPanelSettings.Compact
+            FullPanel = TaskbarFullPanelSettings.Compact,
+            Density = TaskbarInformationDensity.Information,
+            HoverButtonSpacingDip = 12
         };
         SettingsManager.Current.TrackChangeNotification = TrackChangeNotificationSettings.Default with { Enabled = true };
         SettingsManager.Current.TaskbarTargetMonitorDeviceIds = ["DISPLAY2"];
         SettingsManager.ResetDisplayModes();
         Assert.AreEqual(TaskbarFullPanelSettings.Full, SettingsManager.Current.TaskbarExperience.FullPanel);
+        Assert.AreEqual(TaskbarInformationDensity.Information, SettingsManager.Current.TaskbarExperience.Density);
+        Assert.AreEqual(12, SettingsManager.Current.TaskbarExperience.HoverButtonSpacingDip);
         Assert.IsTrue(SettingsManager.Current.TrackChangeNotification.Enabled);
         Assert.AreEqual(0, SettingsManager.Current.TaskbarTargetMonitorDeviceIds?.Count ?? 0);
         SettingsManager.Current.SmtcSourceFilter = new SmtcSourceFilterSettings(true, ["player"]);
         SettingsManager.Current.QuickLaunch = new QuickLaunchSettings([
             new QuickLaunchEntry("player", "Player", QuickLaunchTargetKind.AppUserModelId, "Player.App!App")]);
-        SettingsManager.Current.SpectrumComponent = new SpectrumComponentSettings(3, 8, 250);
+        SettingsManager.Current.SpectrumComponent = new SpectrumComponentSettings(12, 8, 250);
         SettingsManager.Current.PerformanceComponent = new PerformanceComponentSettings([MetricKind.SystemGpu], 900, true);
         SettingsManager.ResetExtraFeatures();
         Assert.AreEqual(TrackChangeNotificationSettings.Default, SettingsManager.Current.TrackChangeNotification);
         Assert.AreEqual(SmtcSourceFilterSettings.Default, SettingsManager.Current.SmtcSourceFilter);
         Assert.AreEqual(0, SettingsManager.Current.QuickLaunch.Entries!.Count);
+        Assert.AreEqual(12, SettingsManager.Current.SpectrumComponent.BandCount);
+        CollectionAssert.AreEqual(
+            new[] { MetricKind.SystemGpu },
+            SettingsManager.Current.PerformanceComponent.Metrics!.ToArray());
+        SettingsManager.ResetComponents();
         Assert.AreEqual(SpectrumComponentSettings.Default, SettingsManager.Current.SpectrumComponent);
         CollectionAssert.AreEqual(
             PerformanceComponentSettings.Default.Metrics!.ToArray(),

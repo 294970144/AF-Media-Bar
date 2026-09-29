@@ -42,6 +42,9 @@ public sealed class MediaSessionService : IDisposable
     private bool _snapshotBuildInFlight;
     private bool _snapshotBuildPending;
     private readonly CancellationTokenSource _snapshotBuildCancellation = new();
+    private readonly BrowserMissingPresentationState _browserPresentation = new();
+    private DispatcherTimer? _browserPresentationTimer;
+    private EventHandler? _browserPresentationTimerTick;
     private int _mediaRevision;
     private (int OsSessionCount, TimeSpan Elapsed)? _pendingReconcileStatus;
     // 释放标记与 generation 会被后台流程读取（取消/过期判定），因此声明为 volatile：写入在 UI 线程，读取在后台线程。
@@ -273,6 +276,7 @@ public sealed class MediaSessionService : IDisposable
         _isDisposed = true;
         _snapshotBuildCancellation.Cancel();
         _snapshotBuildCancellation.Dispose();
+        CancelBrowserPresentationHold();
         _reconcileWatchdog.Stop();
         _reconcileWatchdog.Tick -= OnReconcileWatchdogTick;
         // 取消在飞的后台流程并让 generation 失效：库调用本身无法中止，但它完成后不会再发布任何东西。
@@ -704,7 +708,12 @@ public sealed class MediaSessionService : IDisposable
             _candidates = BuildCandidates();
             var selected = _selection.Resolve(_candidates);
             if (selected is null && _selection.IsMissingSessionGraceActive)
+            {
+                BeginBrowserPresentationHold();
                 return;
+            }
+
+            CancelBrowserPresentationHold();
 
             if (_selection.TryAutoSwitchToPlaying(_candidates))
                 selected = _candidates.FirstOrDefault(source => source.Key == _selection.SelectedKey);
@@ -740,7 +749,8 @@ public sealed class MediaSessionService : IDisposable
         {
             var snapshot = await _snapshotBuilder.BuildAsync(session, isStarted: true, _snapshotBuildCancellation.Token);
             if (_isDisposed || mediaRevision != Volatile.Read(ref _mediaRevision) ||
-                !string.Equals(sessionKey, _selectedSessionKey, StringComparison.Ordinal))
+                !string.Equals(sessionKey, _selectedSessionKey, StringComparison.Ordinal) ||
+                _selection.IsMissingSessionGraceActive)
                 return;
 
             if (snapshot is not null)
@@ -810,6 +820,65 @@ public sealed class MediaSessionService : IDisposable
             .Where(source => _sources.IsAllowed(source.SourceId, SettingsManager.Current.SmtcSourceFilter))
             .ToArray();
 
+    private void BeginBrowserPresentationHold()
+    {
+        if (_browserPresentationTimer is not null || _browserPresentation.IsHidden ||
+            _selection.SelectedKey is not { } selectedKey)
+            return;
+
+        // A read started for the now-missing session must not publish its old frame during the hold.
+        Interlocked.Increment(ref _mediaRevision);
+        var generation = _browserPresentation.Begin();
+        var timer = new DispatcherTimer(DispatcherPriority.Background, _dispatcher)
+        {
+            Interval = BrowserMissingPresentationState.HoldDuration
+        };
+        EventHandler? tick = null;
+        tick = (_, _) =>
+        {
+            timer.Stop();
+            timer.Tick -= tick;
+            if (ReferenceEquals(_browserPresentationTimer, timer))
+            {
+                _browserPresentationTimer = null;
+                _browserPresentationTimerTick = null;
+            }
+
+            var stillMissing = !_isDisposed && _selection.IsMissingSessionGraceActive &&
+                string.Equals(selectedKey, _selection.SelectedKey, StringComparison.Ordinal) &&
+                !_candidates.Any(candidate => string.Equals(candidate.Key, selectedKey, StringComparison.Ordinal));
+            if (_browserPresentation.TryHide(generation, stillMissing))
+            {
+                try
+                {
+                    PublishResolved(MediaSnapshot.Disconnected);
+                }
+                catch (Exception ex)
+                {
+                    // A subscriber failure must not escape a DispatcherTimer tick and crash the host.
+                    Debug.WriteLine($"[MediaSessionService] Failed to publish missing browser presentation: {ex}");
+                }
+            }
+        };
+        _browserPresentationTimer = timer;
+        _browserPresentationTimerTick = tick;
+        timer.Tick += tick;
+        timer.Start();
+    }
+
+    private void CancelBrowserPresentationHold()
+    {
+        if (_browserPresentationTimer is not { } timer)
+            return;
+
+        _browserPresentation.CancelPending();
+        timer.Stop();
+        if (_browserPresentationTimerTick is { } tick)
+            timer.Tick -= tick;
+        _browserPresentationTimer = null;
+        _browserPresentationTimerTick = null;
+    }
+
     private void PublishDiscoveredSources(IReadOnlyList<MediaSession> sessions)
     {
         var sources = _sources.DiscoverSourceIds(sessions.Select(MediaSessionGuard.GetSourceId))
@@ -824,6 +893,9 @@ public sealed class MediaSessionService : IDisposable
 
     private void Publish(MediaSnapshot snapshot)
     {
+        // Only a newly resolved selection (or the final disconnect) may end the presentation hold.
+        // Provider updates still pass through PublishResolved and cannot revive the old browser frame.
+        _browserPresentation.Complete();
         _sessionSnapshot = snapshot;
         if (snapshot.IsConnected)
         {
@@ -881,6 +953,8 @@ public sealed class MediaSessionService : IDisposable
         {
             return;
         }
+
+        snapshot = _browserPresentation.Project(snapshot);
 
         lock (_publishGate)
         {

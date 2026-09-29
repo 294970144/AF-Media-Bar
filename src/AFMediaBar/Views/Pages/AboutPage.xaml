@@ -41,6 +41,25 @@
                 MaxWidth="{StaticResource AfSettingsContentMaxWidth}"
                 Loaded="OnPageLoaded">
 
+                <components:SettingsGroup Header="{DynamicResource Loc.Common.Group.ProjectInfo}" Icon="{ui:SymbolIcon Info24}">
+                    <components:SettingsRow
+                        Description="{DynamicResource Loc.About.Row.Project.Description}"
+                        Icon="{ui:SymbolIcon Info24}"
+                        Title="AF Media Bar">
+                        <WrapPanel>
+                            <ui:Anchor
+                                Margin="0,0,10,0"
+                                Content="{DynamicResource Loc.About.Row.Project.Star}"
+                                Icon="{ui:SymbolIcon Star24}"
+                                NavigateUri="{Binding ViewModel.RepositoryUrl}" />
+                            <ui:Anchor
+                                Content="{DynamicResource Loc.About.Row.Project.Issues}"
+                                Icon="{ui:SymbolIcon Bug24}"
+                                NavigateUri="{Binding ViewModel.IssuesUrl}" />
+                        </WrapPanel>
+                    </components:SettingsRow>
+                </components:SettingsGroup>
+
                 <!--
                     名单状态：正在取或取失败时才出现。取失败时给一个重试按钮——名单是联网取的，而用户看到"暂时无法获取"
                     时唯一想做的事就是再试一次，让他去重启程序是说不过去的。
@@ -167,9 +186,9 @@
                 </components:SettingsGroup>
 
                 <!--
-                    赞助我：两个收款码 + 一个爱发电链接。素材由用户后续放入 Assets/Sponsor/，
+                    赞助我：微信与支付宝收款码。素材由用户放入 Assets/Sponsor/，
                     缺哪一份就在那一格显示还缺哪个文件，而不是让整页打不开。
-                    Support me: two payment codes and one Afdian link. The user adds the images under Assets/Sponsor/ later, and a
+                    Support me: WeChat and Alipay payment codes. The user adds the images under Assets/Sponsor/, and a
                     missing one shows which file is still missing in its own cell instead of breaking the page.
                 -->
                 <components:SettingsGroup Header="{DynamicResource Loc.Common.Group.Support}" Icon="{ui:SymbolIcon Heart24}">
@@ -218,14 +237,6 @@
                                                 Text="{Binding ExpectedAssetPath}"
                                                 TextWrapping="Wrap"
                                                 Visibility="{Binding IsPending, Converter={StaticResource AfBooleanToVisibilityConverter}}" />
-                                            <ui:Button
-                                                Margin="0,8,0,0"
-                                                Command="{Binding DataContext.ViewModel.OpenUrlCommand, RelativeSource={RelativeSource AncestorType=Page}}"
-                                                CommandParameter="{Binding Url}"
-                                                Content="{DynamicResource Loc.About.Support.Open}"
-                                                Icon="{ui:SymbolIcon Open24}"
-                                                Style="{StaticResource AfSettingsButtonStyle}"
-                                                Visibility="{Binding HasUrl, Converter={StaticResource AfBooleanToVisibilityConverter}}" />
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>
@@ -275,24 +286,6 @@
                     </ItemsControl>
                 </components:SettingsGroup>
 
-                <components:SettingsGroup Header="{DynamicResource Loc.Common.Group.ProjectInfo}" Icon="{ui:SymbolIcon Info24}">
-                    <components:SettingsRow
-                        Description="{DynamicResource Loc.About.Row.Project.Description}"
-                        Icon="{ui:SymbolIcon Info24}"
-                        Title="AF Media Bar">
-                        <WrapPanel>
-                            <ui:Anchor
-                                Margin="0,0,10,0"
-                                Content="{DynamicResource Loc.About.Row.Project.Star}"
-                                Icon="{ui:SymbolIcon Star24}"
-                                NavigateUri="{Binding ViewModel.RepositoryUrl}" />
-                            <ui:Anchor
-                                Content="{DynamicResource Loc.About.Row.Project.Issues}"
-                                Icon="{ui:SymbolIcon Bug24}"
-                                NavigateUri="{Binding ViewModel.IssuesUrl}" />
-                        </WrapPanel>
-                    </components:SettingsRow>
-                </components:SettingsGroup>
             </StackPanel>
         </ScrollViewer>
     </Grid>

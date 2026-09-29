@@ -82,6 +82,7 @@ public static class SettingsSearchIndex
     {
         SettingsPageKey.DisplayModes => "Common.Page.DisplayModes",
         SettingsPageKey.MediaAndNotifications => "Common.Page.MediaAndNotifications",
+        SettingsPageKey.Components => "Common.Page.Components",
         SettingsPageKey.Interaction => "Common.Page.Interaction",
         SettingsPageKey.Lyrics => "Common.Page.Lyrics",
         SettingsPageKey.Appearance => "Common.Page.Appearance",
@@ -192,27 +193,20 @@ public static class SettingsSearchIndex
         Create(
             SettingsPageKey.DisplayModes,
             2,
-            "Common.Group.MediaBarWidth",
-            "Search.DisplayModes.MediaBarWidth.Description",
-            language,
-            ["长度", "尺寸", "宽度", "间距", "spacing", "length", "固定", "跟随", "组件", "width", "固定长度", "组件间距"]),
-        Create(
-            SettingsPageKey.DisplayModes,
-            3,
             "Common.RestLayer",
             "Search.DisplayModes.RestLayer.Description",
             language,
-            ["静置", "常驻", "rest", "信息密度", "density", "精简", "均衡", "排列", "布局", "layout", "对齐", "标题", "歌手", "artist", "内容排列", "字号", "字体大小", "文字大小", "font size", "完整层入口", "横杆", "细杠", "进入完整层", "进度", "进度条", "播放进度", "progress", "顺序", "排序", "order", "组件", "component", "小组件", "widget", "设备按钮", "输出设备", "音量按钮", "没有媒体", "无媒体", "空闲", "idle", "隐藏", "保留组件", "小音符", "快速启动", "上移", "下移", "固定在最前"]),
+            ["静置", "常驻", "rest", "完整层入口", "横杆", "细杠", "进入完整层", "进度", "播放进度", "progress", "设备按钮", "输出设备", "音量按钮", "没有媒体", "无媒体", "空闲", "idle", "隐藏", "保留组件", "小音符", "快速启动"]),
         Create(
             SettingsPageKey.DisplayModes,
-            4,
+            3,
             "Common.HoverLayer",
             "Search.DisplayModes.HoverLayer.Description",
             language,
             ["悬停", "hover", "鼠标", "按钮", "播放暂停", "上一首", "下一首", "输出设备", "音量", "进度"]),
         Create(
             SettingsPageKey.DisplayModes,
-            5,
+            4,
             "Common.FullLayer",
             "Search.DisplayModes.FullLayer.Description",
             language,
@@ -248,17 +242,19 @@ public static class SettingsSearchIndex
         Create(
             SettingsPageKey.MediaAndNotifications,
             2,
-            "Common.Group.RestLayerComponents",
-            "Search.MediaAndNotifications.RestLayerComponents.Description",
-            language,
-            ["频谱", "spectrum", "均衡", "柱", "柱数", "刷新率", "灵敏度", "性能", "performance", "内存", "cpu", "gpu", "指标", "任务管理器", "柱子数量", "刷新速度", "跳动幅度", "样式", "波形", "波形图", "像素", "像素柱状图", "点阵", "对称", "上下对称", "采样间隔", "刷新间隔", "秒", "毫秒", "ms"]),
-        Create(
-            SettingsPageKey.MediaAndNotifications,
-            3,
             "Common.Group.TrackChangeNotification",
             "Search.MediaAndNotifications.TrackChangeNotification.Description",
             language,
             ["通知", "notification", "切歌", "曲目", "track", "位置", "锚点", "停留", "时长", "duration", "全屏", "显示器", "停留时间", "目标显示器"]),
+
+        // ---- 组件设置 / Components ----
+        Create(
+            SettingsPageKey.Components,
+            0,
+            "Common.Group.RestLayerComponents",
+            "Search.Components.RestLayerComponents.Description",
+            language,
+            ["频谱", "spectrum", "均衡", "柱", "柱数", "刷新率", "灵敏度", "性能", "performance", "内存", "cpu", "gpu", "指标", "任务管理器", "柱子数量", "刷新速度", "跳动幅度", "样式", "波形", "波形图", "像素", "像素柱状图", "点阵", "对称", "上下对称", "采样间隔", "刷新间隔", "秒", "毫秒", "ms"]),
 
         // ---- 交互 / Interaction ----
         Create(
@@ -328,6 +324,27 @@ public static class SettingsSearchIndex
             "Search.Appearance.MediaBarText.Description",
             language,
             ["文字颜色", "foreground", "文字", "颜色", "自动", "浅色文字", "深色文字", "对比", "可读", "播放器文字", "媒体文字大小", "字号", "文字大小", "font size", "缩放"]),
+        Create(
+            SettingsPageKey.Appearance,
+            3,
+            "Common.Group.MediaBarWidth",
+            "Search.Appearance.MediaBarWidth.Description",
+            language,
+            ["长度", "尺寸", "宽度", "间距", "spacing", "length", "固定", "跟随", "组件", "width", "固定长度", "组件间距"]),
+        Create(
+            SettingsPageKey.Appearance,
+            4,
+            "Appearance.Group.RestLayout",
+            "Search.Appearance.RestLayout.Description",
+            language,
+            ["静置层外观", "rest layout", "排列", "布局", "layout", "对齐", "标题", "歌手", "artist", "内容排列", "顺序", "排序", "order", "组件", "component", "上移", "下移"]),
+        Create(
+            SettingsPageKey.Appearance,
+            5,
+            "Appearance.Group.InteractionButtons",
+            "Search.Appearance.InteractionButtons.Description",
+            language,
+            ["交互按钮大小", "按钮尺寸", "小", "中", "大", "hover button size", "button spacing", "悬停层间距", "静置层按钮", "图标大小"]),
 
         // ---- 应用 / Application ----
         //
@@ -362,37 +379,37 @@ public static class SettingsSearchIndex
         Create(
             SettingsPageKey.About,
             0,
+            "Common.Group.ProjectInfo",
+            "Search.About.ProjectInfo.Description",
+            language,
+            ["版本", "version", "关于", "about", "github", "反馈", "issue", "star", "仓库", "repository"]),
+        Create(
+            SettingsPageKey.About,
+            1,
             "Common.Group.Developers",
             "Search.About.Developers.Description",
             language,
             ["开发", "developer", "贡献者", "contributor", "名单", "人员", "github", "感谢", "credits"]),
         Create(
             SettingsPageKey.About,
-            1,
+            2,
             "Common.Group.Sponsors",
             "Search.About.Sponsors.Description",
             language,
             ["赞助", "sponsor", "支持", "捐赠", "donate", "名单", "感谢"]),
         Create(
             SettingsPageKey.About,
-            2,
+            3,
             "Common.Group.Support",
             "Search.About.Support.Description",
             language,
-            ["赞助我", "请我喝咖啡", "打赏", "二维码", "微信", "wechat", "支付宝", "alipay", "爱发电", "afdian", "支持"]),
+            ["赞助我", "请我喝咖啡", "打赏", "二维码", "微信", "wechat", "支付宝", "alipay", "支持"]),
         Create(
             SettingsPageKey.About,
-            3,
+            4,
             "Common.Group.Licenses",
             "Search.About.Licenses.Description",
             language,
             ["开源", "许可", "license", "licence", "许可证", "第三方", "依赖", "package", "apache", "mit", "gpl"]),
-        Create(
-            SettingsPageKey.About,
-            4,
-            "Common.Group.ProjectInfo",
-            "Search.About.ProjectInfo.Description",
-            language,
-            ["版本", "version", "关于", "about", "github", "反馈", "issue", "star", "仓库", "repository"]),
     ];
 }

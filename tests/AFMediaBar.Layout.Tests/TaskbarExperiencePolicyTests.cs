@@ -15,6 +15,8 @@ public sealed class TaskbarExperiencePolicyTests
         var compact = TaskbarDensityMetrics.From(TaskbarInformationDensity.Minimal);
         var information = TaskbarDensityMetrics.From(TaskbarInformationDensity.Information);
         Assert.IsTrue(information.ButtonSize > compact.ButtonSize);
+        Assert.IsTrue(information.IconSize > compact.IconSize);
+        Assert.IsTrue(information.IconSize < information.ButtonSize);
         Assert.IsTrue(information.ProgressWidth > compact.ProgressWidth);
         Assert.IsTrue(information.HoverLayerHeight > compact.HoverLayerHeight);
         Assert.IsTrue(information.SectionGap > compact.SectionGap);
@@ -95,10 +97,10 @@ public sealed class TaskbarExperiencePolicyTests
     }
 
     [TestMethod]
-    public void ComponentSpacingChangesHoverMinimum()
+    public void HoverButtonSpacingChangesHoverMinimum()
     {
-        var compact = TaskbarExperiencePolicy.CalculateHoverLayerWidth(true, true, TaskbarInformationDensity.Balanced, 4);
-        var spacious = TaskbarExperiencePolicy.CalculateHoverLayerWidth(true, true, TaskbarInformationDensity.Balanced, 24);
+        var compact = TaskbarExperiencePolicy.CalculateHoverLayerWidth(true, true, TaskbarInformationDensity.Balanced, 0);
+        var spacious = TaskbarExperiencePolicy.CalculateHoverLayerWidth(true, true, TaskbarInformationDensity.Balanced, 16);
         Assert.IsTrue(spacious > compact);
     }
 
@@ -274,6 +276,23 @@ public sealed class TaskbarExperiencePolicyTests
         Assert.AreEqual(WheelAction.CurrentApplicationVolume, normalized.ChordWheelAction);
         Assert.AreEqual(TrayWheelBehavior.AdjustVolume, GlobalWheelGesturePolicy.ResolveTray(normalized, false, true, false));
         Assert.AreEqual(TrayWheelBehavior.SwitchOutputDevice, GlobalWheelGesturePolicy.ResolveTray(normalized, false, false, false));
+    }
+
+    [TestMethod]
+    public void DisabledTrayBindingsSurviveNormalization()
+    {
+        // 禁用值被归一化覆盖时，用户本来停用的托盘滚轮会再次控制音量或设备。
+        var settings = GlobalInteractionSettings.Default with
+        {
+            TrayClickAction = TrayClickAction.None,
+            TrayPrimaryWheelAction = TrayWheelBehavior.Disabled,
+            TrayChordWheelAction = TrayWheelBehavior.Disabled
+        };
+
+        var normalized = settings.Normalize();
+        Assert.AreEqual(TrayClickAction.None, normalized.TrayClickAction);
+        Assert.AreEqual(TrayWheelBehavior.Disabled, GlobalWheelGesturePolicy.ResolveTray(normalized, false, false, false));
+        Assert.AreEqual(TrayWheelBehavior.Disabled, GlobalWheelGesturePolicy.ResolveTray(normalized, true, false, false));
     }
 
     [TestMethod]

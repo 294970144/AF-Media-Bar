@@ -100,34 +100,20 @@
             </ui:NavigationView.AutoSuggestBox>
 
             <ui:NavigationView.MenuItems>
-                <!--
-                    导航从七项收敛为六项：原“常规”页只剩三个不可用条目和一个设置文件入口，
-                    已并入页脚的“应用与关于”。“额外功能”改名为“媒体与通知”，“全局外观”改名为“外观”，
-                    因为前者看不出内容、后者页内还包含窗口材质。
-                    Navigation went from seven items to six: the general page had been reduced to three unusable
-                    entries and one settings-file entry and is now part of "application and about" in the footer.
-                    "Extra features" became "media and notifications" and "global appearance" became
-                    "appearance", because the first name said nothing about its contents and the second page also
-                    owns window material.
-                -->
+                <!-- 页面按显示、外观、交互、歌词、组件和应用排列；媒体来源与通知仍保留独立入口。 -->
                 <ui:NavigationViewItem Content="{DynamicResource Loc.Common.Page.DisplayModes}" Icon="{ui:SymbolIcon Desktop24}"
                                        TargetPageType="{x:Type pages:DisplayModesPage}" />
-                <ui:NavigationViewItem Content="{DynamicResource Loc.Common.Page.MediaAndNotifications}" Icon="{ui:SymbolIcon PuzzlePiece24}"
-                                       TargetPageType="{x:Type pages:ExtraFeaturesPage}" />
+                <ui:NavigationViewItem Content="{DynamicResource Loc.Common.Page.Appearance}"
+                                       Icon="{ui:SymbolIcon PaintBrush24}"
+                                       TargetPageType="{x:Type pages:AppearancePage}" />
                 <ui:NavigationViewItem Content="{DynamicResource Loc.Common.Page.Interaction}" Icon="{ui:SymbolIcon HandDraw24}"
                                        TargetPageType="{x:Type pages:InteractionPage}" />
                 <ui:NavigationViewItem Content="{DynamicResource Loc.Common.Page.Lyrics}" Icon="{ui:SymbolIcon TextQuote24}"
                                        TargetPageType="{x:Type pages:LyricsPage}" />
-                <ui:NavigationViewItem Content="{DynamicResource Loc.Common.Page.Appearance}"
-                                       Icon="{ui:SymbolIcon PaintBrush24}"
-                                       TargetPageType="{x:Type pages:AppearancePage}" />
-                <!--
-                    「应用」紧跟在「外观」下面：两者都是应用自身的设置（外观改观感，应用改版本、更新、语言、
-                    开机自启、设置文件与诊断日志），把它们排在一起，用户不需要再往页脚找。
-                    "Application" sits right below "appearance": both are the application's own settings — appearance changes
-                    how it looks, while application covers version, updates, language, run-at-startup, the settings file, and
-                    diagnostics — and keeping them together saves a trip to the footer.
-                -->
+                <ui:NavigationViewItem Content="{DynamicResource Loc.Common.Page.Components}" Icon="{ui:SymbolIcon DataHistogram24}"
+                                       TargetPageType="{x:Type pages:ComponentsSettingsPage}" />
+                <ui:NavigationViewItem Content="{DynamicResource Loc.Common.Page.MediaAndNotifications}" Icon="{ui:SymbolIcon PuzzlePiece24}"
+                                       TargetPageType="{x:Type pages:ExtraFeaturesPage}" />
                 <ui:NavigationViewItem Content="{DynamicResource Loc.Common.Page.Application}"
                                        Icon="{ui:SymbolIcon Settings24}"
                                        TargetPageType="{x:Type pages:ApplicationPage}" />

@@ -166,6 +166,13 @@
                                               Tag="{x:Static settings:WheelAction.Disabled}" />
                             </ComboBox>
                         </components:SettingsRow>
+
+                        <components:SettingsRow
+                            Description="{DynamicResource Loc.Interaction.Row.WheelTooltip.Description}"
+                            Icon="{ui:SymbolIcon Info24}"
+                            Title="{DynamicResource Loc.Interaction.Row.WheelTooltip.Title}">
+                            <ui:ToggleSwitch IsChecked="{Binding ViewModel.ShowWheelTooltips, Mode=TwoWay}" />
+                        </components:SettingsRow>
                     </StackPanel>
                 </components:SettingsGroup>
 
@@ -193,6 +200,8 @@
                                               Tag="{x:Static settings:TrayClickAction.OpenSettings}" />
                                 <ComboBoxItem Content="{DynamicResource Loc.Interaction.TrayAction.OpenContextMenu}"
                                               Tag="{x:Static settings:TrayClickAction.OpenContextMenu}" />
+                                <ComboBoxItem Content="{DynamicResource Loc.Interaction.Disabled}"
+                                              Tag="{x:Static settings:TrayClickAction.None}" />
                             </ComboBox>
                         </components:SettingsRow>
 
@@ -208,12 +217,15 @@
                                               Tag="{x:Static settings:TrayWheelBehavior.SwitchOutputDevice}" />
                                 <ComboBoxItem Content="{DynamicResource Loc.Common.AdjustCurrentMediaVolume}"
                                               Tag="{x:Static settings:TrayWheelBehavior.AdjustVolume}" />
+                                <ComboBoxItem Content="{DynamicResource Loc.Interaction.Disabled}"
+                                              Tag="{x:Static settings:TrayWheelBehavior.Disabled}" />
                             </ComboBox>
                         </components:SettingsRow>
 
                         <components:SettingsRow
                             Description="{DynamicResource Loc.Interaction.Row.TrayChordWheel.Description}"
                             Icon="{ui:SymbolIcon Keyboard24}"
+                            IsEnabled="False"
                             Title="{DynamicResource Loc.Interaction.Wheel.Chord.Title}">
                             <ComboBox
                                 MinWidth="200"
@@ -223,6 +235,8 @@
                                               Tag="{x:Static settings:TrayWheelBehavior.AdjustVolume}" />
                                 <ComboBoxItem Content="{DynamicResource Loc.Common.SwitchOutputDevice}"
                                               Tag="{x:Static settings:TrayWheelBehavior.SwitchOutputDevice}" />
+                                <ComboBoxItem Content="{DynamicResource Loc.Interaction.Disabled}"
+                                              Tag="{x:Static settings:TrayWheelBehavior.Disabled}" />
                             </ComboBox>
                         </components:SettingsRow>
                     </StackPanel>

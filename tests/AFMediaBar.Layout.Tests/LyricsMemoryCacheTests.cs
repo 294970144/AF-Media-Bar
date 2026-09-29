@@ -69,6 +69,26 @@ public sealed class LyricsMemoryCacheTests
     }
 
     [TestMethod]
+    public void BrowserAndVideoGateBlocksNormalAndFallbackRequestsUntilEnabled()
+    {
+        var source = new Source(_ => Hit());
+        using var builder = new MediaSnapshotBuilder(new LyricsService(source));
+
+        Assert.IsNull(builder.GetLyrics("session", "chrome.exe", Request()));
+        Assert.IsNull(builder.GetLyrics("session", "unknown-player", Request(), isVideo: true));
+        builder.RequestOnlineLyrics("session", "chrome.exe", "Song", "Artist", 180);
+        Assert.AreEqual(0, source.Requests.Count);
+
+        SettingsManager.SetAllowBrowserAndVideoLyrics(true);
+        builder.GetLyrics("session", "chrome.exe", Request());
+        Assert.AreEqual(1, source.Requests.Count);
+
+        SettingsManager.SetAllowBrowserAndVideoLyrics(false);
+        Assert.IsNull(builder.GetLyrics("session", "chrome.exe", Request()));
+        Assert.AreEqual(1, source.Requests.Count);
+    }
+
+    [TestMethod]
     public void FallbackReusesSmtcAlbumAndCanRetryTheSameTrack()
     {
         var clock = new CacheClock();

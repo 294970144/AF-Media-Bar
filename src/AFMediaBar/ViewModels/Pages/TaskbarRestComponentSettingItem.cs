@@ -5,12 +5,12 @@ using CommunityToolkit.Mvvm.ComponentModel;
 namespace AFMediaBar.ViewModels.Pages;
 
 /// <summary>
-/// 显示模式页静置层两张列表共用的一项：一个静置层组件、它在界面上的显示名与说明、能否排序，以及"没有媒体时是否显示"。
+/// 显示模式和外观页静置层列表共用的一项：一个静置层组件、显示名与说明、能否排序，以及"没有媒体时是否显示"。
 ///
 /// 顺序列表与"没有媒体时显示"列表刻意是两份：一张列表同时管两件事时，用户想调顺序就会看到一排显隐开关，
 /// 而想调显隐又会看到上下移按钮。两个列表的条目集合不同——固定在最前面的封面与媒体文字只出现在顺序列表里（且不能移动），
 /// "没有媒体时显示"列表里则是快速启动小音符加其余四个小组件。
-/// One row shared by the Display-modes page's two rest-layer lists: a rest-layer component, the name and description shown for it, whether it can be
+/// One row shared by the rest-layer lists on Display Modes and Appearance: a rest-layer component, the name and description shown for it, whether it can be
 /// reordered, and whether it is shown while there is no media.
 ///
 /// The order list and the "shown without media" list are separate on purpose: a single list carrying both makes the user see a row of visibility

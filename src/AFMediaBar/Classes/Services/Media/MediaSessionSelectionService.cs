@@ -25,6 +25,7 @@ public sealed class MediaSessionSelectionService : IDisposable, IMemoryPrunable
     /// The refresh period while pruned: the grace periods are decided from timestamps, so slowing down only delays the resolution instead of losing it.</summary>
     private static readonly TimeSpan PrunedRefreshInterval = TimeSpan.FromSeconds(1);
     private readonly Func<string?> _getFocusedSessionKey;
+    private readonly Func<DateTime> _utcNow;
     private readonly DispatcherTimer _timer;
     private string? _pendingAutoSwitchKey;
     private DateTime _pendingAutoSwitchSinceUtc;
@@ -59,8 +60,14 @@ public sealed class MediaSessionSelectionService : IDisposable, IMemoryPrunable
     }
 
     internal MediaSessionSelectionService(Func<string?> getFocusedSessionKey, Dispatcher dispatcher)
+        : this(getFocusedSessionKey, dispatcher, () => DateTime.UtcNow)
+    {
+    }
+
+    internal MediaSessionSelectionService(Func<string?> getFocusedSessionKey, Dispatcher dispatcher, Func<DateTime> utcNow)
     {
         _getFocusedSessionKey = getFocusedSessionKey;
+        _utcNow = utcNow;
         _timer = new DispatcherTimer(DispatcherPriority.Background, dispatcher)
         {
             Interval = RefreshInterval
@@ -184,7 +191,7 @@ public sealed class MediaSessionSelectionService : IDisposable, IMemoryPrunable
             HasPlayingReplacement: replacement is not null,
             ReplacementMatchesPending: replacement is not null &&
                                        string.Equals(_pendingAutoSwitchKey, replacement.Key, StringComparison.Ordinal),
-            SincePending: DateTime.UtcNow - _pendingAutoSwitchSinceUtc,
+            SincePending: _utcNow() - _pendingAutoSwitchSinceUtc,
             GracePeriod: AutoSwitchGracePeriod));
 
         switch (decision)
@@ -193,7 +200,7 @@ public sealed class MediaSessionSelectionService : IDisposable, IMemoryPrunable
                 if (!string.Equals(_pendingAutoSwitchKey, replacement!.Key, StringComparison.Ordinal))
                 {
                     _pendingAutoSwitchKey = replacement.Key;
-                    _pendingAutoSwitchSinceUtc = DateTime.UtcNow;
+                    _pendingAutoSwitchSinceUtc = _utcNow();
                 }
 
                 _timer.Start();
@@ -228,7 +235,7 @@ public sealed class MediaSessionSelectionService : IDisposable, IMemoryPrunable
 
     public bool IsMissingSessionGraceActive =>
         _missingSessionSinceUtc != default &&
-        DateTime.UtcNow - _missingSessionSinceUtc < MissingSessionGracePeriod &&
+        _utcNow() - _missingSessionSinceUtc < MissingSessionGracePeriod &&
         IsBrowserSource(SelectedSourceId ?? string.Empty);
 
     /// <summary>
@@ -244,11 +251,11 @@ public sealed class MediaSessionSelectionService : IDisposable, IMemoryPrunable
 
         if (_missingSessionSinceUtc == default)
         {
-            _missingSessionSinceUtc = DateTime.UtcNow;
+            _missingSessionSinceUtc = _utcNow();
             Debug.WriteLine($"[MediaSessionSelection] Holding missing browser source: {SelectedSourceId}");
         }
 
-        if (DateTime.UtcNow - _missingSessionSinceUtc >= MissingSessionGracePeriod)
+        if (_utcNow() - _missingSessionSinceUtc >= MissingSessionGracePeriod)
         {
             Debug.WriteLine($"[MediaSessionSelection] Missing browser source grace expired: {SelectedSourceId}");
             return false;

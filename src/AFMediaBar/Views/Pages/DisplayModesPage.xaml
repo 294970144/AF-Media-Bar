@@ -65,26 +65,6 @@
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}" />
         </Style>
 
-        <!--
-            依赖未满足时才出现的徽章：固定宽度需要先关闭「跟随内容长度」。
-            父项开关就在紧邻上方，因此徽章只需一句话。
-            A badge that appears only while its dependency is unmet: a fixed width requires turning off content
-            following first. The parent switch sits directly above, so one short phrase is enough.
-        -->
-        <Style
-            x:Key="FixedLengthRowStyle"
-            BasedOn="{StaticResource {x:Type components:SettingsRow}}"
-            TargetType="{x:Type components:SettingsRow}">
-            <Setter Property="Badge" Value="" />
-            <Setter Property="IsEnabled" Value="{Binding ViewModel.UsesFixedTaskbarLength}" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding ViewModel.FollowMediaTextLength}" Value="True">
-                    <Setter Property="Badge" Value="{DynamicResource Loc.DisplayModes.Width.Row.Fixed.Badge}" />
-                    <Setter Property="BadgeTone" Value="Attention" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
         <!--  「当前模式」徽章只在任务栏确实是运行宿主时出现，读的是真实 WindowMode。  -->
         <!--  The "current mode" badge appears only when the taskbar really is the running host.  -->
         <Style
@@ -274,6 +254,7 @@
                             <components:SettingsRow
                                 Description="{DynamicResource Loc.DisplayModes.Placement.Row.Orientation.Description}"
                                 Icon="{ui:SymbolIcon Orientation24}"
+                                IsEnabled="False"
                                 Title="{DynamicResource Loc.DisplayModes.Placement.Row.Orientation.Title}">
                                 <ComboBox
                                     MinWidth="200"
@@ -329,54 +310,6 @@
                     </components:SettingsGroup>
 
                     <components:SettingsGroup
-                        Description="{DynamicResource Loc.DisplayModes.Width.Group.Description}"
-                        Header="{DynamicResource Loc.Common.Group.MediaBarWidth}"
-                        Icon="{ui:SymbolIcon ResizeLarge24}">
-                        <StackPanel>
-                            <components:SettingsDiagram Margin="0,0,0,12" Kind="TaskbarLength" />
-
-                            <components:SettingsRow
-                                Description="{DynamicResource Loc.DisplayModes.Width.Row.Follow.Description}"
-                                Icon="{ui:SymbolIcon ArrowAutofitWidth24}"
-                                Title="{DynamicResource Loc.DisplayModes.Width.Row.Follow.Title}">
-                                <ui:ToggleSwitch IsChecked="{Binding ViewModel.FollowMediaTextLength, Mode=TwoWay}" />
-                            </components:SettingsRow>
-
-                            <components:SettingsRow
-                                Description="{DynamicResource Loc.DisplayModes.Width.Row.Fixed.Description}"
-                                Icon="{ui:SymbolIcon SlideSize24}"
-                                Style="{StaticResource FixedLengthRowStyle}"
-                                Title="{DynamicResource Loc.DisplayModes.Width.Row.Fixed.Title}">
-                                <StackPanel Orientation="Horizontal">
-                                    <Slider
-                                        Maximum="{Binding ViewModel.FixedTaskbarLengthMaximum}"
-                                        Minimum="{Binding ViewModel.FixedTaskbarLengthMinimum}"
-                                        Style="{StaticResource RowSliderStyle}"
-                                        ToolTip="{Binding ViewModel.FixedTaskbarLengthRangeText}"
-                                        Value="{Binding ViewModel.FixedTaskbarLengthDip, Mode=TwoWay}" />
-                                    <TextBlock Style="{StaticResource RowValueStyle}" Text="{Binding ViewModel.FixedTaskbarLengthDip, StringFormat={}{0:0} DIP}" />
-                                </StackPanel>
-                            </components:SettingsRow>
-
-                            <components:SettingsRow
-                                Description="{DynamicResource Loc.DisplayModes.Width.Row.Spacing.Description}"
-                                Icon="{ui:SymbolIcon PaddingLeft24}"
-                                Title="{DynamicResource Loc.DisplayModes.Width.Row.Spacing.Title}">
-                                <StackPanel Orientation="Horizontal">
-                                    <Slider
-                                        Maximum="32"
-                                        Minimum="4"
-                                        Style="{StaticResource RowSliderStyle}"
-                                        IsSnapToTickEnabled="True"
-                                        TickFrequency="1"
-                                        Value="{Binding ViewModel.ComponentSpacingDip, Mode=TwoWay}" />
-                                    <TextBlock Style="{StaticResource RowValueStyle}" Text="{Binding ViewModel.ComponentSpacingDip, StringFormat={}{0:0} DIP}" />
-                                </StackPanel>
-                            </components:SettingsRow>
-                        </StackPanel>
-                    </components:SettingsGroup>
-
-                    <components:SettingsGroup
                         Description="{DynamicResource Loc.DisplayModes.Rest.Group.Description}"
                         Header="{DynamicResource Loc.Common.RestLayer}"
                         Icon="{ui:SymbolIcon Layer24}"
@@ -384,47 +317,6 @@
                         StatusTone="Accent">
                         <StackPanel>
                             <components:SettingsDiagram Margin="0,0,0,12" Kind="LayerRest" />
-
-                            <components:SettingsRow
-                                Description="{DynamicResource Loc.DisplayModes.Rest.Row.Density.Description}"
-                                Icon="{ui:SymbolIcon TextAlignJustify24}"
-                                Title="{DynamicResource Loc.DisplayModes.Rest.Row.Density.Title}">
-                                <ComboBox
-                                    MinWidth="200"
-                                    SelectedValue="{Binding ViewModel.Density, Mode=TwoWay}"
-                                    SelectedValuePath="Tag">
-                                    <ComboBoxItem Content="{DynamicResource Loc.DisplayModes.Rest.Density.Minimal}" Tag="{x:Static settings:TaskbarInformationDensity.Minimal}" />
-                                    <ComboBoxItem Content="{DynamicResource Loc.DisplayModes.Rest.Density.Balanced}" Tag="{x:Static settings:TaskbarInformationDensity.Balanced}" />
-                                    <ComboBoxItem Content="{DynamicResource Loc.DisplayModes.Rest.Density.Information}" Tag="{x:Static settings:TaskbarInformationDensity.Information}" />
-                                </ComboBox>
-                            </components:SettingsRow>
-
-                            <components:SettingsRow
-                                Description="{DynamicResource Loc.DisplayModes.Rest.Row.Layout.Description}"
-                                Icon="{ui:SymbolIcon LayoutColumnTwo24}"
-                                Title="{DynamicResource Loc.DisplayModes.Rest.Row.Layout.Title}">
-                                <ComboBox
-                                    MinWidth="200"
-                                    SelectedValue="{Binding ViewModel.ContentLayout, Mode=TwoWay}"
-                                    SelectedValuePath="Tag">
-                                    <ComboBoxItem Content="{DynamicResource Loc.DisplayModes.Rest.ContentLayout.CompactInline}" Tag="{x:Static settings:TaskbarContentLayout.CompactInline}" />
-                                    <ComboBoxItem Content="{DynamicResource Loc.DisplayModes.Rest.ContentLayout.AdaptiveStack}" Tag="{x:Static settings:TaskbarContentLayout.AdaptiveStack}" />
-                                </ComboBox>
-                            </components:SettingsRow>
-
-                            <components:SettingsRow
-                                Description="{DynamicResource Loc.DisplayModes.Rest.Row.Alignment.Description}"
-                                Icon="{ui:SymbolIcon TextAlignLeft24}"
-                                Title="{DynamicResource Loc.DisplayModes.Rest.Row.Alignment.Title}">
-                                <ComboBox
-                                    MinWidth="200"
-                                    SelectedValue="{Binding ViewModel.MediaTextAlignment, Mode=TwoWay}"
-                                    SelectedValuePath="Tag">
-                                    <ComboBoxItem Content="{DynamicResource Loc.Common.AlignLeft}" Tag="{x:Static settings:TaskbarMediaTextAlignment.Left}" />
-                                    <ComboBoxItem Content="{DynamicResource Loc.Common.AlignCenter}" Tag="{x:Static settings:TaskbarMediaTextAlignment.Center}" />
-                                    <ComboBoxItem Content="{DynamicResource Loc.Common.AlignRight}" Tag="{x:Static settings:TaskbarMediaTextAlignment.Right}" />
-                                </ComboBox>
-                            </components:SettingsRow>
 
                             <components:SettingsRow
                                 Description="{DynamicResource Loc.DisplayModes.Rest.Row.Progress.Description}"
@@ -453,83 +345,6 @@
                                 Title="{DynamicResource Loc.DisplayModes.Rest.Row.VolumeButton.Title}">
                                 <ui:ToggleSwitch IsChecked="{Binding ViewModel.RestVolumeVisible, Mode=TwoWay}" />
                             </components:SettingsRow>
-
-                            <!--
-                                静置层组件在这里有两张列表，刻意分开：一张管顺序、一张管"没有媒体时显示什么"。
-                                合成一张时，用户想调顺序会看到一排显隐开关，想调显隐又会看到上下移按钮。
-                                顺序列表的前两行是固定在最前面的封面与媒体文字（没有上下移按钮）：它们是这条媒体栏的主干，
-                                排到别处只会让界面错乱，因此不再参与排序。
-                                The rest layer has two lists here on purpose: one owns the order and one owns what is shown while there is no media.
-                                Merged into one, a user arranging components would face a row of visibility switches, and a user switching visibility
-                                would face move buttons. The first two rows of the order list are the artwork and the media text pinned to the front
-                                (no move buttons): they are the backbone of the bar, moving them only broke the layout, and they no longer take part in
-                                ordering.
-                            -->
-                            <ui:CardExpander
-                                Style="{StaticResource AfSettingsExpanderStyle}"
-                                Icon="{ui:SymbolIcon ArrowSort24}"
-                                IsExpanded="True">
-                                <ui:CardExpander.Header>
-                                    <StackPanel>
-                                        <TextBlock Style="{StaticResource AfSettingsRowTitleStyle}" Text="{DynamicResource Loc.DisplayModes.Rest.Order.Expander.Title}" />
-                                        <TextBlock Style="{StaticResource AfSettingsRowDescriptionStyle}" Text="{DynamicResource Loc.DisplayModes.Rest.Order.Expander.Description}" />
-                                    </StackPanel>
-                                </ui:CardExpander.Header>
-
-                                <StackPanel>
-                                    <components:SettingsCallout
-                                        Margin="0,0,0,4"
-                                        Symbol="Info24"
-                                        Text="{DynamicResource Loc.DisplayModes.Rest.Order.Notice}" />
-
-                                    <ItemsControl Margin="0,0,0,4" ItemsSource="{Binding ViewModel.RestOrderEntries}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <components:SettingsRow
-                                                    Description="{Binding Description}"
-                                                    IsNested="True"
-                                                    Title="{Binding DisplayName}">
-                                                    <StackPanel Orientation="Horizontal">
-                                                        <!--
-                                                            固定在最前面的两行没有按钮：它们在提示条里说明了不参与排序，而一个点不动的按钮比没有按钮更难懂。
-                                                            The two pinned rows carry no buttons: the callout says they take no part in ordering, and a button that does
-                                                            nothing is harder to understand than no button at all.
-                                                        -->
-                                                        <ui:Button
-                                                            Margin="8,0,0,0"
-                                                            Command="{Binding DataContext.ViewModel.MoveRestComponentUpCommand, RelativeSource={RelativeSource AncestorType=Page}}"
-                                                            CommandParameter="{Binding}"
-                                                            Icon="{ui:SymbolIcon ArrowUp24}"
-                                                            Style="{StaticResource AfSettingsIconButtonStyle}"
-                                                            ToolTip="{DynamicResource Loc.Lyrics.Sources.MoveUp}"
-                                                            Visibility="{Binding CanMove, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                                        <ui:Button
-                                                            Margin="4,0,0,0"
-                                                            Command="{Binding DataContext.ViewModel.MoveRestComponentDownCommand, RelativeSource={RelativeSource AncestorType=Page}}"
-                                                            CommandParameter="{Binding}"
-                                                            Icon="{ui:SymbolIcon ArrowDown24}"
-                                                            Style="{StaticResource AfSettingsIconButtonStyle}"
-                                                            ToolTip="{DynamicResource Loc.Lyrics.Sources.MoveDown}"
-                                                            Visibility="{Binding CanMove, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                                    </StackPanel>
-                                                </components:SettingsRow>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-
-                                    <components:SettingsRow
-                                        Description="{DynamicResource Loc.DisplayModes.Rest.Order.Reset.Description}"
-                                        Icon="{ui:SymbolIcon ArrowReset24}"
-                                        IsNested="True"
-                                        Title="{DynamicResource Loc.DisplayModes.Rest.Order.Reset.Title}">
-                                        <ui:Button
-                                            Command="{Binding ViewModel.ResetRestComponentOrderCommand}"
-                                            Content="{DynamicResource Loc.Lyrics.Sources.Reset.Action}"
-                                            Icon="{ui:SymbolIcon ArrowReset24}"
-                                            Style="{StaticResource AfSettingsButtonStyle}" />
-                                    </components:SettingsRow>
-                                </StackPanel>
-                            </ui:CardExpander>
 
                             <ui:CardExpander
                                 Style="{StaticResource AfSettingsExpanderStyle}"

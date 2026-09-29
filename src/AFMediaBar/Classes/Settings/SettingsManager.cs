@@ -35,6 +35,7 @@ public sealed class AppSettings : INotifyPropertyChanged
     private AppearanceSettings _appearance = AppearanceSettings.Default;
     private TrayWheelBehavior _trayWheelBehavior = TrayWheelBehavior.SwitchOutputDevice;
     private bool _lyricsEnabled = true;
+    private bool _allowBrowserAndVideoLyrics;
     private bool _twoLineLyricsEnabled = true;
     /// <summary>
     /// 双行歌词第二行的**来源顺序**：列表顺序即优先级（默认 下一句 → 翻译 → 音译），未列出的来源不会被使用。
@@ -85,6 +86,7 @@ public sealed class AppSettings : INotifyPropertyChanged
     public AppearanceSettings Appearance { get => _appearance; set => Set(ref _appearance, value.Normalize()); }
     public TrayWheelBehavior TrayWheelBehavior { get => _trayWheelBehavior; set => Set(ref _trayWheelBehavior, value); }
     public bool LyricsEnabled { get => _lyricsEnabled; set => Set(ref _lyricsEnabled, value); }
+    public bool AllowBrowserAndVideoLyrics { get => _allowBrowserAndVideoLyrics; set => Set(ref _allowBrowserAndVideoLyrics, value); }
     public bool TwoLineLyricsEnabled { get => _twoLineLyricsEnabled; set => Set(ref _twoLineLyricsEnabled, value); }
     public LyricsSecondaryLineSettings LyricsSecondaryLine { get => _lyricsSecondaryLine; set => Set(ref _lyricsSecondaryLine, value.Normalize()); }
     public bool TaskbarBarEnabled { get => _taskbarBarEnabled; set => Set(ref _taskbarBarEnabled, value); }
@@ -246,6 +248,7 @@ public sealed class AppSettings : INotifyPropertyChanged
         Appearance = Appearance,
         TrayWheelBehavior = TrayWheelBehavior,
         LyricsEnabled = LyricsEnabled,
+        AllowBrowserAndVideoLyrics = AllowBrowserAndVideoLyrics,
         TwoLineLyricsEnabled = TwoLineLyricsEnabled,
         LyricsSecondaryLine = LyricsSecondaryLine,
         TaskbarBarEnabled = TaskbarBarEnabled,
@@ -310,7 +313,7 @@ public sealed class AppSettings : INotifyPropertyChanged
 }
 
 /// <summary>设置重置范围。 / Settings reset scope.</summary>
-public enum SettingsResetScope { General, Appearance, Layout, DisplayModes, ExtraFeatures, Interaction, Lyrics, All }
+public enum SettingsResetScope { General, Appearance, Layout, DisplayModes, ExtraFeatures, Interaction, Lyrics, All, Components }
 
 /// <summary>设置变更通知参数。 / Settings change notification arguments.</summary>
 public sealed class SettingsChangedEventArgs(SettingsResetScope? resetScope = null, string? propertyName = null) : EventArgs
@@ -367,6 +370,7 @@ public static class SettingsManager
     }
     public static void SetTrayWheelBehavior(TrayWheelBehavior behavior) => Current.TrayWheelBehavior = behavior;
     public static void SetLyricsEnabled(bool enabled) => Current.LyricsEnabled = enabled;
+    public static void SetAllowBrowserAndVideoLyrics(bool enabled) => Current.AllowBrowserAndVideoLyrics = enabled;
     public static void SetTwoLineLyricsEnabled(bool enabled) => Current.TwoLineLyricsEnabled = enabled;
     public static void SetLyricsSecondaryLineSettings(LyricsSecondaryLineSettings settings) => Current.LyricsSecondaryLine = settings;
     public static void SetLyricsTextAlignment(LyricsTextAlignment alignment) => Current.LyricsTextAlignment = alignment;
@@ -401,21 +405,39 @@ public static class SettingsManager
         next.Appearance = defaults.Appearance;
         next.TaskbarSurface = defaults.TaskbarSurface;
         next.DynamicIslandSurface = defaults.DynamicIslandSurface;
-        // 媒体文字大小的界面位于外观页的「媒体栏文字」分组，因此它也属于这一页的重置作用域。
-        // 显示模式页的重置仍然重置同一份任务栏体验设置，两个入口重置同一组值不会互相矛盾——与灵动岛外观的处理相同。
-        // The media text size is presented in the appearance page's media-bar-text group, so it belongs to this page's reset scope
-        // too. The display-mode page's reset still resets the same taskbar experience settings, and both entries agreeing is what
-        // keeps "restore this page" honest — the same arrangement the island appearance already uses.
+        // 外观页仍写入原有 TaskbarExperience 字段；本页重置只恢复外观字段，不动各层功能开关。
         next.TaskbarExperience = next.TaskbarExperience with
         {
-            MediaFontSizePercent = defaults.TaskbarExperience.MediaFontSizePercent
+            MediaFontSizePercent = defaults.TaskbarExperience.MediaFontSizePercent,
+            Density = defaults.TaskbarExperience.Density,
+            ContentLayout = defaults.TaskbarExperience.ContentLayout,
+            MediaTextAlignment = defaults.TaskbarExperience.MediaTextAlignment,
+            ComponentSpacingDip = defaults.TaskbarExperience.ComponentSpacingDip,
+            HoverButtonSpacingDip = defaults.TaskbarExperience.HoverButtonSpacingDip,
+            LengthMode = defaults.TaskbarExperience.LengthMode,
+            FixedLengthDip = defaults.TaskbarExperience.FixedLengthDip,
+            RestComponentOrder = defaults.TaskbarExperience.RestComponentOrder
         };
         Replace(next, SettingsResetScope.Appearance);
     }
     public static void ResetDisplayModes()
     {
         var next = Current.Clone(); var defaults = Defaults;
-        next.TaskbarExperience = defaults.TaskbarExperience;
+        // 显示模式页只恢复各层功能；尺寸、间距、排列与文字样式由外观页重置。
+        next.TaskbarExperience = next.TaskbarExperience with
+        {
+            HoverLayerEnabled = defaults.TaskbarExperience.HoverLayerEnabled,
+            FullLayerEnabled = defaults.TaskbarExperience.FullLayerEnabled,
+            FullPanel = defaults.TaskbarExperience.FullPanel,
+            SpectrumVisible = defaults.TaskbarExperience.SpectrumVisible,
+            PerformanceVisible = defaults.TaskbarExperience.PerformanceVisible,
+            RestProgressVisible = defaults.TaskbarExperience.RestProgressVisible,
+            FullPanelEntryVisible = defaults.TaskbarExperience.FullPanelEntryVisible,
+            HoverControls = defaults.TaskbarExperience.HoverControls,
+            OutputDeviceVisible = defaults.TaskbarExperience.OutputDeviceVisible,
+            VolumeVisible = defaults.TaskbarExperience.VolumeVisible,
+            IdleComponents = defaults.TaskbarExperience.IdleComponents
+        };
         next.WindowMode = defaults.WindowMode; next.LayoutOrientationMode = defaults.LayoutOrientationMode;
         next.TaskbarBarEnabled = defaults.TaskbarBarEnabled;
         next.TaskbarTargetMonitorDeviceIds = defaults.TaskbarTargetMonitorDeviceIds;
@@ -436,9 +458,14 @@ public static class SettingsManager
         next.TrackChangeNotification = defaults.TrackChangeNotification;
         next.SmtcSourceFilter = defaults.SmtcSourceFilter;
         next.QuickLaunch = QuickLaunchSettings.Default;
+        Replace(next, SettingsResetScope.ExtraFeatures);
+    }
+    public static void ResetComponents()
+    {
+        var next = Current.Clone(); var defaults = Defaults;
         next.SpectrumComponent = defaults.SpectrumComponent;
         next.PerformanceComponent = defaults.PerformanceComponent;
-        Replace(next, SettingsResetScope.ExtraFeatures);
+        Replace(next, SettingsResetScope.Components);
     }
     public static void ResetInteraction()
     {
@@ -450,6 +477,7 @@ public static class SettingsManager
     {
         var next = Current.Clone(); var defaults = Defaults;
         next.LyricsEnabled = defaults.LyricsEnabled; next.TwoLineLyricsEnabled = defaults.TwoLineLyricsEnabled;
+        next.AllowBrowserAndVideoLyrics = defaults.AllowBrowserAndVideoLyrics;
         next.LyricsSecondaryLine = defaults.LyricsSecondaryLine; next.LyricsTextAlignment = defaults.LyricsTextAlignment;
         next.LyricsSyllableHighlightEnabled = defaults.LyricsSyllableHighlightEnabled;
         next.LyricsUnsungOpacityPercent = defaults.LyricsUnsungOpacityPercent;
@@ -491,6 +519,7 @@ public static class SettingsManager
             case nameof(AppSettings.Appearance): AppearanceSettingsChanged?.Invoke(null, new AppearanceSettingsChangedEventArgs(Current.Appearance)); break;
             case nameof(AppSettings.TrayWheelBehavior): TrayWheelBehaviorChanged?.Invoke(null, EventArgs.Empty); break;
             case nameof(AppSettings.LyricsEnabled):
+            case nameof(AppSettings.AllowBrowserAndVideoLyrics):
             case nameof(AppSettings.TwoLineLyricsEnabled):
             case nameof(AppSettings.LyricsSecondaryLine):
             case nameof(AppSettings.LyricsSyllableHighlightEnabled):
