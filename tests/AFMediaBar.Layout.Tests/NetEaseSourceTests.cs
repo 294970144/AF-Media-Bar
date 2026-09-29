@@ -120,6 +120,22 @@ public sealed class NetEaseSourceTests
         Assert.AreSame(artwork, Policy.Merge(Memory(), smtc).Artwork);
         Assert.IsNull(Policy.Merge(Memory(), smtc with { Title = "Previous song" }).Artwork);
         Assert.IsNull(Policy.Merge(Memory(), smtc with { Artist = "Another artist" }).Artwork);
+        Assert.IsNull(Policy.Merge(Memory(), smtc with { SourceId = "spotify" }).Artwork);
+    }
+
+    [TestMethod]
+    public void ArtworkAlwaysFollowsSmtcArrivalReplacementAndLoss()
+    {
+        var memory = Memory() with { Artwork = new System.Windows.Media.DrawingImage() };
+        var first = new System.Windows.Media.DrawingImage();
+        var second = new System.Windows.Media.DrawingImage();
+        var smtc = Memory() with { Artwork = first };
+
+        Assert.IsNull(Policy.Merge(memory, MediaSnapshot.Disconnected).Artwork);
+        Assert.AreSame(first, Policy.Merge(memory, smtc).Artwork);
+        Assert.AreSame(second, Policy.Merge(memory, smtc with { Artwork = second }).Artwork);
+        Assert.IsNull(Policy.Merge(memory, smtc with { Artwork = null }).Artwork);
+        Assert.IsNull(Policy.Merge(memory, smtc with { Title = "Next song" }).Artwork);
     }
 
     [TestMethod]

@@ -1,8 +1,6 @@
 // Owns NetEase polling and readers; publishes snapshots through the shared source contract.
 using System.Diagnostics;
 using System.Windows;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using AFMediaBar.Classes.Abstractions;
 using AFMediaBar.Classes.Models;
@@ -14,8 +12,8 @@ using AFMediaBar.Resources;
 namespace AFMediaBar.Classes.Services.Media.Sources.NetEase;
 
 /// <summary>
-/// 读取网易云客户端内存并提供更精确的进度、歌曲标识、封面和歌词。
-/// Reads NetEase client memory and provides precise progress, song identity, artwork, and lyrics.
+/// 读取网易云客户端内存并提供更精确的进度、歌曲标识和歌词；封面由 SMTC 通道提供。
+/// Reads NetEase client memory for precise progress, song identity, and lyrics; artwork comes from SMTC.
 /// </summary>
 public sealed class NetEaseMediaProvider : IIndependentMediaSourceProvider, IMemoryPrunable
 {
@@ -43,20 +41,9 @@ public sealed class NetEaseMediaProvider : IIndependentMediaSourceProvider, IMem
     /// </summary>
     private const int LyricsCacheCapacity = 64;
 
-    /// <summary>
-    /// 封面缓存的容量：每张封面解码后约 256 KB，无界字典会随播放曲目数一直涨（长时间播放是一条稳定的内存增长曲线）。
-    /// 只留最后几首的封面足够：封面总与当前曲目一起出现，切回上一首时重新下载一次的代价远小于常驻几十兆。
-    /// Capacity of the artwork cache: one decoded cover is about 256 KB, and an unbounded dictionary grows with the number of played
-    /// tracks, which is a steady memory climb over a long session. Keeping the last few covers is enough: a cover only appears together
-    /// with its track, and re-downloading one beats keeping tens of megabytes resident.
-    /// </summary>
-    private const int ArtworkCacheCapacity = 8;
-
     private readonly Dispatcher _dispatcher;
     private readonly Func<INetEaseMemoryReader> _createReader;
     private readonly LyricsService _lyricsService;
-    private readonly LruCache<string, BitmapImage?> _artworkCache = new(ArtworkCacheCapacity);
-    private readonly HashSet<string> _pendingArtwork = new(StringComparer.OrdinalIgnoreCase);
     private readonly LruCache<string, LyricsResult?> _lyricsCache = new(
         LyricsCacheCapacity,
         result => LyricsCacheBudgetPolicy.EstimateBytes(result?.Document),
@@ -182,8 +169,8 @@ public sealed class NetEaseMediaProvider : IIndependentMediaSourceProvider, IMem
     public string PruneParticipantName => "netease-source";
 
     /// <summary>
-    /// 按档位丢弃封面与歌词缓存，并放慢或停掉内存轮询。
-    /// Drops the artwork and lyric caches for the level and slows down or stops the memory poll.
+    /// 按档位丢弃歌词缓存，并放慢或停掉内存轮询。
+    /// Drops the lyric cache for the level and slows down or stops the memory poll.
     ///
     /// 两级处理是有区别的：空闲档位只是"没人看，别那么勤快"，而显示器关闭或系统睡眠时连"看看有没有在放"都不必做——恢复由媒体事件驱动，
     /// 协调器一收到播放状态变化就会把档位调回常规，本提供器随即被重新启动。
@@ -202,10 +189,6 @@ public sealed class NetEaseMediaProvider : IIndependentMediaSourceProvider, IMem
         _pruneLevel = level;
         if (level >= MemoryPruneLevel.Idle)
         {
-            // 缓存清掉不会让界面变空：正在显示的那张封面由快照自己持有，这里丢掉的只是"下次再要时不用重新下载"的那一份。
-            // Clearing the caches does not blank the interface: the cover on screen is held by the snapshot itself, and what is dropped here is only
-            // the copy that saved a re-download.
-            _artworkCache.Clear();
             _lyricsCache.Clear();
             _lyricsCacheGeneration++;
         }
@@ -241,7 +224,6 @@ public sealed class NetEaseMediaProvider : IIndependentMediaSourceProvider, IMem
         _currentProcessId = 0;
         _version++;
         _continuity.Clear();
-        _pendingArtwork.Clear();
         _pendingLyrics.Clear();
         if (!_isDisposed)
             SnapshotChanged?.Invoke(this, null);
@@ -280,8 +262,8 @@ public sealed class NetEaseMediaProvider : IIndependentMediaSourceProvider, IMem
                         PublishPlayerInfo(info, token);
                     else
                     {
-                        // 迟到的同曲封面/歌词不能覆盖失败缓冲或已退出的进程。
-                        // Late artwork/lyrics cannot resurrect a failed or exited source.
+                        // 迟到的同曲歌词不能覆盖失败缓冲或已退出的进程。
+                        // Late lyrics cannot resurrect a failed or exited source.
                         _currentInfo = null;
                         _version++;
                         PublishSnapshot(_continuity.Update(null, result.ProcessId > 0, DateTimeOffset.UtcNow), token);
@@ -330,33 +312,21 @@ public sealed class NetEaseMediaProvider : IIndependentMediaSourceProvider, IMem
 
     private void PublishPlayerInfo(PlayerInfo info, CancellationToken token)
     {
-        var version = _currentInfo is { } current &&
-            string.Equals(current.Identity, info.Identity, StringComparison.Ordinal) &&
-            string.Equals(current.Cover, info.Cover, StringComparison.Ordinal)
-                ? _version
-                : ++_version;
+        if (_currentInfo is not { } current ||
+            !string.Equals(current.Identity, info.Identity, StringComparison.Ordinal))
+            _version++;
         _currentInfo = info;
-
-        ImageSource? artwork = null;
-        if (_artworkCache.TryGetValue(info.Cover, out var cachedArtwork))
-        {
-            artwork = cachedArtwork;
-        }
-        else if (!string.IsNullOrWhiteSpace(info.Cover) && _pendingArtwork.Add(info.Cover))
-        {
-            _ = LoadArtworkAsync(info.Cover, version, token);
-        }
 
         var hasCachedLyrics = _lyricsCache.TryGetValue(info.Identity, out var lyrics);
         var shouldLoadLyrics = !hasCachedLyrics && _pendingLyrics.Add(info.Identity);
-        PublishSnapshot(_continuity.Update(CreateSnapshot(info, artwork, lyrics), true, DateTimeOffset.UtcNow), token);
+        PublishSnapshot(_continuity.Update(CreateSnapshot(info, lyrics), true, DateTimeOffset.UtcNow), token);
         if (shouldLoadLyrics)
         {
             _ = LoadLyricsAsync(info, token);
         }
     }
 
-    private MediaSnapshot CreateSnapshot(PlayerInfo info, ImageSource? artwork, LyricsResult? lyrics) =>
+    private MediaSnapshot CreateSnapshot(PlayerInfo info, LyricsResult? lyrics) =>
         new(
             true,
             !info.Pause,
@@ -367,7 +337,7 @@ public sealed class NetEaseMediaProvider : IIndependentMediaSourceProvider, IMem
             info.Artists,
             MemoryPlayerSourceId,
             MediaSourceNameFormatter.GetDisplayName(MemoryPlayerSourceId, Translations.Get("Service.MediaSource.Unknown")),
-            artwork,
+            null, // Artwork is supplied by the same-track SMTC snapshot during source merging.
             lyrics,
             info.Schedule,
             info.Duration,
@@ -384,36 +354,6 @@ public sealed class NetEaseMediaProvider : IIndependentMediaSourceProvider, IMem
         if (_isDisposed || token.IsCancellationRequested || _dispatcher.HasShutdownStarted)
             return;
         SnapshotChanged?.Invoke(this, snapshot);
-    }
-
-    private async Task LoadArtworkAsync(string coverUrl, int version, CancellationToken token)
-    {
-        try
-        {
-            var artwork = await ArtworkLoader.GetImageFromUrlAsync(coverUrl, token);
-            if (token.IsCancellationRequested || _isDisposed)
-                return;
-            _artworkCache.Set(coverUrl, artwork);
-            if (artwork is not null && !_isDisposed && version == _version &&
-                _currentInfo is { } info && string.Equals(info.Cover, coverUrl, StringComparison.OrdinalIgnoreCase))
-            {
-                _lyricsCache.TryGetValue(info.Identity, out var lyrics);
-                PublishSnapshot(_continuity.Update(CreateSnapshot(info, artwork, lyrics), true, DateTimeOffset.UtcNow), token);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch
-        {
-            if (!token.IsCancellationRequested && !_isDisposed)
-                _artworkCache.Set(coverUrl, null);
-        }
-        finally
-        {
-            if (!token.IsCancellationRequested)
-                _pendingArtwork.Remove(coverUrl);
-        }
     }
 
     private async Task LoadLyricsAsync(PlayerInfo info, CancellationToken token)
@@ -439,8 +379,7 @@ public sealed class NetEaseMediaProvider : IIndependentMediaSourceProvider, IMem
             if (!_isDisposed && version == _version && _currentInfo is { } current &&
                 string.Equals(current.Identity, info.Identity, StringComparison.Ordinal))
             {
-                _artworkCache.TryGetValue(current.Cover, out var artwork);
-                PublishSnapshot(_continuity.Update(CreateSnapshot(current, artwork, result), true, DateTimeOffset.UtcNow), token);
+                PublishSnapshot(_continuity.Update(CreateSnapshot(current, result), true, DateTimeOffset.UtcNow), token);
             }
         }
         catch (OperationCanceledException)

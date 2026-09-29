@@ -54,7 +54,7 @@ public sealed class NetEaseSourcePolicy : IMediaSourcePolicy
         return memory with
         {
             SourceId = SourceId,
-            Artwork = memory.Artwork ?? (sameTrack ? baseline.Artwork : null),
+            Artwork = sameTrack ? baseline.Artwork : null,
             Lyrics = memory.Lyrics ?? (sameTrack ? baseline.Lyrics : null),
             CanPlayPause = baseline.CanPlayPause,
             CanSkipPrevious = baseline.CanSkipPrevious,
