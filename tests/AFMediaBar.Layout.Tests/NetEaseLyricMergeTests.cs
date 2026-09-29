@@ -122,11 +122,16 @@ public sealed class NetEaseLyricMergeTests
     }
 
     [TestMethod]
-    public void NoLyricPayloadsResolveToNull()
+    public void MissingOrUnparseablePayloadsRemainFailuresWhileExplicitNoLyricsIsValid()
     {
         Assert.IsNull(NetEaseLyricMerge.Resolve("Netease", null, null, Request()));
         Assert.IsNull(NetEaseLyricMerge.Resolve("Netease", Payload(lrc: "   "), Payload(yrc: "   "), Request()));
-        Assert.IsNull(NetEaseLyricMerge.Resolve("Netease", Payload(lrc: LegacyLrc, nolyric: true), null, Request()));
+        var result = NetEaseLyricMerge.Resolve("Netease", Payload(lrc: LegacyLrc, nolyric: true), null, Request());
+        Assert.AreEqual(LyricsResultStatus.NoLyrics, result!.Status);
+        Assert.AreEqual(0, result.Document.Lines.Count);
+        var error = Payload(nolyric: true);
+        error.Code = 500;
+        Assert.IsNull(NetEaseLyricMerge.Resolve("Netease", error, null, Request()));
     }
 
     [TestMethod]

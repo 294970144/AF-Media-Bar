@@ -7,11 +7,11 @@ namespace AFMediaBar.Classes.Services.Lyrics;
 /// Lyric-cache invalidation policy: which settings changes have to drop the cached retrieval results and fetch again.
 ///
 /// 取词结果按曲目缓存（含"未命中"），因此只改呈现的设置不该触发重新取词：拖动未唱部分不透明度的滑杆每走一格都重发请求，
-/// 既不必要又会打到第三方接口。反过来，改变"从哪些来源取词"、"多严格才算匹配"或"要不要过滤信息行"之后，当前这一首必须
+/// 既不必要又会打到第三方接口。反过来，改变"从哪些来源取词"或"要不要过滤信息行"之后，当前这一首必须
 /// 重新走一遍取词链，否则用户会以为设置没生效。
 /// Retrieval results are cached per track, including misses, so a presentation-only change must not refetch: dragging the
 /// unsung-opacity slider would otherwise re-request on every step, which is pointless and hits third-party endpoints. Conversely,
-/// changing which sources are used, how strict a match has to be, or whether info lines are filtered has to send the current
+/// changing which sources are used or whether info lines are filtered has to send the current
 /// track through the chain again, or the setting looks like it does nothing.
 /// </summary>
 public static class LyricsCacheInvalidationPolicy
@@ -32,21 +32,7 @@ public static class LyricsCacheInvalidationPolicy
             return true;
         }
 
-        return propertyName is
-            nameof(AppSettings.AllowBrowserAndVideoLyrics) or
-            nameof(AppSettings.LyricsSource) or
-            nameof(AppSettings.LyricsDefaultBindings) or
-            // 查询策略决定链路的执行模型本身，切换后旧结果不再属于当前配置。
-            // The query strategy decides the chain's execution model itself, so results fetched under the old strategy
-            // no longer belong to the current configuration.
-            nameof(AppSettings.LyricsQueryStrategy) or
-            nameof(AppSettings.LyricsMatchStrictness) or
-            nameof(AppSettings.LyricsInfoLineFilterEnabled) or
-            // 并发与采纳设置同样决定"这一次取词用哪些请求、采纳哪个结果"，改了它们旧结果已经不属于当前配置。
-            // The concurrency and adoption settings equally decide which requests a retrieval sends and which result is
-            // adopted, so results fetched under the old values no longer belong to the current configuration.
-            nameof(AppSettings.LyricsAdoptionMode) or
-            nameof(AppSettings.LyricsConcurrencyBatchSize) or
-            nameof(AppSettings.LyricsAdoptionDeadlineMilliseconds);
+        return propertyName is nameof(AppSettings.AllowBrowserAndVideoLyrics) or
+            nameof(AppSettings.LyricsSource) or nameof(AppSettings.LyricsInfoLineFilterEnabled);
     }
 }

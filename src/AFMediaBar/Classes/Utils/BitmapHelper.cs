@@ -20,7 +20,7 @@ internal static class BitmapHelper
     private const int MaximumSampleSize = 64;
 
     // cached bitmapImage hashes and their dominant colors
-    private static readonly LruCache<int, List<SolidColorBrush>> _dominantColorsCache = new(5);
+    private static readonly LruCache<(int Hash, int ColorCount, int Iterations, bool DarkTheme), List<SolidColorBrush>> _dominantColorsCache = new(5);
 
     // current or latest dominant colors
     private static List<SolidColorBrush>? _currentDominantColors;
@@ -83,9 +83,9 @@ internal static class BitmapHelper
 
         try
         {
-            // check if we've already calculated colors for this thumbnail by checking
-            // the current hash with cache (dumb method because we're assuming it's always the latest)
-            if (_dominantColorsCache.TryGetValue(hashCode, out var cachedColors) && cachedColors != null)
+            var darkTheme = ApplicationThemeManager.GetSystemTheme() == SystemTheme.Dark;
+            var cacheKey = (hashCode, colorCount, maxIterations, darkTheme);
+            if (_dominantColorsCache.TryGetValue(cacheKey, out var cachedColors) && cachedColors != null)
             {
                 _currentDominantColors = cachedColors;
                 return _currentDominantColors;
@@ -120,7 +120,7 @@ internal static class BitmapHelper
                     height,
                     colorCount,
                     maxIterations,
-                    ApplicationThemeManager.GetSystemTheme() == SystemTheme.Dark);
+                    darkTheme);
             }
             finally
             {
@@ -137,8 +137,7 @@ internal static class BitmapHelper
 
             _currentDominantColors = brushes;
 
-            // save brushes to cache with current hash as key
-            _dominantColorsCache.Set(hashCode, _currentDominantColors);
+            _dominantColorsCache.Set(cacheKey, _currentDominantColors);
 
 #if DEBUG
             stopwatch.Stop();

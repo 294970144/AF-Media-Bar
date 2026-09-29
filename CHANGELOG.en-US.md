@@ -12,6 +12,14 @@ Reliability fixes: media-session self-healing, spectrum level calibration, and l
 
 ### Changed
 
+- Removed QQ Music local lyric-cache scanning, file reads, and decryption; QQ retrieval now uses online search with the 85-point threshold.
+
+- QQ Music online lyric downloads now require a match score of 85. Fallback selection trusts the highest score, including confirmed absence of lyrics, so instrumental tracks are not replaced by lower-scoring lyrics. Logs distinguish song matching, provider results, and final selection.
+
+- Media artwork now comes only from SMTC. Removed artwork URL downloads and caching from the independent NetEase source; when no same-track SMTC artwork is available, no artwork is shown. Memory reading still supplies track information, progress, and lyrics.
+
+- Lyrics now try enabled QQ Music online first, then query other enabled sources in parallel and choose the highest matching score. Independent scoring reduces preview-duration influence and supplies search variants for translated names. Strictness, dispatch, adoption, batch, player-binding, and source-order controls and their obsolete settings fields are removed; old files with the same schema remain readable, but saving drops those fields.
+
 - Replaced custom device enumeration, application-volume access, capture-endpoint discovery and loopback capture with NAudio.Wasapi 3.1.0, removing duplicated Core Audio COM declarations and manual PCM decoding. Spectrum capture runs on demand in a hosted worker and is released during host shutdown. Default-device switching retains a minimal PolicyConfig adapter; spatial audio continues to use Windows APIs.
 
 ### Added
@@ -21,6 +29,10 @@ Reliability fixes: media-session self-healing, spectrum level calibration, and l
 - Instant line resizing: when the lyric line changes the bar now lands on the new length immediately instead of animating into it, so no brief ellipsis appears right after a line change.
 
 ### Fixed
+
+- NetEase artwork no longer disappears on featured tracks when SMTC reports only the primary artist while client metadata includes guests. Primary-artist matching still requires the same title and source, and rejects other tracks, guest-only names, and name substrings.
+
+- LRU rejects negative costs and accounting overflow, and evaluates costs outside its lock. Inconclusive lyric lookups and failed avatar loads are cached for 30 seconds without extending the cooldown on reads. SMTC lyric keys include the session and complete matching metadata, fallback lookups can retry failures, and artwork-color keys include the theme and extraction parameters.
 
 - NetEase Cloud Music can appear in the source menu and display track information and lyrics through memory reading without SMTC, including the Store version. Both channels share one source: memory information takes priority and SMTC supplies controls. Hiding the source stops reading; allowing it resumes reading. Transient failures have a three-second grace period, while player exit removes the memory source.
 - Losing media sessions permanently after a single missed SMTC event (for example at a track change): an auto-reconcile watchdog now heals on a one-second cadence for thirty seconds after a session closes and falls back to five seconds, and it rebuilds the media catalog when the third-party library is stuck beyond what ForceUpdate can fix.
@@ -33,6 +45,7 @@ Reliability fixes: media-session self-healing, spectrum level calibration, and l
 
 ### Improved
 
+- Taskbar UIA probes reuse one persistent MTA worker to reduce thread creation and teardown overhead. Probes run serially with a bounded queue that coalesces requests per taskbar. A rare stuck UIA call delays subsequent probes until it returns; the existing timeout fallback remains in effect, and shutdown does not wait for the call.
 - Spectrum resolution and look: the FFT size now follows the sample rate (96 kHz goes from 512 to 4096 points), band values integrate power with fractional-bin linear interpolation (low bands no longer share one bin with their neighbour, so the leading columns stop sharing one height), and a +3 dB/octave tilt in the power domain compensates the natural roll-off for a more balanced look.
 
 ## [1.2.1] - 2026-09-21

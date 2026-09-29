@@ -22,19 +22,14 @@ public sealed class LyricsServiceBudgetTests
     private static readonly TimeSpan PerSource = TimeSpan.FromMilliseconds(60);
     private static readonly TimeSpan Total = TimeSpan.FromMilliseconds(400);
 
-    private static readonly LyricsRetrievalOptions Options =
-        new(LyricsQueryStrategy.Concurrent, LyricsAdoptionMode.FirstArrival, LyricsConcurrencyDefaults.BatchSizeDefault, TimeSpan.Zero);
-
     private static LyricsRequest Request() => new("Song", "Artist", "Album", 200, NetEaseSongId: null);
 
-    private static LyricsResult Hit(string source) => new(source, LyricDocument.Empty);
+    private static LyricsResult Hit(string source) => new(source, LyricDocument.Empty) { MatchScore = source == "slow-first" ? 95 : 70 };
 
     [TestMethod]
-    public async Task TheEarliestResultInTheBatchWinsEvenWhenAHigherPrioritySourceIsSlower()
+    public async Task TheHighestScoreWinsEvenWhenItArrivesLater()
     {
-        // 并发语义：同一批里的来源同时被询问，先到先得——高优先级但慢的结果不会赢得比赛。
-        // Concurrent semantics: sources in one batch are asked together, first arrival wins — a higher-priority but slower
-        // result never wins the race.
+        // 备用来源同时派发，较慢的高分结果应胜出。
         var asked = new List<string>();
         var service = new LyricsService(
             PerSource,
@@ -51,10 +46,10 @@ public sealed class LyricsServiceBudgetTests
                 return Task.FromResult<LyricsResult?>(Hit("fast-second"));
             }));
 
-        var result = await service.GetLyricsAsync(Request(), Options, CancellationToken.None);
+        var result = await service.GetLyricsAsync(Request(), CancellationToken.None);
 
         Assert.IsNotNull(result);
-        Assert.AreEqual("fast-second", result!.Source);
+        Assert.AreEqual("slow-first", result!.Source);
         CollectionAssert.AreEqual(new[] { "slow-first", "fast-second" }, asked);
     }
 
@@ -68,7 +63,7 @@ public sealed class LyricsServiceBudgetTests
             new StubProvider("hanging", _ => hang.Task),
             new StubProvider("fallback", _ => Task.FromResult<LyricsResult?>(Hit("fallback"))));
 
-        var result = await service.GetLyricsAsync(Request(), Options, CancellationToken.None);
+        var result = await service.GetLyricsAsync(Request(), CancellationToken.None);
 
         Assert.IsNotNull(result);
         Assert.AreEqual("fallback", result!.Source);
@@ -86,7 +81,7 @@ public sealed class LyricsServiceBudgetTests
             new StubProvider("three", _ => new TaskCompletionSource<LyricsResult?>().Task));
 
         var startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
-        var result = await service.GetLyricsAsync(Request(), Options, CancellationToken.None);
+        var result = await service.GetLyricsAsync(Request(), CancellationToken.None);
         var elapsed = System.Diagnostics.Stopwatch.GetElapsedTime(startedAt);
 
         Assert.IsNull(result);
@@ -102,7 +97,7 @@ public sealed class LyricsServiceBudgetTests
             new StubProvider("faulting", _ => throw new InvalidOperationException("boom")),
             new StubProvider("fallback", _ => Task.FromResult<LyricsResult?>(Hit("fallback"))));
 
-        var result = await service.GetLyricsAsync(Request(), Options, CancellationToken.None);
+        var result = await service.GetLyricsAsync(Request(), CancellationToken.None);
 
         Assert.IsNotNull(result);
         Assert.AreEqual("fallback", result!.Source);
@@ -119,7 +114,7 @@ public sealed class LyricsServiceBudgetTests
         cancellation.Cancel();
 
         await Assert.ThrowsExceptionAsync<OperationCanceledException>(
-            () => service.GetLyricsAsync(Request(), Options, cancellation.Token));
+            () => service.GetLyricsAsync(Request(), cancellation.Token));
     }
 
     [TestMethod]
@@ -132,7 +127,7 @@ public sealed class LyricsServiceBudgetTests
             new StubProvider("hanging", _ => hanging.Task));
         using var cancellation = new CancellationTokenSource();
 
-        var lookup = service.GetLyricsAsync(Request(), Options, cancellation.Token);
+        var lookup = service.GetLyricsAsync(Request(), cancellation.Token);
         Assert.IsFalse(lookup.IsCompleted);
         cancellation.Cancel();
 

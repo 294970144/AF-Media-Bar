@@ -4,12 +4,13 @@ using AFMediaBar.Classes.Services;
 using AFMediaBar.Classes.Services.Lyrics;
 using AFMediaBar.Classes.Settings;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Text.Json;
 
 namespace AFMediaBar.Layout.Tests;
 
 /// <summary>
-/// 歌词设置、来源选择、匹配严格度、占位文本与缓存失效的测试。
-/// Tests for the lyric settings, source selection, match strictness, placeholder text, and cache invalidation.
+/// 歌词设置、来源选择、占位文本与缓存失效的测试。
+/// Tests for the lyric settings, source selection, placeholder text, and cache invalidation.
 /// </summary>
 [TestClass]
 public sealed class LyricsSettingsTests
@@ -22,8 +23,57 @@ public sealed class LyricsSettingsTests
     [TestCleanup]
     public void TearDown()
     {
+        SettingsManager.SetUserDefaults(null);
         SettingsManager.ResetAll();
         if (Directory.Exists(_directory)) Directory.Delete(_directory, true);
+    }
+
+    [TestMethod]
+    public void RemovedLyricSettingsAreIgnoredAndDroppedWithoutLosingActiveSettings()
+    {
+        Directory.CreateDirectory(_directory);
+        var legacyFields = new Dictionary<string, object>
+        {
+            ["lyricsMatchStrictness"] = "Exact",
+            ["lyricsQueryStrategy"] = "Sequential",
+            ["lyricsAdoptionMode"] = "FirstArrival",
+            ["lyricsConcurrencyBatchSize"] = 1,
+            ["lyricsAdoptionDeadlineMilliseconds"] = 500,
+            ["lyricsDefaultBindings"] = new { bindings = new[] { new { appId = "cloudmusic", sourceId = "Netease" } } },
+            ["lyricsEnabled"] = false,
+            ["lyricsInfoLineFilterEnabled"] = false,
+            ["lyricsSource"] = new { enabledSourceIds = new[] { LyricsSourceCatalog.QQMusic } }
+        };
+        var settingsPath = Path.Combine(_directory, "settings.json");
+        var original = JsonSerializer.Serialize(new
+        {
+            schemaVersion = SettingsPersistenceService.CurrentSchemaVersion,
+            settings = legacyFields
+        });
+        File.WriteAllText(settingsPath, original);
+        var defaultsPath = Path.Combine(_directory, "user-defaults.json");
+        File.WriteAllText(defaultsPath, original);
+
+        using var service = new SettingsPersistenceService(_directory);
+        service.Initialize();
+        Assert.IsFalse(SettingsManager.Current.LyricsEnabled);
+        Assert.IsFalse(SettingsManager.Current.LyricsInfoLineFilterEnabled);
+        CollectionAssert.AreEqual(new[] { LyricsSourceCatalog.QQMusic }, SettingsManager.Current.LyricsSource.EnabledSourceIds!.ToArray());
+        Assert.IsFalse(service.LoadUserDefaults()!.LyricsEnabled);
+        service.Flush();
+        Assert.IsNull(service.SaveCurrentAsUserDefaults());
+
+        foreach (var path in new[] { settingsPath, defaultsPath })
+        {
+            using var saved = JsonDocument.Parse(File.ReadAllText(path));
+            var settings = saved.RootElement.GetProperty("settings");
+            foreach (var name in legacyFields.Keys.Take(6))
+                Assert.IsFalse(settings.TryGetProperty(name, out _), name);
+            Assert.IsFalse(settings.GetProperty("lyricsEnabled").GetBoolean());
+            Assert.IsFalse(settings.GetProperty("lyricsInfoLineFilterEnabled").GetBoolean());
+            Assert.AreEqual(LyricsSourceCatalog.QQMusic, settings.GetProperty("lyricsSource").GetProperty("enabledSourceIds")[0].GetString());
+        }
+        Assert.AreEqual(0, Directory.GetFiles(_directory, "*.unsupported-*").Length);
     }
 
     // ---- 缺字段的默认值 / missing-field defaults ----
@@ -43,9 +93,9 @@ public sealed class LyricsSettingsTests
     [TestMethod]
     public void MissingLyricFieldsUseTheDocumentedDefaults()
     {
-        // 文件里没有五项取词与擦亮设置：每一项都必须取文档化的默认值，尤其是来源列表——null 表示"全部来源"，
+        // 文件里没有取词与擦亮设置：每一项都必须取文档化的默认值，尤其是来源列表——null 表示"全部来源"，
         // 绝不能读成"一首歌都取不到歌词"的空列表。
-        // The file carries none of the five lyric and highlight settings, so each one must take its documented default — especially the
+        // The file carries none of the lyric and highlight settings, so each one must take its documented default — especially the
         // source list, where null means "all sources" and must never read as the empty list that fetches no lyrics at all.
         Directory.CreateDirectory(_directory);
         File.WriteAllText(
@@ -58,7 +108,6 @@ public sealed class LyricsSettingsTests
         Assert.IsTrue(SettingsManager.Current.LyricsSyllableHighlightEnabled);
         Assert.AreEqual(LyricsUnsungOpacity.DefaultPercent, SettingsManager.Current.LyricsUnsungOpacityPercent);
         Assert.IsTrue(SettingsManager.Current.LyricsInfoLineFilterEnabled);
-        Assert.AreEqual(LyricsMatchStrictness.Balanced, SettingsManager.Current.LyricsMatchStrictness);
         Assert.IsNull(SettingsManager.Current.LyricsSource.EnabledSourceIds);
         // 间距字段同样取默认 0：升级后的外观与升级前逐像素一致。
         // The spacing fields take their zero defaults as well: the look after upgrading is pixel-identical to before.
@@ -262,7 +311,7 @@ public sealed class LyricsSettingsTests
         var stubB = new StubProvider(LyricsSourceCatalog.QQMusic, _ =>
         {
             asked.Add(LyricsSourceCatalog.QQMusic);
-            return Task.FromResult<LyricsResult?>(new LyricsResult(LyricsSourceCatalog.QQMusic, LyricDocument.Empty));
+            return Task.FromResult<LyricsResult?>(LyricsResult.NoLyrics(LyricsSourceCatalog.QQMusic, 85));
         });
         var service = new LyricsService(
             LyricsService.DefaultPerSourceBudget,
@@ -311,7 +360,7 @@ public sealed class LyricsSettingsTests
     [DataRow("张三,李四", "张三")]
     [DataRow("  Taylor Swift  ", "Taylor Swift")]
     [DataRow("", "")]
-    public async Task EveryLyricsSourceReceivesOnlyTheFirstArtist(string artist, string expected)
+    public async Task EveryLyricsSourceReceivesTheFullOriginalArtist(string artist, string expected)
     {
         var providers = new[]
         {
@@ -327,7 +376,7 @@ public sealed class LyricsSettingsTests
         foreach (var provider in providers)
         {
             Assert.IsNotNull(provider.Request, provider.SourceName);
-            Assert.AreEqual(expected, provider.Request.Artist, provider.SourceName);
+            Assert.AreEqual(artist, provider.Request.Artist, provider.SourceName);
             Assert.AreEqual(request.Title, provider.Request.Title);
             Assert.AreEqual(request.DurationSeconds, provider.Request.DurationSeconds);
         }
@@ -344,20 +393,6 @@ public sealed class LyricsSettingsTests
             Request = request;
             return Task.FromResult<LyricsResult?>(null);
         }
-    }
-
-    [TestMethod]
-    public void MatchStrictnessMapsOntoTheLibraryLevels()
-    {
-        Assert.AreEqual(
-            Lyricify.Lyrics.Searchers.Helpers.CompareHelper.MatchType.High,
-            LyricsMatchPolicy.ToMinimumMatch(LyricsMatchStrictness.Balanced));
-        Assert.AreEqual(
-            Lyricify.Lyrics.Searchers.Helpers.CompareHelper.MatchType.VeryHigh,
-            LyricsMatchPolicy.ToMinimumMatch(LyricsMatchStrictness.Strict));
-        Assert.AreEqual(
-            Lyricify.Lyrics.Searchers.Helpers.CompareHelper.MatchType.Perfect,
-            LyricsMatchPolicy.ToMinimumMatch(LyricsMatchStrictness.Exact));
     }
 
     // ---- 占位文本 ----
@@ -392,7 +427,6 @@ public sealed class LyricsSettingsTests
     {
         Assert.IsTrue(LyricsCacheInvalidationPolicy.ShouldClearCache(nameof(AppSettings.LyricsSource), null));
         Assert.IsTrue(LyricsCacheInvalidationPolicy.ShouldClearCache(nameof(AppSettings.AllowBrowserAndVideoLyrics), null));
-        Assert.IsTrue(LyricsCacheInvalidationPolicy.ShouldClearCache(nameof(AppSettings.LyricsMatchStrictness), null));
         Assert.IsTrue(LyricsCacheInvalidationPolicy.ShouldClearCache(nameof(AppSettings.LyricsInfoLineFilterEnabled), null));
         Assert.IsTrue(LyricsCacheInvalidationPolicy.ShouldClearCache(null, SettingsResetScope.Lyrics));
         Assert.IsTrue(LyricsCacheInvalidationPolicy.ShouldClearCache(null, SettingsResetScope.All));

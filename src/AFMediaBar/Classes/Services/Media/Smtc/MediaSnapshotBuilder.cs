@@ -17,7 +17,7 @@ namespace AFMediaBar.Classes.Services.Media.Smtc;
 /// 从选中的 SMTC 会话构建统一媒体快照，并异步补充歌词。
 /// Builds the unified media snapshot from a selected SMTC session and enriches it with lyrics asynchronously.
 /// </summary>
-public sealed class MediaSnapshotBuilder : IMemoryPrunable
+public sealed class MediaSnapshotBuilder : IMemoryPrunable, IDisposable
 {
     /// <summary>
     /// 无法识别来源时的回退名称，按快照构建时的语言取值：它不能是常量，否则切换语言后来源名会停在启动时的语言上。
@@ -37,11 +37,11 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable
     private const int LyricsCacheCapacity = 64;
 
     private readonly LyricsService _lyricsService;
-    private readonly LruCache<string, LyricsResult?> _lyricsCache = new(
-        LyricsCacheCapacity,
-        result => LyricsCacheBudgetPolicy.EstimateBytes(result?.Document),
-        LyricsCacheBudgetPolicy.DefaultBudgetBytes);
-    private readonly HashSet<string> _pendingLyrics = new(StringComparer.Ordinal);
+    private readonly LruCache<(string SessionId, LyricsRequest Request), LyricsResult?> _lyricsCache;
+    private readonly HashSet<(string SessionId, LyricsRequest Request)> _pendingLyrics = [];
+    private (string SessionId, LyricsRequest Request)? _lastLyricsKey;
+    private readonly CancellationTokenSource _lifetime = new();
+    private bool _disposed;
 
     /// <summary>
     /// 缓存代次：设置变化清空缓存时自增，让仍在飞行中的取词结果写不回来（否则它会把按旧设置取到的歌词塞进新缓存）。
@@ -68,7 +68,7 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable
     /// <param name="level">目标档位。/ The target level.</param>
     public void Prune(MemoryPruneLevel level)
     {
-        if (level < MemoryPruneLevel.Idle)
+        if (_disposed || level < MemoryPruneLevel.Idle)
         {
             return;
         }
@@ -89,9 +89,29 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable
     /// Creates the snapshot builder and uses the lyrics service for asynchronous enrichment tied to the current track version.
     /// </summary>
     public MediaSnapshotBuilder(LyricsService lyricsService)
+        : this(lyricsService, TimeProvider.System)
+    {
+    }
+
+    internal MediaSnapshotBuilder(LyricsService lyricsService, TimeProvider timeProvider)
     {
         _lyricsService = lyricsService;
+        _lyricsCache = new(LyricsCacheCapacity,
+            result => LyricsCacheBudgetPolicy.EstimateBytes(result?.Document),
+            LyricsCacheBudgetPolicy.DefaultBudgetBytes, timeProvider);
         SettingsManager.SettingsChanged += OnSettingsChanged;
+    }
+
+    /// <summary>取消取词并解除设置订阅；释放后不再发布补全结果。</summary>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        SettingsManager.SettingsChanged -= OnSettingsChanged;
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+        _lyricsCache.Clear();
+        _lastLyricsKey = null;
     }
 
     /// <summary>
@@ -100,7 +120,7 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable
     /// </summary>
     private void OnSettingsChanged(object? sender, SettingsChangedEventArgs e)
     {
-        if (!LyricsCacheInvalidationPolicy.ShouldClearCache(e.PropertyName, e.ResetScope))
+        if (_disposed || !LyricsCacheInvalidationPolicy.ShouldClearCache(e.PropertyName, e.ResetScope))
         {
             return;
         }
@@ -116,7 +136,7 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable
     /// </summary>
     public async Task<MediaSnapshot?> BuildAsync(MediaSession? session, bool isStarted, CancellationToken cancellationToken = default)
     {
-        if (session is null || !isStarted)
+        if (_disposed || session is null || !isStarted)
         {
             return MediaSnapshot.Disconnected;
         }
@@ -183,8 +203,8 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable
         var sourceId = read.SourceId;
         var title = read.Title;
         var artist = read.Artist;
-        var lyricsKey = BuildLyricsKey(session.Id, title, artist);
-        var lyrics = GetLyrics(lyricsKey, sourceId, read.IsVideo, title, artist, read.Album, duration);
+        var request = new LyricsRequest(title, artist, read.Album, duration > 0 ? duration : null, null);
+        var lyrics = GetLyrics(session.Id, sourceId, request, read.IsVideo);
 
         return new MediaSnapshot(
             true,
@@ -221,36 +241,27 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable
         _ => MediaRepeatMode.Unavailable
     };
 
-    private static string BuildLyricsKey(string sessionId, string title, string artist) =>
-        $"{sessionId}\u001f{title}\u001f{artist}";
-
-    private LyricsResult? GetLyrics(
-        string key,
-        string sourceId,
-        bool isVideo,
-        string title,
-        string artist,
-        string album,
-        double duration)
+    internal LyricsResult? GetLyrics(string sessionId, string sourceId, LyricsRequest request, bool isVideo = false)
     {
+        if (_disposed) return null;
         if (!LyricsMediaEligibilityPolicy.ShouldFetch(sourceId, isVideo, SettingsManager.Current.AllowBrowserAndVideoLyrics))
-        {
             return null;
-        }
-
+        // Structured keys include every matching input and cannot collide through separator characters.
+        var key = (sessionId, request);
+        _lastLyricsKey = key;
         if (_lyricsCache.TryGetValue(key, out var cached))
         {
             return cached;
         }
         if (_pendingLyrics.Contains(key) ||
             IsProvidedBySourceProvider(sourceId) ||
-            string.IsNullOrWhiteSpace(title))
+            string.IsNullOrWhiteSpace(request.Title))
         {
             return null;
         }
 
         _pendingLyrics.Add(key);
-        _ = LoadLyricsAsync(key, sourceId, title, artist, album, duration > 0 ? duration : null);
+        _ = LoadLyricsAsync(key);
         return null;
     }
 
@@ -265,13 +276,13 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable
 
     /// <summary>
     /// 为"来源提供器读不出媒体"的会话发起一次在线取词兜底，结果同样进本类的歌词缓存，
-    /// 因此下一次 <see cref="Build"/> 会把它挂到快照上。
+    /// 因此下一次 <see cref="BuildAsync"/> 会把它挂到快照上。
     ///
     /// 这是常规路径的例外通道：<see cref="GetLyrics"/> 对来源提供器负责的来源一律不取词，提供器一旦失效就完全没有
     /// 兜底，界面只剩 SMTC 的标题与歌手。是否该走这条通道由 <see cref="MediaEnrichmentFallbackPolicy"/> 判定，
     /// 调用方 MUST NOT 无条件调用（提供器每 233 毫秒都会报一次"没有媒体"）。
     /// Starts one online retrieval for a session whose source provider cannot read any media. The result lands in this class's lyric
-    /// cache, so the next <see cref="Build"/> attaches it to the snapshot.
+    /// cache, so the next <see cref="BuildAsync"/> attaches it to the snapshot.
     ///
     /// This is the exception channel of the ordinary path: <see cref="GetLyrics"/> never fetches for a source a provider is responsible
     /// for, so a failing provider leaves no fallback at all and only SMTC's title and artist remain. Whether this channel applies is
@@ -279,72 +290,58 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable
     /// "no media" every 233 milliseconds).
     /// </summary>
     /// <param name="sessionId">SMTC 会话标识，参与歌词缓存键。/ SMTC session identifier, part of the lyric cache key.</param>
-    /// <param name="sourceId">来源应用的 SMTC 标识，随请求带给取词链。/ The source application's SMTC identifier, passed on to the retrieval chain.</param>
+    /// <param name="sourceId">来源应用的 SMTC 标识，保留调用方的来源上下文。</param>
     /// <param name="title">曲名。/ Title.</param>
     /// <param name="artist">歌手。/ Artist.</param>
     /// <param name="durationSeconds">曲目时长（秒）；不可用时传 null。/ Track duration in seconds, or null when unavailable.</param>
     public void RequestOnlineLyrics(string sessionId, string sourceId, string title, string artist, double? durationSeconds)
     {
-        if (string.IsNullOrWhiteSpace(sessionId) || string.IsNullOrWhiteSpace(title) ||
+        if (_disposed || string.IsNullOrWhiteSpace(sessionId) || string.IsNullOrWhiteSpace(title) ||
             !LyricsMediaEligibilityPolicy.ShouldFetch(sourceId, false, SettingsManager.Current.AllowBrowserAndVideoLyrics))
         {
             return;
         }
 
-        var key = BuildLyricsKey(sessionId, title, artist);
+        var request = new LyricsRequest(title, artist, string.Empty, durationSeconds is > 0 ? durationSeconds : null, null);
+        // The service snapshot has no album field; reuse the matching request already read from SMTC.
+        var key = _lastLyricsKey is { } last && last.SessionId == sessionId &&
+                  last.Request.Title == title && last.Request.Artist == artist &&
+                  last.Request.DurationSeconds == request.DurationSeconds
+            ? last : (sessionId, request);
         if (_lyricsCache.TryGetValue(key, out _) || !_pendingLyrics.Add(key))
         {
             return;
         }
 
-        _ = LoadLyricsAsync(
-            key,
-            sourceId,
-            title,
-            artist,
-            string.Empty,
-            durationSeconds is > 0 ? durationSeconds : null);
+        _ = LoadLyricsAsync(key);
     }
 
-    private async Task LoadLyricsAsync(
-        string key,
-        string sourceId,
-        string title,
-        string artist,
-        string album,
-        double? durationSeconds)
+    private async Task LoadLyricsAsync((string SessionId, LyricsRequest Request) key)
     {
         var generation = _lyricsCacheGeneration;
         try
         {
-            var request = new LyricsRequest(
-                title,
-                artist,
-                album,
-                durationSeconds,
-                NetEaseSongId: null,
-                SourceAppId: sourceId);
-            var result = await _lyricsService.GetLyricsAsync(request, CancellationToken.None);
+            var result = await _lyricsService.GetLyricsAsync(key.Request, _lifetime.Token);
 
-            // 取词过程中设置若被改过（来源、严格度、署名行过滤），这次结果已经不属于当前配置，写入只会让用户以为设置没生效。
-            // If the settings changed while this retrieval ran (sources, strictness, credit filtering), the result no longer belongs
+            // 取词过程中设置若被改过（来源、署名行过滤），这次结果已经不属于当前配置，写入只会让用户以为设置没生效。
+            // If the settings changed while this retrieval ran (sources, credit filtering), the result no longer belongs
             // to the current configuration and writing it would only make the setting look ineffective.
-            if (generation == _lyricsCacheGeneration)
+            if (!_disposed && generation == _lyricsCacheGeneration)
             {
-                _lyricsCache.Set(key, result);
+                _lyricsCache.Set(key, result, LyricsCacheRetentionPolicy.Lifetime(result));
             }
         }
         catch
         {
-            if (generation == _lyricsCacheGeneration)
+            if (!_disposed && generation == _lyricsCacheGeneration)
             {
-                _lyricsCache.Set(key, null);
+                _lyricsCache.Set(key, null, LyricsCacheRetentionPolicy.Lifetime(null));
             }
         }
         finally
         {
             _pendingLyrics.Remove(key);
-            EnrichmentCompleted?.Invoke();
+            if (!_disposed) EnrichmentCompleted?.Invoke();
         }
     }
 

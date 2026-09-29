@@ -1,7 +1,16 @@
 namespace AFMediaBar.Classes.Models;
 
+/// <summary>已完成取词的有效状态；请求或解析失败用 null 表示，不参与排序。</summary>
+public enum LyricsResultStatus
+{
+    /// <summary>有可用歌词。</summary>
+    Available,
+    /// <summary>来源已成功响应并确认没有歌词。</summary>
+    NoLyrics
+}
+
 /// <summary>
-/// 歌词结果：一个来源命中的歌词文档及其来源标识。
+/// 歌词结果：一个来源命中的歌词文档及其来源标识；确认无歌词时保留分数并携带空文档。
 /// Lyrics result: the lyric document one source matched, together with that source's identifier.
 ///
 /// 解析在取词侧完成，因此这里携带的是已解析的 <see cref="LyricDocument"/>，而不是原始文本；呈现层只做按位置选行，
@@ -15,4 +24,15 @@ namespace AFMediaBar.Classes.Models;
 /// </summary>
 /// <param name="Source">歌词来源标识（如 "Netease"、"LRCLIB"），只用于诊断 / Source identifier such as "Netease" or "LRCLIB"; diagnostics only.</param>
 /// <param name="Document">该来源命中的歌词文档 / The lyric document this source matched.</param>
-public sealed record LyricsResult(string Source, LyricDocument Document);
+public sealed record LyricsResult(string Source, LyricDocument Document)
+{
+    /// <summary>获取侧计算的匹配分（0–100），用于备用结果排序。/ Retrieval-side metadata score for fallback ranking.</summary>
+    public int MatchScore { get; init; }
+
+    /// <summary>有效取词结果的状态；无歌词也保留曲目匹配分。</summary>
+    public LyricsResultStatus Status { get; init; } = LyricsResultStatus.Available;
+
+    /// <summary>创建确认无歌词的结果；空文档沿用现有呈现与缓存接口。</summary>
+    public static LyricsResult NoLyrics(string source, int score = 0) =>
+        new(source, LyricDocument.Empty) { Status = LyricsResultStatus.NoLyrics, MatchScore = score };
+}

@@ -20,7 +20,7 @@ namespace AFMediaBar.Classes.Services;
 /// Coordinates the session catalog, source selection, snapshot building, and source enrichers,
 /// publishing a unified state to ViewModels.
 /// </summary>
-public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanner
+public sealed class MediaSessionService : IDisposable
 {
     private readonly MediaSourceRegistry _sources;
     private readonly MediaSessionCatalog _catalog;
@@ -83,7 +83,6 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
     /// exactly one is deliberate: it only has to block repeats for the same track, a track change must allow a new one, and an unbounded set
     /// would grow for as long as playback lasts.
     /// </summary>
-    private string? _fallbackLyricsKey;
 
     /// <summary>最近一次写进日志的快照指纹；相同则不再重复记录（时间戳每次轮询都变，否则会刷屏）。/ Signature of the last logged snapshot; an identical one is not logged again, since the timestamp changes on every poll.</summary>
     private string? _loggedSnapshotSignature;
@@ -603,9 +602,7 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
         else
             PublishResolved(ResolveSnapshot(_sessionSnapshot));
 
-        // 提供器报"没有可读的媒体"时，它是每 233 毫秒报一次，因此这里必须用"同一个键只请求一次"挡住重复兜底取词。
-        // When a provider reports "no readable media" it does so every 233 ms, so a repeated fallback retrieval is blocked here by
-        // requesting once per key.
+        // 提供器可能每 233 毫秒报告读取失败；快照构建器负责在途去重和失败冷却，允许网络恢复后重试。
         if (snapshot is null)
         {
             TryRequestFallbackLyrics();
@@ -616,13 +613,13 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
     /// 在来源提供器读不出媒体时为当前 SMTC 会话发起一次在线取词兜底。
     ///
     /// 判据是"提供器已经明确报过它没有可读的媒体"（<see cref="MediaEnrichmentFallbackPolicy"/>）：提供器还没发布过任何
-    /// 快照时它只是还没跑完第一轮轮询，那时兜底会在每次切歌的头 233 毫秒里白发一次请求。同一个"来源 + 曲名 + 歌手"只请求
-    /// 一次，重复的请求由歌词缓存与键门闩一起挡住。
+    /// 快照时它只是还没跑完第一轮轮询，那时兜底会在每次切歌的头 233 毫秒里白发一次请求。
+    /// 重复请求由歌词缓存与在途去重挡住，临时失败在冷却后允许重试。
     /// Starts one online-lyric fallback for the current SMTC session when its source provider cannot read any media.
     ///
     /// The condition is that the provider has already reported having no readable media (<see cref="MediaEnrichmentFallbackPolicy"/>): before
     /// it has published anything it has merely not finished its first poll, and a fallback then would waste one request during the first
-    /// 233 ms of every track change. One "source + title + artist" is requested once, and the lyric cache plus the key latch block repeats.
+    /// 233 ms of every track change. The lyric cache and in-flight lookup set block repeats while allowing failed requests to retry after a cooldown.
     /// </summary>
     private void TryRequestFallbackLyrics()
     {
@@ -642,12 +639,6 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
             return;
         }
 
-        var key = $"{baseline.SourceId}\u001f{baseline.Title}\u001f{baseline.Artist}";
-        if (string.Equals(key, _fallbackLyricsKey, StringComparison.Ordinal))
-        {
-            return;
-        }
-
         // 会话标识必须是选中的那一个：歌词缓存键由它构成，兜底取回的结果要靠同一个键才会被下一次 Build 认领。
         // The session identifier has to be the selected one: it makes up the lyric cache key, and only the same key lets the next Build
         // claim the result the fallback fetched.
@@ -657,7 +648,6 @@ public sealed class MediaSessionService : IDisposable, IMediaSessionSourceScanne
             return;
         }
 
-        _fallbackLyricsKey = key;
         _snapshotBuilder.RequestOnlineLyrics(
             sessionKey,
             baseline.SourceId,

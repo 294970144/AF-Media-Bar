@@ -81,7 +81,11 @@ public static class LyricsSecondaryLinePolicy
             _ => nextLine
         };
 
-        return string.IsNullOrWhiteSpace(value) ? null : value;
+        // Some lyric sources mark untranslated lines with "//"; it must not consume the secondary row or block fallback.
+        return string.IsNullOrWhiteSpace(value) ||
+            (mode == LyricsSecondaryLineMode.Translation && value.Trim() == "//")
+            ? null
+            : value;
     }
 }
 

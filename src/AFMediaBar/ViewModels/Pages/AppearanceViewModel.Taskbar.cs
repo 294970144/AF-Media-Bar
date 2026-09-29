@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace AFMediaBar.ViewModels.Pages;
 
+/// <summary>提供外观页中的任务栏布局与交互按钮设置。</summary>
 public partial class AppearanceViewModel
 {
     public TaskbarInformationDensity InteractionButtonSize

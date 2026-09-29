@@ -280,10 +280,23 @@ html, body {
   flex-direction: column;
   gap: var(--row-gap);
   transform: none;
+  translate: 0 0;
+  transition: translate 560ms cubic-bezier(0.22, 0.72, 0.24, 1);
+}
+
+/* Reserve the roll slots, but center the visible row and suppress an empty secondary row. */
+.layout.single-line .track {
+  translate: 0 var(--single-line-offset, 0px);
+}
+
+.layout.single-line .track > .next-line:not(.promoting):not(.incoming-line) {
+  opacity: 0 !important;
 }
 
 .track.animating {
-  transition: transform 560ms cubic-bezier(0.22, 0.72, 0.24, 1);
+  transition:
+    transform 560ms cubic-bezier(0.22, 0.72, 0.24, 1),
+    translate 560ms cubic-bezier(0.22, 0.72, 0.24, 1);
   will-change: transform;
 }
 
@@ -573,10 +586,12 @@ html, body {
     will-change: auto;
   }
 
+  .line,
   .line.word-scan-smoothing {
     transition: none;
   }
 
+  .track,
   .track.animating {
     transition: none;
     will-change: auto;

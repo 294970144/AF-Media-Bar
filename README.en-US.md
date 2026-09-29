@@ -38,13 +38,13 @@ Download a release package rather than GitHub's generated Source code archive. T
 | Area | What you can do |
 | --- | --- |
 | Playback | Previous, play/pause, next, repeat, and click-to-position or draggable progress. |
-| Taskbar lyrics | Live lyrics rendered by the web lyrics engine, with translation, romanization, and two-line alignment; sources are tried in order: NetEase Cloud Music, LRCLIB, QQ Music, Kugou Music, and Soda Music |
+| Taskbar lyrics | Live lyrics rendered by the web lyrics engine, with translation, romanization, and two-line alignment; enabled QQ Music is searched first; candidates require a score of 85, otherwise other enabled sources are queried in parallel and the highest score wins, including confirmed absence of lyrics |
 | Sources and clicks | Switch media sessions; assign artwork and title/lyric clicks to play/pause, activate the media app, or open the full menu |
 | Audio and system | Click or scroll to switch the default output device, adjust the current media app's volume, and view spatial audio; four spectrum styles and a performance metrics component |
 | Layout and appearance | Avoid taskbar icons and system areas; select a display, auto-hide when nothing plays, and adjust fonts, accent colour, and window material |
 | Shortcuts | Hover for controls, open the full layer for more information, use the note icon for quick launch, and quickly switch output devices |
 
-**Limits:** Most players need to publish a Windows GSMTC session; some require “system media controls” or “media keys” in their settings. NetEase Cloud Music can also be discovered through memory reading, including the Store version without SMTC. Memory data takes priority for track information and lyrics; playback controls still require its SMTC support. NetEase appears once in the source list, and hiding it with source filtering enabled stops memory reading. Taskbar is the only runtime mode; Dynamic Island, Desktop Card, and Floating Orb in Settings are placeholders.
+**Limits:** Most players need to publish a Windows GSMTC session; some require “system media controls” or “media keys” in their settings. NetEase Cloud Music can also be discovered through memory reading, including the Store version without SMTC. Memory data takes priority for track information and lyrics; artwork and playback controls require its SMTC support. Artwork is read only from SMTC, without separate downloads; no artwork is shown when SMTC has none for the same track. NetEase appears once in the source list, and hiding it with source filtering enabled stops memory reading. Taskbar is the only runtime mode; Dynamic Island, Desktop Card, and Floating Orb in Settings are placeholders.
 
 ## How it works
 
@@ -83,7 +83,7 @@ Remove-Item "$env:LOCALAPPDATA\AFMediaBar" -Recurse -Force
 
 - No telemetry, ads, account system, or analytics; media information, system metrics, and volume operations are all handled locally.
 - The update check requests two public manifest endpoints (`docs/latest.json` on `raw.githubusercontent.com` and jsDelivr).
-- Lyrics are requested from the public endpoints of the five sources above (one request per source, stopping at the first hit) and send only title, artist, album, and duration.
+- Lyrics search QQ Music first and download lyrics only for matches scoring at least 85; other enabled sources are queried in parallel on a miss. Online searches use track and artist metadata; a source may make multiple requests for search and lyric retrieval. Sources can be disabled in Settings.
 - The app runs with the current user's rights and requests no elevation. Report security issues privately as described in [SECURITY.md](SECURITY.md).
 
 ## Building from Source

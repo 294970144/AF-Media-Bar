@@ -20,11 +20,11 @@ namespace AFMediaBar.Classes.Services.Lyrics;
 ///   lyrics.
 ///
 /// 因此主文本取自新端点的逐字字段**只在它确实被识别成逐字格式时**，否则回落到旧端点的行级正文；译文与音译分别取
-/// 两个端点的并集（逐字优先）。主文本候选按顺序尝试，第一个能产出非空行的胜出，全部为空时返回 null 让兜底链继续。
+/// 两个端点的并集（逐字优先）。主文本候选按顺序尝试，第一个能产出非空行的胜出，仅在明确无歌词标记时返回无歌词结果，否则全部为空视为失败。
 /// The main text therefore comes from the new endpoint's syllable field only when that field really is recognized as a syllable
 /// format, and otherwise falls back to the legacy endpoint's line-level body; translation and romanization take the union of
 /// both endpoints with the syllable variant first. Candidates are tried in order and the first one that yields lines wins; when
-/// every candidate is empty the merge returns null so the fallback chain continues.
+/// every candidate is empty, explicit no-lyrics markers yield a valid no-lyrics result; otherwise the lookup fails.
 /// </summary>
 public static class NetEaseLyricMerge
 {
@@ -36,7 +36,7 @@ public static class NetEaseLyricMerge
     /// <param name="legacy">旧端点结果，缺失为 null / Legacy endpoint result, null when unavailable.</param>
     /// <param name="wordLevel">新端点结果，缺失为 null / New endpoint result, null when unavailable.</param>
     /// <param name="request">歌词请求，提供信息行判定与时长 / Lyric request supplying info-line classification and duration.</param>
-    /// <returns>歌词结果；没有可用行时为 null / The lyric result, or null without usable lines.</returns>
+    /// <returns>歌词结果；无歌词标记也返回有效结果；无匹配内容及失败为 null。</returns>
     public static LyricsResult? Resolve(
         string sourceName,
         LyricResult? legacy,
@@ -61,7 +61,11 @@ public static class NetEaseLyricMerge
             }
         }
 
-        return null;
+        // 无歌词是歌曲身份已确认后的有效结果；不能丢掉它让低分来源覆盖。
+        // 空白正文或解析失败本身不足以证明纯音乐，必须有成功响应的明确标记。
+        return legacy is { Code: 200, Nolyric: true } || wordLevel is { Code: 200, Nolyric: true }
+            ? LyricsResult.NoLyrics(sourceName)
+            : null;
     }
 
     private static IEnumerable<string> EnumerateMainTexts(LyricResult? legacy, LyricResult? wordLevel)
@@ -98,7 +102,7 @@ public static class NetEaseLyricMerge
         }
     }
 
-    private static bool HasLyrics(LyricResult? result) => result is not null && !result.Nolyric;
+    private static bool HasLyrics(LyricResult? result) => result is { Code: 200, Nolyric: false };
 
     /// <summary>
     /// 判断逐字字段是否可以当作主文本：只有被识别成逐字或标记格式的文本才算，署名 JSON 不算。

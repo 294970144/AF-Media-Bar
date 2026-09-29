@@ -89,7 +89,8 @@ public sealed class TaskbarOccupiedAreaService
                     ? now - activeProbe.StartedAtUtc >= FailedProbeCooldown
                     : activeProbe.Generation != _cacheGeneration || now - activeProbe.StartedAtUtc > ProbeResultTimeout))
             {
-                // Failed scans wait briefly before retrying; expired UIA scans still release only this taskbar's slot.
+                // Failed scans wait briefly before retrying; expired UIA results release this cache slot,
+                // but the probe keeps its single worker and coalesces queued requests for this taskbar.
                 _activeProbes.Remove(key);
                 availableCache = [];
             }
@@ -203,7 +204,7 @@ public sealed class TaskbarOccupiedAreaService
             if (_activeProbes.TryGetValue(key, out var activeProbe) && probeId == activeProbe.Id)
             {
                 // A missing taskbar HWND may persist while a shell flyout is open. Retain a
-                // failed slot briefly instead of launching another MTA thread every UI tick.
+                // failed slot briefly instead of queuing another probe every UI tick.
                 _activeProbes[key] = activeProbe with { StartedAtUtc = _utcNow(), IsFailed = true };
                 var staleFailures = _activeProbes.Where(pair => pair.Value.IsFailed)
                     .OrderBy(pair => pair.Value.StartedAtUtc)

@@ -3,8 +3,8 @@ using AFMediaBar.Classes.Models;
 namespace AFMediaBar.Classes.Abstractions;
 
 /// <summary>
-/// 单个歌词源：返回该源命中的歌词，未命中返回 null。
-/// A single lyric source; returns matched lyrics or null when it has nothing.
+/// 单个歌词源：有歌词或确认无歌词均返回有效结果，未匹配及请求/解析失败返回 null。
+/// A lyric source returns lyrics or confirmed absence; unmatched or failed lookups return null.
 /// </summary>
 public interface ILyricsProvider
 {
@@ -16,7 +16,7 @@ public interface ILyricsProvider
     /// </summary>
     /// <param name="request">歌词查询请求 / Lyric query request.</param>
     /// <param name="cancellationToken">取消令牌 / Cancellation token.</param>
-    /// <returns>命中的歌词或 null / Matched lyrics or null.</returns>
+    /// <returns>有歌词或确认无歌词的结果；失败为 null。</returns>
     Task<LyricsResult?> GetLyricsAsync(
         LyricsRequest request,
         CancellationToken cancellationToken);

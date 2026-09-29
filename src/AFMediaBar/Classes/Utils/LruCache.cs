@@ -20,6 +20,7 @@ public sealed class LruCache<TKey, TValue> where TKey : notnull
     private readonly int _capacity;
     private readonly Func<TValue, long>? _costSelector;
     private readonly long _maximumCost;
+    private readonly TimeProvider _timeProvider;
     private readonly Dictionary<TKey, LinkedListNode<CacheEntry>> _map;
     private readonly LinkedList<CacheEntry> _lruList = [];
     private readonly object _sync = new();
@@ -30,6 +31,8 @@ public sealed class LruCache<TKey, TValue> where TKey : notnull
         public TKey Key { get; } = key;
         public TValue Value { get; set; } = value;
         public long Cost { get; set; } = cost;
+        public long WrittenAt { get; set; }
+        public TimeSpan? Lifetime { get; set; }
     }
 
     /// <summary>创建只按条数封顶的缓存。/ Creates a cache capped by entry count alone.</summary>
@@ -45,8 +48,9 @@ public sealed class LruCache<TKey, TValue> where TKey : notnull
     /// </summary>
     /// <param name="capacity">最大条数。/ Maximum number of entries.</param>
     /// <param name="costSelector">取单条代价的函数；为空时只按条数封顶。/ Cost selector for one entry, or null to cap by entry count alone.</param>
-    /// <param name="maximumCost">总代价上限；小于等于 0 时表示不限制。/ Total cost ceiling, with zero or less meaning no limit.</param>
-    public LruCache(int capacity, Func<TValue, long>? costSelector, long maximumCost)
+    /// <param name="maximumCost">总代价上限；0 表示不限制，负值无效。</param>
+    /// <param name="timeProvider">过期检查使用的单调时钟；省略时使用系统时钟。</param>
+    public LruCache(int capacity, Func<TValue, long>? costSelector, long maximumCost, TimeProvider? timeProvider = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(capacity);
         ArgumentOutOfRangeException.ThrowIfNegative(maximumCost);
@@ -54,6 +58,7 @@ public sealed class LruCache<TKey, TValue> where TKey : notnull
         _capacity = capacity;
         _costSelector = costSelector;
         _maximumCost = costSelector is null ? 0 : maximumCost;
+        _timeProvider = timeProvider ?? TimeProvider.System;
         _map = new Dictionary<TKey, LinkedListNode<CacheEntry>>(capacity);
     }
 
@@ -89,8 +94,21 @@ public sealed class LruCache<TKey, TValue> where TKey : notnull
     {
         lock (_sync)
         {
+            if (key is null)
+            {
+                value = default;
+                return false;
+            }
+
             if (_map.TryGetValue(key, out var node))
             {
+                if (node.Value.Lifetime is { } lifetime &&
+                    _timeProvider.GetElapsedTime(node.Value.WrittenAt) >= lifetime)
+                {
+                    Remove(node);
+                    value = default;
+                    return false;
+                }
                 _lruList.Remove(node);
                 _lruList.AddFirst(node);
                 value = node.Value.Value;
@@ -109,26 +127,43 @@ public sealed class LruCache<TKey, TValue> where TKey : notnull
     /// </summary>
     /// <param name="key">键。/ Key.</param>
     /// <param name="value">值。/ Value.</param>
-    public void Set(TKey key, TValue value)
+    /// <param name="lifetime">可选有效期，从写入时计算；读取不会延长。必须为正值。</param>
+    /// <exception cref="ArgumentOutOfRangeException">代价为负或有效期不为正。</exception>
+    /// <exception cref="OverflowException">总代价超过 Int64 范围；保留原缓存状态。</exception>
+    public void Set(TKey key, TValue value, TimeSpan? lifetime = null)
     {
+        ArgumentNullException.ThrowIfNull(key);
+        if (lifetime is { } duration && duration <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(lifetime));
+        // Estimation may walk an entire lyric document; keep caller work outside the cache lock.
+        var cost = CostOf(value);
+        ArgumentOutOfRangeException.ThrowIfNegative(cost);
         lock (_sync)
         {
-            var cost = CostOf(value);
             if (_map.TryGetValue(key, out var existing))
             {
-                _currentCost += cost - existing.Value.Cost;
+                var updatedCost = checked(_currentCost - existing.Value.Cost + cost);
+                var writtenAt = _timeProvider.GetTimestamp();
                 existing.Value.Value = value;
                 existing.Value.Cost = cost;
+                existing.Value.WrittenAt = writtenAt;
+                existing.Value.Lifetime = lifetime;
+                _currentCost = updatedCost;
                 _lruList.Remove(existing);
                 _lruList.AddFirst(existing);
                 TrimToLimits();
                 return;
             }
 
-            var node = new LinkedListNode<CacheEntry>(new CacheEntry(key, value, cost));
+            var totalCost = checked(_currentCost + cost);
+            var node = new LinkedListNode<CacheEntry>(new CacheEntry(key, value, cost)
+            {
+                WrittenAt = _timeProvider.GetTimestamp(),
+                Lifetime = lifetime
+            });
+            _map.Add(key, node);
             _lruList.AddFirst(node);
-            _map[key] = node;
-            _currentCost += cost;
+            _currentCost = totalCost;
 
             TrimToLimits();
         }
@@ -149,6 +184,13 @@ public sealed class LruCache<TKey, TValue> where TKey : notnull
     }
 
     private long CostOf(TValue value) => _costSelector?.Invoke(value) ?? 0;
+
+    private void Remove(LinkedListNode<CacheEntry> node)
+    {
+        _map.Remove(node.Value.Key);
+        _lruList.Remove(node);
+        _currentCost -= node.Value.Cost;
+    }
 
     /// <summary>
     /// 淘汰最久未使用的条目，直到条数与总代价都在上限内。
@@ -171,9 +213,7 @@ public sealed class LruCache<TKey, TValue> where TKey : notnull
                 return;
             }
 
-            _lruList.RemoveLast();
-            _map.Remove(leastRecent.Value.Key);
-            _currentCost -= leastRecent.Value.Cost;
+            Remove(leastRecent);
         }
     }
 }

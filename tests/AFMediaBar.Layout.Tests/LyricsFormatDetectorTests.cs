@@ -70,9 +70,9 @@ public sealed class LyricsFormatDetectorTests
     [TestMethod]
     public void QrcFullUnwrapKeepsTheNewlinesInsideTheAttribute()
     {
-        // 回归（实测 QQ 音乐本地缓存）：LyricContent 属性里的字面换行若被 XML 属性值规范化折成空格，
+        // QRC 格式回归：LyricContent 属性里的字面换行若被 XML 属性值规范化折成空格，
         // 整首歌词会黏成一行、库只认出元数据头，最终一首有词的歌被判成未命中。
-        // Regression (measured on the QQ Music local cache): when the literal newlines inside the LyricContent attribute are
+        // QRC regression: when the literal newlines inside the LyricContent attribute are
         // folded into spaces by XML attribute-value normalization, the whole lyric glues into one line, the library reads the
         // metadata header only, and a track that does have lyrics ends up reported as a miss.
         const string xml =
