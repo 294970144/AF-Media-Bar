@@ -535,29 +535,22 @@ public partial class AudioControlViewModel : ObservableObject, IDisposable
     private void OnTrayTooltipOpening(object? sender, EventArgs e)
     {
         // Shell 气泡打开时再次读取实时值；首次指向图标的读取已由鼠标移动消息提前触发。
-        _appliedTrayWheelSlot = null;
-        _trayWheelResultShown = false;
-        if (SettingsManager.Current.Interaction.ShowWheelTooltips)
-            _trayTooltipTimer.Start();
+        _trayTooltipTimer.Start();
         QueueTrayTooltipRefresh();
     }
 
     private void OnTrayPointerMovedOverIcon(object? sender, EventArgs e)
     {
-        if (_trayTooltipTimer.IsEnabled || !SettingsManager.Current.Interaction.ShowWheelTooltips)
+        if (_trayTooltipTimer.IsEnabled)
             return;
 
         // 先于 Shell 的气泡打开通知读取系统状态，避免第一次悬停显示上次缓存的设备或音量。
-        _appliedTrayWheelSlot = null;
-        _trayWheelResultShown = false;
         _trayTooltipTimer.Start();
         QueueTrayTooltipRefresh();
     }
 
     private void OnInteractionSettingsChanged(object? sender, EventArgs e)
     {
-        if (!SettingsManager.Current.Interaction.ShowWheelTooltips)
-            _trayTooltipTimer.Stop();
         QueueTrayTooltipRefresh();
     }
 
@@ -572,13 +565,9 @@ public partial class AudioControlViewModel : ObservableObject, IDisposable
         try
         {
             var settings = SettingsManager.Current.Interaction.Normalize();
-            if (!settings.ShowWheelTooltips)
-            {
-                if (!_disposed && version == _tooltipRefreshVersion)
-                    _trayIconService.UpdateTooltip("AF Media Bar");
-                return;
-            }
-            var slot = ChordWheelHeld ? WheelGestureSlot.Chord : WheelGestureSlot.Primary;
+            var slot = settings.ShowWheelTooltips && ChordWheelHeld
+                ? WheelGestureSlot.Chord
+                : WheelGestureSlot.Primary;
             if (_trayWheelResultShown && slot == _appliedTrayWheelSlot && DateTime.UtcNow < _trayWheelResultUntilUtc)
                 return;
 
@@ -587,12 +576,15 @@ public partial class AudioControlViewModel : ObservableObject, IDisposable
             var behavior = slot == WheelGestureSlot.Chord
                 ? (TrayChordWheelEnabled ? settings.TrayChordWheelAction : TrayWheelBehavior.Disabled)
                 : settings.TrayPrimaryWheelAction;
-            if (behavior == TrayWheelBehavior.Disabled)
+            if (behavior == TrayWheelBehavior.Disabled && settings.ShowWheelTooltips)
             {
                 if (!_disposed && version == _tooltipRefreshVersion)
                     _trayIconService.UpdateTooltip("AF Media Bar");
                 return;
             }
+            // Even with no wheel binding, the tray remains a useful audio-status surface.
+            if (behavior == TrayWheelBehavior.Disabled)
+                behavior = TrayWheelBehavior.SwitchOutputDevice;
             ApplicationVolumeSnapshot? application = null;
             AudioDeviceOption? device = null;
             if (behavior == TrayWheelBehavior.AdjustVolume)
@@ -607,17 +599,18 @@ public partial class AudioControlViewModel : ObservableObject, IDisposable
                 device = devices.FirstOrDefault(candidate => candidate.IsDefault) ?? devices.FirstOrDefault();
             }
 
-            // 悬停提示说明"滚轮现在做什么"，并把当前结果附在后面：用户既知道手势会做什么，也知道它此刻的值。
-            // The hover hint states what the wheel does right now and appends the current value, so the user learns both the gesture
-            // and where it currently stands.
-            var hint = WheelTooltipPolicy.BuildHint(
-                slot,
-                settings.Modifier,
-                WheelTooltipPolicy.BuildActionName(behavior));
-            var currentValue = behavior == TrayWheelBehavior.AdjustVolume
-                ? BuildVolumeDetail(application)
-                : device?.DisplayName;
-            var text = WheelTooltipPolicy.BuildHintWithValue(hint, currentValue);
+            // 关闭滚轮操作提示只去掉手势说明；当前设备/音量仍用悬停层组件同款状态文案。
+            // Disabling wheel hints removes only the gesture description; the current device/volume uses the same status text as the hover controls.
+            var text = settings.ShowWheelTooltips
+                ? WheelTooltipPolicy.BuildHintWithValue(
+                    WheelTooltipPolicy.BuildHint(
+                        slot,
+                        settings.Modifier,
+                        WheelTooltipPolicy.BuildActionName(behavior)),
+                    behavior == TrayWheelBehavior.AdjustVolume
+                        ? BuildVolumeDetail(application)
+                        : device?.DisplayName)
+                : AudioTooltipPolicy.Build(behavior, application, device);
 
             if (!_disposed && version == _tooltipRefreshVersion)
             {
@@ -672,13 +665,10 @@ public partial class AudioControlViewModel : ObservableObject, IDisposable
     private void SetTrayTooltip(string text)
     {
         _tooltipRefreshVersion++;
-        if (!SettingsManager.Current.Interaction.ShowWheelTooltips)
-        {
-            _trayIconService.UpdateTooltip("AF Media Bar");
-            return;
-        }
         // 暂留滚轮结果供确认，之后恢复实时读取，避免系统设置中的变化被旧结果永久遮住。
-        _appliedTrayWheelSlot = ChordWheelHeld ? WheelGestureSlot.Chord : WheelGestureSlot.Primary;
+        _appliedTrayWheelSlot = SettingsManager.Current.Interaction.ShowWheelTooltips && ChordWheelHeld
+            ? WheelGestureSlot.Chord
+            : WheelGestureSlot.Primary;
         _trayWheelResultShown = true;
         _trayWheelResultUntilUtc = DateTime.UtcNow.AddSeconds(1);
         _trayIconService.UpdateTooltip(text);

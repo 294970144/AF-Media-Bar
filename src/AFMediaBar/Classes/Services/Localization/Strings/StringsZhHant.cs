@@ -407,7 +407,7 @@ internal static class StringsZhHant
         table.Add("Interaction.Row.Modifier.Title", "組合滾輪按鍵");
         table.Add("Interaction.Row.PrimaryWheel.Description", "不按組合鍵時的滾輪行為");
         table.Add("Interaction.Row.WheelTooltip.Title", "顯示滾輪提示");
-        table.Add("Interaction.Row.WheelTooltip.Description", "懸停封面、歌詞或托盤圖示時顯示目前滾輪操作；未綁定的操作不顯示提示");
+        table.Add("Interaction.Row.WheelTooltip.Description", "懸停封面、歌詞或托盤圖示時顯示滾輪操作；關閉後托盤仍顯示目前裝置或音量及滾動結果");
         table.Add("Interaction.Row.TextClick.Title", "點擊標題或歌詞");
         table.Add("Interaction.Row.TrayChordWheel.Description", "暫時停用");
         table.Add("Interaction.Row.TrayClick.Description", "右鍵始終開啟功能表；此處設定左鍵單擊行為");

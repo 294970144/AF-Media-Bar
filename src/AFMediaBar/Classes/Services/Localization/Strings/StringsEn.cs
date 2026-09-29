@@ -407,7 +407,7 @@ internal static class StringsEn
         table.Add("Interaction.Row.Modifier.Title", "Chord wheel modifier");
         table.Add("Interaction.Row.PrimaryWheel.Description", "Wheel behavior while the modifier is not held");
         table.Add("Interaction.Row.WheelTooltip.Title", "Show wheel hints");
-        table.Add("Interaction.Row.WheelTooltip.Description", "Show the wheel action over artwork, lyrics, or the tray icon; unbound actions have no hint");
+        table.Add("Interaction.Row.WheelTooltip.Description", "Show wheel actions over artwork, lyrics, or the tray icon; tray device or volume status and wheel results remain visible when off");
         table.Add("Interaction.Row.TextClick.Title", "Title or lyrics click");
         table.Add("Interaction.Row.TrayChordWheel.Description", "Temporarily disabled");
         table.Add("Interaction.Row.TrayClick.Description", "The right button always opens the menu; this sets the left-click behavior");
