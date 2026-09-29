@@ -54,6 +54,7 @@ public sealed class ShellTrayIconService : IDisposable
     public event EventHandler? LeftClicked;
     public event EventHandler? ContextMenuRequested;
     public event EventHandler? TooltipOpening;
+    public event EventHandler? PointerMovedOverIcon;
     public event EventHandler? ShellRestarted;
 
     /// <summary>
@@ -168,7 +169,11 @@ public sealed class ShellTrayIconService : IDisposable
         }
 
         var notification = unchecked((int)(lParam.ToInt64() & 0xFFFF));
-        if (notification is NativeMethods.NIN_SELECT or NativeMethods.NIN_KEYSELECT)
+        if (notification == NativeMethods.WM_MOUSEMOVE)
+        {
+            PointerMovedOverIcon?.Invoke(this, EventArgs.Empty);
+        }
+        else if (notification is NativeMethods.NIN_SELECT or NativeMethods.NIN_KEYSELECT)
         {
             LeftClicked?.Invoke(this, EventArgs.Empty);
             handled = true;

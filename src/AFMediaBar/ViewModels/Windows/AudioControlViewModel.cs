@@ -53,6 +53,7 @@ public partial class AudioControlViewModel : ObservableObject, IDisposable
     private readonly DispatcherTimer _trayTooltipTimer;
     private WheelGestureSlot? _appliedTrayWheelSlot;
     private bool _trayWheelResultShown;
+    private DateTime _trayWheelResultUntilUtc;
     private bool _disposed;
 
     public ObservableCollection<AudioDeviceOption> OutputDevices { get; } = [];
@@ -110,13 +111,12 @@ public partial class AudioControlViewModel : ObservableObject, IDisposable
         _trayIconService.LeftClicked += OnTrayLeftClicked;
         _trayIconService.ContextMenuRequested += OnTrayContextMenuRequested;
         _trayIconService.TooltipOpening += OnTrayTooltipOpening;
+        _trayIconService.PointerMovedOverIcon += OnTrayPointerMovedOverIcon;
         _mouseInputMonitor.WheelChanged += OnTrayWheelChanged;
         _mediaSessionService.SnapshotChanged += OnMediaSnapshotChanged;
         SettingsManager.InteractionSettingsChanged += OnInteractionSettingsChanged;
-        // 气泡打开后按需轮询按键状态：托盘图标不提供按键事件，而"按住组合键"必须立刻反映到提示上。
-        // Poll the modifier state while the bubble is open: the shell tray icon offers no key events, and "hold the chord key" has to
-        // show up in the tooltip immediately.
-        _trayTooltipTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
+        // 指针停在图标上时定期读取系统音频状态；Shell 不会主动通知我们普通音量混音器的更改。
+        _trayTooltipTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(750) };
         _trayTooltipTimer.Tick += (_, _) => AdvanceTrayTooltipPoll();
         _mouseInputMonitor.Start();
         QueueTrayTooltipRefresh();
@@ -534,8 +534,20 @@ public partial class AudioControlViewModel : ObservableObject, IDisposable
 
     private void OnTrayTooltipOpening(object? sender, EventArgs e)
     {
-        // 每次气泡打开都从提示态开始，并启动按键轮询；指针离开图标后轮询自停。
-        // Every bubble starts in the hint state and starts the key poll, which stops itself once the pointer leaves the icon.
+        // Shell 气泡打开时再次读取实时值；首次指向图标的读取已由鼠标移动消息提前触发。
+        _appliedTrayWheelSlot = null;
+        _trayWheelResultShown = false;
+        if (SettingsManager.Current.Interaction.ShowWheelTooltips)
+            _trayTooltipTimer.Start();
+        QueueTrayTooltipRefresh();
+    }
+
+    private void OnTrayPointerMovedOverIcon(object? sender, EventArgs e)
+    {
+        if (_trayTooltipTimer.IsEnabled || !SettingsManager.Current.Interaction.ShowWheelTooltips)
+            return;
+
+        // 先于 Shell 的气泡打开通知读取系统状态，避免第一次悬停显示上次缓存的设备或音量。
         _appliedTrayWheelSlot = null;
         _trayWheelResultShown = false;
         _trayTooltipTimer.Start();
@@ -544,6 +556,8 @@ public partial class AudioControlViewModel : ObservableObject, IDisposable
 
     private void OnInteractionSettingsChanged(object? sender, EventArgs e)
     {
+        if (!SettingsManager.Current.Interaction.ShowWheelTooltips)
+            _trayTooltipTimer.Stop();
         QueueTrayTooltipRefresh();
     }
 
@@ -558,8 +572,14 @@ public partial class AudioControlViewModel : ObservableObject, IDisposable
         try
         {
             var settings = SettingsManager.Current.Interaction.Normalize();
+            if (!settings.ShowWheelTooltips)
+            {
+                if (!_disposed && version == _tooltipRefreshVersion)
+                    _trayIconService.UpdateTooltip("AF Media Bar");
+                return;
+            }
             var slot = ChordWheelHeld ? WheelGestureSlot.Chord : WheelGestureSlot.Primary;
-            if (_trayWheelResultShown && slot == _appliedTrayWheelSlot)
+            if (_trayWheelResultShown && slot == _appliedTrayWheelSlot && DateTime.UtcNow < _trayWheelResultUntilUtc)
                 return;
 
             _appliedTrayWheelSlot = slot;
@@ -567,6 +587,12 @@ public partial class AudioControlViewModel : ObservableObject, IDisposable
             var behavior = slot == WheelGestureSlot.Chord
                 ? (TrayChordWheelEnabled ? settings.TrayChordWheelAction : TrayWheelBehavior.Disabled)
                 : settings.TrayPrimaryWheelAction;
+            if (behavior == TrayWheelBehavior.Disabled)
+            {
+                if (!_disposed && version == _tooltipRefreshVersion)
+                    _trayIconService.UpdateTooltip("AF Media Bar");
+                return;
+            }
             ApplicationVolumeSnapshot? application = null;
             AudioDeviceOption? device = null;
             if (behavior == TrayWheelBehavior.AdjustVolume)
@@ -629,9 +655,8 @@ public partial class AudioControlViewModel : ObservableObject, IDisposable
         _mouseInputMonitor.IsRightButtonDown);
 
     /// <summary>
-    /// 托盘提示的按键轮询：气泡打开时启动，指针离开图标后自停，因此按键状态一变提示就跟着换槽位。
-    /// The tray tooltip's key poll: it starts when the bubble opens and stops once the pointer leaves the icon, so a modifier change
-    /// switches the hint to its own slot immediately.
+    /// 指针停在托盘图标上时重新读取音频状态，离开后停止轮询。
+    /// Refreshes audio state while the pointer rests on the tray icon and stops polling when it leaves.
     /// </summary>
     private void AdvanceTrayTooltipPoll()
     {
@@ -647,11 +672,15 @@ public partial class AudioControlViewModel : ObservableObject, IDisposable
     private void SetTrayTooltip(string text)
     {
         _tooltipRefreshVersion++;
-        // 滚轮动作的结果留在气泡上，直到按键状态变化或指针离开；否则轮询会在 120 ms 后把结果换回提示。
-        // The wheel result stays on the bubble until the modifier state changes or the pointer leaves; otherwise the poll would
-        // replace it with the hint 120 ms later.
+        if (!SettingsManager.Current.Interaction.ShowWheelTooltips)
+        {
+            _trayIconService.UpdateTooltip("AF Media Bar");
+            return;
+        }
+        // 暂留滚轮结果供确认，之后恢复实时读取，避免系统设置中的变化被旧结果永久遮住。
         _appliedTrayWheelSlot = ChordWheelHeld ? WheelGestureSlot.Chord : WheelGestureSlot.Primary;
         _trayWheelResultShown = true;
+        _trayWheelResultUntilUtc = DateTime.UtcNow.AddSeconds(1);
         _trayIconService.UpdateTooltip(text);
     }
 
@@ -669,6 +698,8 @@ public partial class AudioControlViewModel : ObservableObject, IDisposable
         _trayIconService.LeftClicked -= OnTrayLeftClicked;
         _trayIconService.ContextMenuRequested -= OnTrayContextMenuRequested;
         _trayIconService.TooltipOpening -= OnTrayTooltipOpening;
+        _trayIconService.PointerMovedOverIcon -= OnTrayPointerMovedOverIcon;
+        _trayTooltipTimer.Stop();
         _mouseInputMonitor.WheelChanged -= OnTrayWheelChanged;
         _mediaSessionService.SnapshotChanged -= OnMediaSnapshotChanged;
         SettingsManager.InteractionSettingsChanged -= OnInteractionSettingsChanged;
