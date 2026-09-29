@@ -110,7 +110,11 @@ internal static class StringsEn
         table.Add("Appearance.Font.PreviewLabel", "Preview");
         table.Add("Appearance.LatinFont.FollowSystem", "Follow the system");
         table.Add("Appearance.LatinFont.Sample", "Aa Bb 123");
-        table.Add("Appearance.Header.Subtitle", "Fonts, theme, window backdrop, and media-bar text");
+        table.Add("Appearance.Header.Subtitle", "Fonts, theme, media-bar width, and interaction button appearance");
+        table.Add("Appearance.Group.RestLayout", "Rest-layer appearance");
+        table.Add("Appearance.Group.InteractionButtons", "Interaction buttons");
+        table.Add("Appearance.Row.InteractionButtonSize.Title", "Interaction button size");
+        table.Add("Appearance.Row.InteractionButtonSize.Description", "Sizes buttons and icons in both the rest and hover layers");
         table.Add("Appearance.Motion.Detail.Full", "Keeps expansion, feedback, and spectrum transitions");
         table.Add("Appearance.Motion.Detail.Instant", "Follows the system setting to avoid transition latency");
         table.Add("Appearance.Motion.Detail.Reduced", "Blur, the marquee, and the continuous spectrum are turned off");
@@ -291,7 +295,7 @@ internal static class StringsEn
         table.Add("DisplayModes.Full.Row.Performance.Title", "Performance information");
         table.Add("DisplayModes.Full.Row.Preset.Description", "Applies one set of section visibilities in a single step");
         table.Add("DisplayModes.Full.Row.Preset.Title", "Apply a preset");
-        table.Add("DisplayModes.Header.Subtitle", "Where the media bar sits, how wide it is, and its three display states");
+        table.Add("DisplayModes.Header.Subtitle", "Where the media bar sits and which layer features are enabled");
         table.Add("DisplayModes.Hover.Expander.Description", "Chooses which controls appear on hover");
         table.Add("DisplayModes.Hover.Expander.Title", "Hover-layer controls");
         table.Add("DisplayModes.Hover.Group.Description", "Quick controls that appear when the pointer enters the media bar");
@@ -660,6 +664,9 @@ internal static class StringsEn
         table.Add("Application.Header.Subtitle", "Version and updates, interface language, run-at-startup, the settings file, and diagnostics");
         table.Add("Search.Appearance.Fonts.Description", "Latin font, Chinese font, and font weight");
         table.Add("Search.Appearance.MediaBarText.Description", "Color and size of the text on the media bar");
+        table.Add("Search.Appearance.MediaBarWidth.Description", "Media-bar width, fixed length, and component spacing");
+        table.Add("Search.Appearance.RestLayout.Description", "Rest-layer content layout, text alignment, and component order");
+        table.Add("Search.Appearance.InteractionButtons.Description", "Button size and spacing in the rest and hover layers");
         table.Add("Search.Appearance.ThemeAndBackdrop.Description", "Light or dark appearance, and the window backdrop material");
         table.Add("Search.DisplayModes.ChooseDisplayMode.Description", "Display mode used by the media bar: taskbar, dynamic island, desktop card, or floating ball");
         table.Add("Search.DisplayModes.FullLayer.Description", "Sections of the panel that opens when the media bar is clicked");

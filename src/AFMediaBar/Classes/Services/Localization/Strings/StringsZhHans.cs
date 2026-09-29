@@ -110,7 +110,11 @@ internal static class StringsZhHans
         table.Add("Appearance.Font.PreviewLabel", "预览");
         table.Add("Appearance.LatinFont.FollowSystem", "跟随系统");
         table.Add("Appearance.LatinFont.Sample", "Aa Bb 123");
-        table.Add("Appearance.Header.Subtitle", "字体、主题、窗口背景与媒体栏文字");
+        table.Add("Appearance.Header.Subtitle", "字体、主题、媒体栏宽度与交互按钮外观");
+        table.Add("Appearance.Group.RestLayout", "静置层外观");
+        table.Add("Appearance.Group.InteractionButtons", "交互按钮");
+        table.Add("Appearance.Row.InteractionButtonSize.Title", "交互按钮大小");
+        table.Add("Appearance.Row.InteractionButtonSize.Description", "同时调整静置层和悬停层按钮及图标的大小");
         table.Add("Appearance.Motion.Detail.Full", "保留展开、反馈和频谱过渡");
         table.Add("Appearance.Motion.Detail.Instant", "跟随系统设置，避免过渡延迟");
         table.Add("Appearance.Motion.Detail.Reduced", "已关闭模糊、跑马灯和连续频谱");
@@ -291,7 +295,7 @@ internal static class StringsZhHans
         table.Add("DisplayModes.Full.Row.Performance.Title", "性能信息");
         table.Add("DisplayModes.Full.Row.Preset.Description", "一次应用一组分区显隐方案");
         table.Add("DisplayModes.Full.Row.Preset.Title", "套用预设");
-        table.Add("DisplayModes.Header.Subtitle", "媒体栏的显示位置、宽度与三种显示状态");
+        table.Add("DisplayModes.Header.Subtitle", "媒体栏的显示位置与各层功能开关");
         table.Add("DisplayModes.Hover.Expander.Description", "选择悬停时出现的控制项");
         table.Add("DisplayModes.Hover.Expander.Title", "悬停层控制");
         table.Add("DisplayModes.Hover.Group.Description", "鼠标移入媒体栏时出现的快捷控制");
@@ -660,6 +664,9 @@ internal static class StringsZhHans
         table.Add("Application.Header.Subtitle", "版本与更新、界面语言、开机自启、设置文件与诊断日志");
         table.Add("Search.Appearance.Fonts.Description", "英文字体、中文字体与字体粗细");
         table.Add("Search.Appearance.MediaBarText.Description", "媒体栏上文字的颜色与大小");
+        table.Add("Search.Appearance.MediaBarWidth.Description", "媒体栏宽度、固定长度与组件间距");
+        table.Add("Search.Appearance.RestLayout.Description", "静置层内容排列、文字对齐与组件顺序");
+        table.Add("Search.Appearance.InteractionButtons.Description", "静置层和悬停层按钮的大小与间距");
         table.Add("Search.Appearance.ThemeAndBackdrop.Description", "浅色还是深色，以及窗口背景材质");
         table.Add("Search.DisplayModes.ChooseDisplayMode.Description", "选择任务栏、灵动岛、桌面卡片或悬浮球");
         table.Add("Search.DisplayModes.FullLayer.Description", "点击媒体栏展开的面板包含哪些分区");

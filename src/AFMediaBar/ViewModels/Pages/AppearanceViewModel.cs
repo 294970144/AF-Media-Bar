@@ -8,12 +8,13 @@ using AFMediaBar.Resources;
 namespace AFMediaBar.ViewModels.Pages;
 
 /// <summary>
-/// 外观页 ViewModel：管理字体、播放器文字、应用主题和窗口材质设置。
-/// Appearance-page ViewModel: manages font, player text, application theme, and window material settings.
+/// 外观页 ViewModel：管理字体、主题、窗口材质和媒体栏的视觉参数。
+/// Appearance-page ViewModel: manages fonts, theme, window material, and visual taskbar settings.
 /// </summary>
 public partial class AppearanceViewModel : ObservableObject
 {
     private readonly LocalizationService _localization;
+    private readonly TaskbarLengthConstraintsService _taskbarLengthConstraints;
     private LatinFontPreset _latinFont;
     private CjkFontPreset _cjkFont;
     private string _latinFontFamily;
@@ -41,9 +42,11 @@ public partial class AppearanceViewModel : ObservableObject
     /// view model is a singleton, so both subscriptions live as long as the process and no unsubscription is needed.
     /// </summary>
     /// <param name="localization">界面语言服务：本页在它变化后刷新自己产出的文案。/ The interface-language service, whose change this page follows to refresh its own text.</param>
-    public AppearanceViewModel(LocalizationService localization)
+    /// <param name="taskbarLengthConstraints">当前任务栏安全宽度范围。/ Current safe width range of the taskbar.</param>
+    public AppearanceViewModel(LocalizationService localization, TaskbarLengthConstraintsService taskbarLengthConstraints)
     {
         _localization = localization;
+        _taskbarLengthConstraints = taskbarLengthConstraints;
 
         var appearance = SettingsManager.Current.Appearance.Normalize();
         _latinFontChoices = InstalledFontCatalog.GetChoices("Appearance.LatinFont.FollowSystem", cjk: false);
@@ -61,6 +64,8 @@ public partial class AppearanceViewModel : ObservableObject
         _backdropTintOpacityPercent = appearance.ResolveBackdropTintOpacityPercent();
         SettingsManager.SettingsChanged += OnSettingsChanged;
         _localization.LanguageChanged += OnLanguageChanged;
+        _taskbarLengthConstraints.Changed += OnTaskbarLengthConstraintsChanged;
+        RefreshRestOrderEntries();
     }
 
     public LatinFontPreset LatinFont
@@ -260,7 +265,6 @@ public partial class AppearanceViewModel : ObservableObject
 
             SettingsManager.SetTaskbarExperienceSettings(
                 SettingsManager.Current.TaskbarExperience with { MediaFontSizePercent = value });
-            OnPropertyChanged();
         }
     }
 
@@ -284,6 +288,7 @@ public partial class AppearanceViewModel : ObservableObject
     private void OnLanguageChanged(object? sender, EventArgs e)
     {
         RefreshInstalledFonts();
+        RefreshRestOrderEntries();
         OnPropertyChanged(string.Empty);
     }
 
@@ -329,11 +334,16 @@ public partial class AppearanceViewModel : ObservableObject
 
     private void OnSettingsChanged(object? sender, SettingsChangedEventArgs e)
     {
-        // 媒体文字大小存在任务栏体验设置里，因此它的外部变化（例如显示模式页的重置）也要回写本页读数。
-        // The media text size lives in the taskbar experience settings, so an external change to it (the display-mode page's
-        // reset, for example) must be reflected in this page's reading too.
-        if (e.ResetScope is not (SettingsResetScope.Appearance or SettingsResetScope.All) &&
-            e.PropertyName != nameof(AppSettings.TaskbarExperience))
+        // 媒体栏外观仍存在任务栏体验设置里，外部写入或页面重置后要重读这些绑定。
+        // Taskbar appearance still lives in the experience settings, so external writes and page resets refresh these bindings.
+        if (e.ResetScope is null && e.PropertyName == nameof(AppSettings.TaskbarExperience))
+        {
+            OnPropertyChanged(nameof(MediaFontSizePercent));
+            RaiseTaskbarAppearance();
+            return;
+        }
+
+        if (e.ResetScope is not (SettingsResetScope.Appearance or SettingsResetScope.DisplayModes or SettingsResetScope.All))
             return;
 
         var appearance = SettingsManager.Current.Appearance;
@@ -351,8 +361,9 @@ public partial class AppearanceViewModel : ObservableObject
             AccentColorMode = appearance.AccentColorMode;
             AccentColorHex = appearance.AccentColor;
             BackdropTintOpacityPercent = appearance.ResolveBackdropTintOpacityPercent();
-            MediaFontSizePercent = SettingsManager.Current.TaskbarExperience.Normalize().MediaFontSizePercent;
         }
         finally { _isRefreshing = false; }
+        OnPropertyChanged(nameof(MediaFontSizePercent));
+        RaiseTaskbarAppearance();
     }
 }

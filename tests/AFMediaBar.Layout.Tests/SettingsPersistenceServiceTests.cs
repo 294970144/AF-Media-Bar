@@ -561,7 +561,7 @@ public sealed class SettingsPersistenceServiceTests
     public void UnimplementedDisplayModeSelectionDoesNotChangeRuntimeModeOrTaskbarSettings()
     {
         SettingsManager.Replace(new AppSettings());
-        var viewModel = new DisplayModesViewModel(new FakeDisplayMonitorService(), new TaskbarLengthConstraintsService(), new LocalizationService());
+        var viewModel = new DisplayModesViewModel(new FakeDisplayMonitorService(), new LocalizationService());
         var original = SettingsManager.Current.TaskbarExperience;
 
         viewModel.SwitchToFloatingBallModeCommand.Execute(null);
@@ -583,7 +583,7 @@ public sealed class SettingsPersistenceServiceTests
                 FullPanel = new TaskbarFullPanelSettings(true, false, false, false)
             }
         });
-        var viewModel = new DisplayModesViewModel(new FakeDisplayMonitorService(), new TaskbarLengthConstraintsService(), new LocalizationService());
+        var viewModel = new DisplayModesViewModel(new FakeDisplayMonitorService(), new LocalizationService());
 
         viewModel.FullPanelMediaInfoVisible = false;
         Assert.IsTrue(viewModel.FullPanelMediaInfoVisible);
@@ -610,7 +610,7 @@ public sealed class SettingsPersistenceServiceTests
     public void DisplayModesUpdatesIndependentNotificationAndTaskbarTargets()
     {
         SettingsManager.Replace(new AppSettings());
-        var viewModel = new DisplayModesViewModel(new FakeDisplayMonitorService(), new TaskbarLengthConstraintsService(), new LocalizationService());
+        var viewModel = new DisplayModesViewModel(new FakeDisplayMonitorService(), new LocalizationService());
 
         viewModel.TrackChangeNotificationEnabled = true;
         viewModel.ShowTrackChangeNotificationWhenFullscreen = true;
@@ -644,12 +644,12 @@ public sealed class SettingsPersistenceServiceTests
     }
 
     [TestMethod]
-    public void DisplayModesClampsFixedLengthToLiveTaskbarRange()
+    public void AppearanceClampsFixedLengthToLiveTaskbarRange()
     {
         SettingsManager.Replace(new AppSettings());
         var constraints = new TaskbarLengthConstraintsService();
         constraints.Update(280, 520);
-        var viewModel = new DisplayModesViewModel(new FakeDisplayMonitorService(), constraints, new LocalizationService());
+        var viewModel = new AppearanceViewModel(new LocalizationService(), constraints);
 
         viewModel.FollowMediaTextLength = false;
         viewModel.FixedTaskbarLengthDip = 900;
@@ -680,8 +680,17 @@ public sealed class SettingsPersistenceServiceTests
         SettingsManager.ResetLayout();
         Assert.AreEqual(WindowMode.Taskbar, SettingsManager.Current.WindowMode);
         Assert.AreEqual(700, SettingsManager.Current.Appearance.FontWeight);
+        SettingsManager.Current.TaskbarExperience = TaskbarExperienceSettings.Default with
+        {
+            Density = TaskbarInformationDensity.Information,
+            HoverButtonSpacingDip = 12,
+            SpectrumVisible = false
+        };
         SettingsManager.ResetAppearance();
         Assert.AreEqual(AppearanceSettings.Default, SettingsManager.Current.Appearance);
+        Assert.AreEqual(TaskbarExperienceSettings.Default.Density, SettingsManager.Current.TaskbarExperience.Density);
+        Assert.AreEqual(TaskbarExperienceSettings.Default.HoverButtonSpacingDip, SettingsManager.Current.TaskbarExperience.HoverButtonSpacingDip);
+        Assert.IsFalse(SettingsManager.Current.TaskbarExperience.SpectrumVisible);
 
         SettingsManager.Current.Interaction = GlobalInteractionSettings.Default with
         {
@@ -694,12 +703,16 @@ public sealed class SettingsPersistenceServiceTests
 
         SettingsManager.Current.TaskbarExperience = TaskbarExperienceSettings.Default with
         {
-            FullPanel = TaskbarFullPanelSettings.Compact
+            FullPanel = TaskbarFullPanelSettings.Compact,
+            Density = TaskbarInformationDensity.Information,
+            HoverButtonSpacingDip = 12
         };
         SettingsManager.Current.TrackChangeNotification = TrackChangeNotificationSettings.Default with { Enabled = true };
         SettingsManager.Current.TaskbarTargetMonitorDeviceIds = ["DISPLAY2"];
         SettingsManager.ResetDisplayModes();
         Assert.AreEqual(TaskbarFullPanelSettings.Full, SettingsManager.Current.TaskbarExperience.FullPanel);
+        Assert.AreEqual(TaskbarInformationDensity.Information, SettingsManager.Current.TaskbarExperience.Density);
+        Assert.AreEqual(12, SettingsManager.Current.TaskbarExperience.HoverButtonSpacingDip);
         Assert.IsTrue(SettingsManager.Current.TrackChangeNotification.Enabled);
         Assert.AreEqual(0, SettingsManager.Current.TaskbarTargetMonitorDeviceIds?.Count ?? 0);
         SettingsManager.Current.SmtcSourceFilter = new SmtcSourceFilterSettings(true, ["player"]);

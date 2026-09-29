@@ -441,21 +441,39 @@ public static class SettingsManager
         next.Appearance = defaults.Appearance;
         next.TaskbarSurface = defaults.TaskbarSurface;
         next.DynamicIslandSurface = defaults.DynamicIslandSurface;
-        // 媒体文字大小的界面位于外观页的「媒体栏文字」分组，因此它也属于这一页的重置作用域。
-        // 显示模式页的重置仍然重置同一份任务栏体验设置，两个入口重置同一组值不会互相矛盾——与灵动岛外观的处理相同。
-        // The media text size is presented in the appearance page's media-bar-text group, so it belongs to this page's reset scope
-        // too. The display-mode page's reset still resets the same taskbar experience settings, and both entries agreeing is what
-        // keeps "restore this page" honest — the same arrangement the island appearance already uses.
+        // 外观页仍写入原有 TaskbarExperience 字段；本页重置只恢复外观字段，不动各层功能开关。
         next.TaskbarExperience = next.TaskbarExperience with
         {
-            MediaFontSizePercent = defaults.TaskbarExperience.MediaFontSizePercent
+            MediaFontSizePercent = defaults.TaskbarExperience.MediaFontSizePercent,
+            Density = defaults.TaskbarExperience.Density,
+            ContentLayout = defaults.TaskbarExperience.ContentLayout,
+            MediaTextAlignment = defaults.TaskbarExperience.MediaTextAlignment,
+            ComponentSpacingDip = defaults.TaskbarExperience.ComponentSpacingDip,
+            HoverButtonSpacingDip = defaults.TaskbarExperience.HoverButtonSpacingDip,
+            LengthMode = defaults.TaskbarExperience.LengthMode,
+            FixedLengthDip = defaults.TaskbarExperience.FixedLengthDip,
+            RestComponentOrder = defaults.TaskbarExperience.RestComponentOrder
         };
         Replace(next, SettingsResetScope.Appearance);
     }
     public static void ResetDisplayModes()
     {
         var next = Current.Clone(); var defaults = Defaults;
-        next.TaskbarExperience = defaults.TaskbarExperience;
+        // 显示模式页只恢复各层功能；尺寸、间距、排列与文字样式由外观页重置。
+        next.TaskbarExperience = next.TaskbarExperience with
+        {
+            HoverLayerEnabled = defaults.TaskbarExperience.HoverLayerEnabled,
+            FullLayerEnabled = defaults.TaskbarExperience.FullLayerEnabled,
+            FullPanel = defaults.TaskbarExperience.FullPanel,
+            SpectrumVisible = defaults.TaskbarExperience.SpectrumVisible,
+            PerformanceVisible = defaults.TaskbarExperience.PerformanceVisible,
+            RestProgressVisible = defaults.TaskbarExperience.RestProgressVisible,
+            FullPanelEntryVisible = defaults.TaskbarExperience.FullPanelEntryVisible,
+            HoverControls = defaults.TaskbarExperience.HoverControls,
+            OutputDeviceVisible = defaults.TaskbarExperience.OutputDeviceVisible,
+            VolumeVisible = defaults.TaskbarExperience.VolumeVisible,
+            IdleComponents = defaults.TaskbarExperience.IdleComponents
+        };
         next.WindowMode = defaults.WindowMode; next.LayoutOrientationMode = defaults.LayoutOrientationMode;
         next.TaskbarBarEnabled = defaults.TaskbarBarEnabled;
         next.TaskbarTargetMonitorDeviceIds = defaults.TaskbarTargetMonitorDeviceIds;
