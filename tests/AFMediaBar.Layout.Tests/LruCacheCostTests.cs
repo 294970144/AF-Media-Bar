@@ -145,6 +145,108 @@ public sealed class LruCacheCostTests
         Assert.ThrowsException<ArgumentOutOfRangeException>(() => new LruCache<string, int>(1, value => value, -1));
     }
 
+    [TestMethod]
+    public void InvalidOrThrowingCostsLeaveValuesAndEvictionOrderUnchanged()
+    {
+        var cache = new LruCache<string, long>(2, value =>
+            value == -2 ? throw new InvalidOperationException() : value, 100);
+        cache.Set("a", 10);
+        cache.Set("b", 20);
+        Assert.ThrowsException<ArgumentOutOfRangeException>(() => cache.Set("a", -1));
+        Assert.ThrowsException<InvalidOperationException>(() => cache.Set("a", -2));
+        Assert.AreEqual(30L, cache.CurrentCost);
+        cache.Set("c", 30);
+        Assert.IsFalse(cache.TryGetValue("a", out _));
+        Assert.IsTrue(cache.TryGetValue("b", out var value));
+        Assert.AreEqual(20L, value);
+    }
+
+    [TestMethod]
+    public void CostOverflowRejectsInsertAndOverwriteWithoutCorruptingAccounting()
+    {
+        var cache = new LruCache<string, long>(4, value => value, 0);
+        cache.Set("a", long.MaxValue - 1);
+        cache.Set("b", 1);
+        Assert.ThrowsException<OverflowException>(() => cache.Set("c", 1));
+        Assert.ThrowsException<OverflowException>(() => cache.Set("b", 2));
+        Assert.AreEqual(2, cache.Count);
+        Assert.AreEqual(long.MaxValue, cache.CurrentCost);
+        Assert.IsTrue(cache.TryGetValue("b", out var value));
+        Assert.AreEqual(1L, value);
+        cache.Set("a", 2);
+        Assert.AreEqual(3L, cache.CurrentCost);
+    }
+
+    [TestMethod]
+    public void RepeatedHitsDoNotExtendExpirationAndRemovalUpdatesCost()
+    {
+        var clock = new CacheClock();
+        var cache = new LruCache<string, long>(4, value => value, 100, clock);
+        cache.Set("failure", 10, TimeSpan.FromSeconds(30));
+        clock.Advance(29);
+        Assert.IsTrue(cache.TryGetValue("failure", out _));
+        clock.Advance(1);
+        Assert.IsFalse(cache.TryGetValue("failure", out _));
+        Assert.AreEqual(0, cache.Count);
+        Assert.AreEqual(0L, cache.CurrentCost);
+    }
+
+    [TestMethod]
+    public void ReplacingAnExpiringFailureWithSuccessRemovesItsDeadline()
+    {
+        var clock = new CacheClock();
+        var cache = new LruCache<string, string?>(2, null, 0, clock);
+        cache.Set("song", null, TimeSpan.FromSeconds(30));
+        Assert.IsTrue(cache.TryGetValue("song", out var miss));
+        Assert.IsNull(miss);
+        clock.Advance(10);
+        cache.Set("song", "lyrics");
+        clock.Advance(60);
+        Assert.IsTrue(cache.TryGetValue("song", out var hit));
+        Assert.AreEqual("lyrics", hit);
+        Assert.ThrowsException<ArgumentOutOfRangeException>(() => cache.Set("song", "bad", TimeSpan.Zero));
+    }
+
+    [TestMethod]
+    public async Task SlowCostEstimationDoesNotBlockCacheReadsOrClear()
+    {
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var cache = new LruCache<string, int>(2, value =>
+        {
+            if (value == 2)
+            {
+                entered.Set();
+                if (!release.Wait(TimeSpan.FromSeconds(5))) throw new TimeoutException();
+            }
+            return value;
+        }, 100);
+        cache.Set("ready", 1);
+        var write = Task.Run(() => cache.Set("slow", 2));
+        try
+        {
+            Assert.IsTrue(entered.Wait(TimeSpan.FromSeconds(2)));
+            var read = Task.Run(() =>
+            {
+                Assert.IsTrue(cache.TryGetValue("ready", out _));
+                cache.Clear();
+            });
+            await read.WaitAsync(TimeSpan.FromSeconds(2));
+        }
+        finally { release.Set(); }
+        await write;
+        Assert.AreEqual(1, cache.Count);
+        Assert.AreEqual(2L, cache.CurrentCost);
+    }
+
+    private sealed class CacheClock : TimeProvider
+    {
+        private long _timestamp;
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+        public override long GetTimestamp() => _timestamp;
+        internal void Advance(int seconds) => _timestamp += TimeSpan.FromSeconds(seconds).Ticks;
+    }
+
     /// <summary>缓存本身要在多线程下可用：歌词缓存由后台取词线程写、UI 线程读。/ The cache has to work across threads: the lyric cache is written by background retrieval and read by the UI thread.</summary>
     [TestMethod]
     public void ConcurrentWritesAndReadsKeepTheCacheBounded()

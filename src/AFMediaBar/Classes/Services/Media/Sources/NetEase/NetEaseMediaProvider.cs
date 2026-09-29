@@ -373,7 +373,7 @@ public sealed class NetEaseMediaProvider : IIndependentMediaSourceProvider, IMem
             // writing it would only make the setting look ineffective.
             if (generation == _lyricsCacheGeneration)
             {
-                _lyricsCache.Set(info.Identity, result);
+                _lyricsCache.Set(info.Identity, result, LyricsCacheRetentionPolicy.Lifetime(result));
             }
 
             if (!_isDisposed && version == _version && _currentInfo is { } current &&
@@ -389,7 +389,7 @@ public sealed class NetEaseMediaProvider : IIndependentMediaSourceProvider, IMem
         {
             if (!token.IsCancellationRequested && !_isDisposed && generation == _lyricsCacheGeneration)
             {
-                _lyricsCache.Set(info.Identity, null);
+                _lyricsCache.Set(info.Identity, null, LyricsCacheRetentionPolicy.Lifetime(null));
             }
         }
         finally
