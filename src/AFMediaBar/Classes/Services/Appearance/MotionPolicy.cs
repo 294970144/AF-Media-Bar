@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 
 namespace AFMediaBar.Classes.Services;
 
@@ -33,6 +34,14 @@ public readonly record struct MotionProfile(
 {
     /// <summary>是否允许使用位置和缩放动画。/ Whether position and scale animations are allowed.</summary>
     public bool UseTransitions => Mode != MotionMode.Instant;
+
+    /// <summary>媒体连接状态专用过渡时长，不影响常规位置与尺寸动画。/ Duration for media connection changes, independent of normal placement motion.</summary>
+    public TimeSpan RestConnectionDuration => Mode switch
+    {
+        MotionMode.Full => TimeSpan.FromMilliseconds(450),
+        MotionMode.Reduced => TimeSpan.FromMilliseconds(160),
+        _ => TimeSpan.Zero
+    };
 }
 
 /// <summary>
@@ -41,6 +50,9 @@ public readonly record struct MotionProfile(
 /// </summary>
 public static class MotionPolicy
 {
+    /// <summary>媒体连接状态共用的柔和缓入缓出曲线。/ Shared gentle easing for media connection transitions.</summary>
+    public static SineEase CreateRestConnectionEase() => new() { EasingMode = EasingMode.EaseInOut };
+
     private static readonly MotionProfile FullProfile = new(
         MotionMode.Full,
         TimeSpan.FromMilliseconds(120),

@@ -204,8 +204,8 @@ public partial class TaskBarMediaControl
         _restTransitionMoves.Clear();
         _restIncomingArtwork = null;
         _restTextClipScale = null;
-        _restTransitionDuration = CurrentMotion.PositionDuration;
-        _restTransitionEase = CreateEaseInOut();
+        _restTransitionDuration = CurrentMotion.RestConnectionDuration;
+        _restTransitionEase = MotionPolicy.CreateRestConnectionEase();
         InteractionSurface.UpdateLayout();
 
         foreach (var component in TaskbarRestLayoutPolicy.DefaultOrder)
