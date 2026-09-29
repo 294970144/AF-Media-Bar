@@ -146,6 +146,18 @@ public sealed class LruCacheCostTests
     }
 
     [TestMethod]
+    public void NullLookupIsAMissWithoutTouchingTheDictionaryOrExistingEntries()
+    {
+        var cache = new LruCache<string, string>(2);
+        cache.Set("song", "lyrics");
+        Assert.IsFalse(cache.TryGetValue(null!, out var value));
+        Assert.IsNull(value);
+        Assert.AreEqual(1, cache.Count);
+        Assert.IsTrue(cache.TryGetValue("song", out var existing));
+        Assert.AreEqual("lyrics", existing);
+    }
+
+    [TestMethod]
     public void InvalidOrThrowingCostsLeaveValuesAndEvictionOrderUnchanged()
     {
         var cache = new LruCache<string, long>(2, value =>

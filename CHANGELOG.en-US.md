@@ -30,6 +30,8 @@ Reliability fixes: media-session self-healing, spectrum level calibration, and l
 
 ### Fixed
 
+- NetEase artwork no longer disappears on featured tracks when SMTC reports only the primary artist while client metadata includes guests. Primary-artist matching still requires the same title and source, and rejects other tracks, guest-only names, and name substrings.
+
 - LRU rejects negative costs and accounting overflow, and evaluates costs outside its lock. Inconclusive lyric lookups and failed avatar loads are cached for 30 seconds without extending the cooldown on reads. SMTC lyric keys include the session and complete matching metadata, fallback lookups can retry failures, and artwork-color keys include the theme and extraction parameters.
 
 - NetEase Cloud Music can appear in the source menu and display track information and lyrics through memory reading without SMTC, including the Store version. Both channels share one source: memory information takes priority and SMTC supplies controls. Hiding the source stops reading; allowing it resumes reading. Transient failures have a three-second grace period, while player exit removes the memory source.

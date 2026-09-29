@@ -101,6 +101,20 @@ public sealed class LyricsSecondaryLineAndArtworkTests
         Assert.AreEqual("下一句", LyricsSecondaryLinePolicy.Resolve(order, "下一句", "   ", null));
     }
 
+    [TestMethod]
+    public void UntranslatedMarkerDoesNotConsumeTheSecondLine()
+    {
+        var translationOnly = new LyricsSecondaryLineSettings([LyricsSecondaryLineMode.Translation]);
+        Assert.IsNull(LyricsSecondaryLinePolicy.ResolveSelection(translationOnly, "下一句", " // ", null));
+
+        var withFallback = new LyricsSecondaryLineSettings(
+            [LyricsSecondaryLineMode.Translation, LyricsSecondaryLineMode.NextLine]);
+        Assert.AreEqual("下一句", LyricsSecondaryLinePolicy.Resolve(withFallback, "下一句", "//", null));
+        Assert.AreEqual("正文 // 译文", LyricsSecondaryLinePolicy.Resolve(translationOnly, null, "正文 // 译文", null));
+        Assert.AreEqual("//", LyricsSecondaryLinePolicy.Resolve(
+            new LyricsSecondaryLineSettings([LyricsSecondaryLineMode.NextLine]), "//", null, null));
+    }
+
     /// <summary>
     /// 封面框按封面比例算宽度：正方形不变、宽封面变宽、竖版变窄，且都不需要留白；超出范围才留白。
     /// The artwork box follows the cover's aspect: square stays square, a wide cover widens, a portrait narrows, none of them letterboxed;

@@ -124,6 +124,21 @@ public sealed class NetEaseSourceTests
     }
 
     [TestMethod]
+    public void FeaturedTrackKeepsArtworkWhenSmtcReportsOnlyThePrimaryArtist()
+    {
+        var artwork = new System.Windows.Media.DrawingImage();
+        var memory = Memory() with { Title = "かもね (feat. Natsumi)", Artist = "JUVENILE,natsumi" };
+        var smtc = memory with { Artist = "JUVENILE", Artwork = artwork };
+        Assert.AreSame(artwork, Policy.Merge(memory, smtc).Artwork);
+        Assert.AreSame(artwork, Policy.Merge(memory, smtc with { Artist = " juvenile " }).Artwork);
+        Assert.IsNull(Policy.Merge(memory, smtc with { Artist = "natsumi" }).Artwork);
+        Assert.IsNull(Policy.Merge(memory, smtc with { Artist = "JUVEN" }).Artwork);
+        Assert.IsNull(Policy.Merge(memory, smtc with { Artist = "" }).Artwork);
+        Assert.IsNull(Policy.Merge(memory, smtc with { Title = "Another song" }).Artwork);
+        Assert.IsNull(Policy.Merge(memory, smtc with { SourceId = "spotify" }).Artwork);
+    }
+
+    [TestMethod]
     public void ArtworkAlwaysFollowsSmtcArrivalReplacementAndLoss()
     {
         var memory = Memory() with { Artwork = new System.Windows.Media.DrawingImage() };

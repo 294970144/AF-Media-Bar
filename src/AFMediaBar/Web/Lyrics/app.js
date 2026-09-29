@@ -324,9 +324,13 @@ function toDisplayLine(line, fallback = " ") {
 function resolveTranslationDisplay(line) {
   const text = (line ?? "").toString().trim();
   return {
-    text: text.length > 0 ? text : "…",
+    text: text.length > 0 ? text : " ",
     isPlaceholder: text.length === 0
   };
+}
+
+function setSingleLineLayout(secondary) {
+  layoutEl.classList.toggle("single-line", (secondary ?? "").toString().trim().length === 0);
 }
 
 function setTrackOffset(rowCount) {
@@ -508,6 +512,7 @@ function setSecondaryLine(line) {
     translationDisplay?.isPlaceholder === true);
   setLineText(nextLineEl, nextLineTextEl, nextLineScanTextEl, safe);
   displayedNext = safe;
+  setSingleLineLayout(safe);
 }
 
 function setIncomingLine(line) {
@@ -1604,6 +1609,12 @@ function updateMetrics() {
   root.style.setProperty("--line-pitch", `${linePitchPx}px`);
   root.style.setProperty("--current-size", `${currentSize.toFixed(2)}px`);
   root.style.setProperty("--next-size", `${nextSize.toFixed(2)}px`);
+  // Keep row boxes intact for rolling; independent translation centers a lone row without changing its roll distance.
+  const rootStyle = window.getComputedStyle(root);
+  const paneTop = Number.parseFloat(rootStyle.getPropertyValue("--lyrics-pane-padding-top")) || 0;
+  const primaryOffset = Number.parseFloat(rootStyle.getPropertyValue("--primary-offset-y")) || 0;
+  const singleLineOffset = snapToPhysicalPixel((layoutEl.clientHeight - rowHeightPx) / 2 - paneTop - primaryOffset);
+  root.style.setProperty("--single-line-offset", `${singleLineOffset}px`);
   setTrackOffset(0);
   refreshLineHorizontalScroll(currentLineEl);
 }
@@ -1828,6 +1839,7 @@ function startTranslationPairTransition(
 
     incomingTranslationPairEl.classList.remove("preparing");
     incomingTranslationPairEl.classList.add("entering");
+    setSingleLineLayout(promotedTranslation);
     trackEl.classList.add("translation-pair-animating", "animating");
     context.requestFrame(() => {
       if (!context.isCurrent()) {
@@ -1916,6 +1928,7 @@ function startStandardTransition(
     context.requestFrame(runTransitionOpacityAnimation);
     currentLineEl.classList.add("leaving");
     nextLineEl.classList.add("promoting");
+    setSingleLineLayout(upcoming);
     nextLineEl.style.setProperty("--promotion-scale", "1");
     nextLineEl.style.removeProperty("transform");
     trackEl.classList.add("animating");
