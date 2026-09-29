@@ -627,6 +627,24 @@ public partial class TaskBarMediaControl
     private bool CanUseTaskbarComponentHover() =>
         _isConnected && _currentMode == WindowMode.Taskbar && !_isVertical;
 
+    private bool CanUseTaskbarRestHover(Border surface)
+    {
+        if (_currentMode != WindowMode.Taskbar || _isVertical || _restTransitionActive)
+            return false;
+
+        if (_isConnected)
+            return true;
+
+        if (ReferenceEquals(surface, SongImageHoverOverlay))
+            return SongImageBorder.Visibility == Visibility.Visible;
+
+        return surface.Visibility == Visibility.Visible &&
+            (ReferenceEquals(surface, TaskbarSpectrumHoverSurface) ||
+             ReferenceEquals(surface, TaskbarPerformanceHoverSurface) ||
+             ReferenceEquals(surface, TaskbarOutputDeviceHoverSurface) ||
+             ReferenceEquals(surface, TaskbarVolumeHoverSurface));
+    }
+
     private bool CanShowDirectFullPanelHandle()
     {
         var experience = SettingsManager.Current.TaskbarExperience;
@@ -747,7 +765,7 @@ public partial class TaskBarMediaControl
     /// <summary>复用原 TaskBarMediaControl 的 hover 色彩和节奏，但将效果限制在单个组件。</summary>
     private void AnimateComponentHover(Border surface, bool isHovered, bool immediate = false)
     {
-        if (isHovered && !CanUseTaskbarComponentHover())
+        if (isHovered && !CanUseTaskbarRestHover(surface))
             return;
 
         var backgroundColor = isHovered
