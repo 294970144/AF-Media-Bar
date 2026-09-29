@@ -284,7 +284,7 @@ public sealed class LyricsSettingsTests
         var stubB = new StubProvider(LyricsSourceCatalog.QQMusic, _ =>
         {
             asked.Add(LyricsSourceCatalog.QQMusic);
-            return Task.FromResult<LyricsResult?>(new LyricsResult(LyricsSourceCatalog.QQMusic, LyricDocument.Empty));
+            return Task.FromResult<LyricsResult?>(LyricsResult.NoLyrics(LyricsSourceCatalog.QQMusic, 85));
         });
         var service = new LyricsService(
             LyricsService.DefaultPerSourceBudget,

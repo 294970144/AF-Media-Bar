@@ -91,6 +91,36 @@ public sealed class LyricsPresentationProjectorTests
     }
 
     [TestMethod]
+    public void MissingTranslationAndDisabledSecondRowProduceOnlyTheOriginal()
+    {
+        var snapshot = Snapshot([
+            new LyricLine(0, 10, "中文原文") { Translation = " // " },
+            new LyricLine(10, 20, "next") { Translation = "下一句译文" }
+        ], position: 2);
+        var settings = new AppSettings
+        {
+            LyricsEnabled = true,
+            TwoLineLyricsEnabled = true,
+            LyricsSecondaryLine = new LyricsSecondaryLineSettings([LyricsSecondaryLineMode.Translation])
+        };
+
+        var missingTranslation = LyricsPresentationProjector.Project(snapshot, settings, Now);
+        Assert.AreEqual("中文原文", missingTranslation.Current);
+        Assert.AreEqual(string.Empty, missingTranslation.Next);
+        Assert.AreEqual(string.Empty, missingTranslation.CurrentTranslation);
+        Assert.IsFalse(missingTranslation.TranslationMode);
+        Assert.AreEqual("下一句译文", missingTranslation.NextTranslation);
+
+        settings.TwoLineLyricsEnabled = false;
+        var singleRow = LyricsPresentationProjector.Project(snapshot, settings, Now);
+        Assert.AreEqual("中文原文", singleRow.Current);
+        Assert.AreEqual(string.Empty, singleRow.Next);
+        Assert.AreEqual(string.Empty, singleRow.CurrentTranslation);
+        Assert.AreEqual(string.Empty, singleRow.NextTranslation);
+        Assert.IsFalse(singleRow.TranslationMode);
+    }
+
+    [TestMethod]
     public void DisabledLyricsProduceHiddenFrame()
     {
         var frame = LyricsPresentationProjector.Project(

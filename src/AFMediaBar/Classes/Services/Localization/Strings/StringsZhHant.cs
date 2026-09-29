@@ -496,7 +496,7 @@ internal static class StringsZhHant
         table.Add("Lyrics.Source.SodaMusic", "汽水音樂");
         table.Add("Lyrics.Source.Unknown", "未知來源");
         table.Add("Lyrics.Sources.AllDisabled.Callout", "已關閉全部歌詞來源：不會再發出任何歌詞請求，媒體列只顯示標題與歌手。");
-        table.Add("Lyrics.Sources.Callout", "先嘗試已啟用的 QQ 音樂（本機快取優先）；未命中後並行查詢其他已啟用來源，採用匹配分最高的歌詞。");
+        table.Add("Lyrics.Sources.Callout", "優先搜尋已啟用的 QQ 音樂，符合度達到 85 分才下載歌詞。否則並行查詢其他啟用來源，採納最高分結果，包括確認無歌詞的結果。");
         table.Add("Lyrics.Sources.Expander.Description", "選擇允許取得歌詞的來源；查詢階段與評分由應用程式統一管理。");
         table.Add("Lyrics.Sources.Expander.Title", "歌詞來源");
         table.Add("Lyrics.Sources.MoveDown", "下移");

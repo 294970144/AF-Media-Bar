@@ -85,14 +85,13 @@ public sealed class AvatarImageLoader : IDisposable
             var bytes = await DownloadAsync(requestUrl, cancellationToken).ConfigureAwait(false);
             if (bytes is null)
             {
-                // 失败也记进内存缓存（值为 null）：同一次会话里不会为同一张图反复重试。
-                // A failure is cached in memory as null as well, so the same image is not retried repeatedly within one session.
-                _memory.Set(requestUrl, null);
+                // 暂时失败短期去重；网络恢复后再次打开名单仍能重试。
+                _memory.Set(requestUrl, null, TimeSpan.FromSeconds(30));
                 return null;
             }
 
             var image = Decode(bytes);
-            _memory.Set(requestUrl, image);
+            _memory.Set(requestUrl, image, image is null ? TimeSpan.FromSeconds(30) : null);
             if (image is not null)
             {
                 TryWriteToDisk(cacheFile, bytes);

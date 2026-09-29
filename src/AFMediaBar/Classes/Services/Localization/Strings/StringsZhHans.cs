@@ -496,7 +496,7 @@ internal static class StringsZhHans
         table.Add("Lyrics.Source.SodaMusic", "汽水音乐");
         table.Add("Lyrics.Source.Unknown", "未知来源");
         table.Add("Lyrics.Sources.AllDisabled.Callout", "已关闭全部歌词来源：不会再发出任何歌词请求，媒体栏只显示标题与歌手。");
-        table.Add("Lyrics.Sources.Callout", "先尝试已启用的 QQ 音乐（本地缓存优先）；未命中后并发查询其他已启用来源，采用匹配分最高的歌词。");
+        table.Add("Lyrics.Sources.Callout", "优先搜索已启用的 QQ 音乐，匹配达到 85 分才下载歌词。否则并发查询其他启用来源，采纳最高分结果，包括确认无歌词的结果。");
         table.Add("Lyrics.Sources.Expander.Description", "选择允许获取歌词的来源；查询阶段与评分由应用统一管理。");
         table.Add("Lyrics.Sources.Expander.Title", "歌词来源");
         table.Add("Lyrics.Sources.MoveDown", "下移");

@@ -10,12 +10,15 @@ internal static class LyricsSearch
 {
     internal sealed record Match(ISearchResult Candidate, int Score);
 
-    public static Task<Match?> MatchAsync(LyricsRequest request, Searchers source, CancellationToken token) =>
-        MatchAsync(request, source.GetSearcher(), token);
+    public static Task<Match?> MatchAsync(LyricsRequest request, Searchers source, CancellationToken token,
+        int minimumScore = LyricsMetadataScore.MinimumScore) =>
+        MatchAsync(request, source.GetSearcher(), token, minimumScore);
 
-    internal static async Task<Match?> MatchAsync(LyricsRequest request, ISearcher searcher, CancellationToken token)
+    internal static async Task<Match?> MatchAsync(LyricsRequest request, ISearcher searcher, CancellationToken token,
+        int minimumScore = LyricsMetadataScore.MinimumScore)
     {
         Match? best = null;
+        int? bestCandidateScore = null;
         foreach (var query in LyricsSearchQueryPolicy.Build(request))
         {
             token.ThrowIfCancellationRequested();
@@ -36,12 +39,14 @@ internal static class LyricsSearch
             {
                 var score = LyricsMetadataScore.Calculate(request, [candidate.Title], candidate.Artists,
                     [candidate.Album], candidate.DurationMs / 1000d);
-                if (score >= LyricsMetadataScore.MinimumScore && (best is null || score > best.Score))
+                bestCandidateScore = Math.Max(bestCandidateScore ?? 0, score);
+                if (score >= minimumScore && (best is null || score > best.Score))
                     best = new Match(candidate, score);
             }
             if (best is not null) break;
         }
-        AppLogService.Current?.Info("Lyrics", $"歌曲匹配 / match: source={searcher.Name} score={best?.Score.ToString() ?? "none"}");
+        AppLogService.Current?.Info("Lyrics", $"歌曲匹配 / match: source={searcher.Name} score={best?.Score.ToString() ?? "none"} " +
+            $"bestCandidateScore={bestCandidateScore?.ToString() ?? "none"} minimum={minimumScore}");
         return best;
     }
 }

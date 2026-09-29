@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 using System.IO;
-using System.Net.Http;
 using System.Security.Cryptography;
 using System.Windows.Media.Imaging;
 using Windows.Storage.Streams;
@@ -18,7 +17,6 @@ internal static class ArtworkLoader
     private const int MaxThumbnailSize = 256;
     private const int CacheEntryLimit = 5;
     private static readonly LruCache<int, BitmapImage> ThumbnailCache = new(CacheEntryLimit);
-    private static readonly HttpClient HttpClient = new() { Timeout = TimeSpan.FromSeconds(8) };
     private static readonly AsyncLocal<int> CurrentHashCodeContext = new();
     private static int _currentHashCode;
 
@@ -91,46 +89,6 @@ internal static class ArtworkLoader
         ThumbnailCache.Set(hashCode, image);
         SetCurrentHash(hashCode);
         return image;
-    }
-
-    /// <summary>
-    /// 从 URL 下载并解码封面；失败或非 2xx 时返回 null，取消请求继续向上传播。
-    /// Downloads and decodes artwork from a URL; returns null on failure or non-2xx and propagates cancellation.
-    /// </summary>
-    /// <param name="url">封面 URL。/ Artwork URL.</param>
-    /// <param name="cancellationToken">取消标记。/ Cancellation token.</param>
-    /// <returns>冻结的 WPF 位图；下载或解码失败时返回 null。/ Frozen WPF bitmap, or null when download or decoding fails.</returns>
-    internal static async Task<BitmapImage?> GetImageFromUrlAsync(
-        string url,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(url) || !Uri.TryCreate(url, UriKind.Absolute, out var uri))
-            return null;
-
-        try
-        {
-            using var response = await HttpClient.GetAsync(uri, cancellationToken);
-            if (!response.IsSuccessStatusCode)
-                return null;
-
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            var image = new BitmapImage();
-            image.BeginInit();
-            image.CacheOption = BitmapCacheOption.OnLoad;
-            image.DecodePixelWidth = MaxThumbnailSize;
-            image.StreamSource = stream;
-            image.EndInit();
-            image.Freeze();
-            return image;
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch
-        {
-            return null;
-        }
     }
 
     /// <summary>

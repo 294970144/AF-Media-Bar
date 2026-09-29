@@ -10,27 +10,12 @@ namespace AFMediaBar.Classes.Services.Lyrics;
 /// The QQ Music source: searches a track by title and artist, then retrieves the decrypted QRC syllable lyrics plus the
 /// separate translation.
 ///
-/// 取词按三条路径依次尝试：先读本地缓存（见 <see cref="QQMusicLocalCache"/>），命中即返回、不碰网络；未命中时走两条
-/// 网络路径——新接口按数字歌曲 id 返回解密后的正文，旧接口按 songmid 返回 base64 正文；三条都拿不到正文时按未命中处理。
-/// Retrieval tries three paths in order: the local cache first (see <see cref="QQMusicLocalCache"/>), returning immediately
-/// on a hit without any network traffic; on a miss the two network paths follow — the new endpoint returns decrypted text for
-/// the numeric song id and the legacy endpoint returns base64 text for the songmid; when none yields text the source counts as
-/// a miss.
+/// 候选至少 85 分才下载正文；先尝试数字歌曲 id 的新接口，再尝试 songmid 的旧接口。
+/// 旧接口成功返回空正文时确认无歌词；请求或解析失败仍允许备用来源兜底。
 /// </summary>
 public sealed class QQMusicLyricsProvider : ILyricsProvider
 {
     private readonly Api _api = new();
-    private readonly Func<LyricsRequest, CancellationToken, LyricsResult?> _cacheReader;
-
-    /// <summary>使用应用内 QQ 歌词缓存读取器创建提供器。/ Creates the provider with the app's QQ lyric-cache reader.</summary>
-    public QQMusicLyricsProvider() : this(TryReadCachedLyrics)
-    {
-    }
-
-    internal QQMusicLyricsProvider(Func<LyricsRequest, CancellationToken, LyricsResult?> cacheReader)
-    {
-        _cacheReader = cacheReader ?? throw new ArgumentNullException(nameof(cacheReader));
-    }
 
     public string SourceName => LyricsSourceCatalog.QQMusic;
 
@@ -43,25 +28,18 @@ public sealed class QQMusicLyricsProvider : ILyricsProvider
             return null;
         }
 
-        // 缓存目录扫描、文件读取、解密和解析都可能阻塞，必须在后台执行；命中时仍不访问网络。
-        // Directory scanning, file reads, decryption, and parsing can block, so run them off the UI thread;
-        // a cache hit still avoids the network entirely.
-        var cachedResult = await Task.Run(() => _cacheReader(request, cancellationToken), cancellationToken)
-            .ConfigureAwait(false);
-        if (cachedResult is not null)
-        {
-            return cachedResult with { MatchScore = 100 };
-        }
-
-        var match = await LyricsSearch.MatchAsync(request, Searchers.QQMusic, cancellationToken);
+        // 在下载歌词之前拒绝低分候选；提高门槛后仍可尝试后续搜索词。
+        var match = await LyricsSearch.MatchAsync(request, Searchers.QQMusic, cancellationToken,
+            LyricsRetrievalPolicy.PreferredMinimumScore);
         if (match?.Candidate is not QQMusicSearchResult qq)
         {
             return null;
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        var (main, translation) = await FetchLyricAsync(qq, cancellationToken);
+        var (main, translation, confirmedNoLyrics) = await FetchLyricAsync(qq, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
+        if (confirmedNoLyrics) return LyricsResult.NoLyrics(SourceName, match.Score);
         if (string.IsNullOrWhiteSpace(main))
         {
             return null;
@@ -76,26 +54,7 @@ public sealed class QQMusicLyricsProvider : ILyricsProvider
         return document.Lines.Count > 0 ? new LyricsResult(SourceName, document) { MatchScore = match!.Score } : null;
     }
 
-    private static LyricsResult? TryReadCachedLyrics(LyricsRequest request, CancellationToken cancellationToken)
-    {
-        if (!QQMusicLocalCache.TryRead(
-                request.Title, request.Album, cancellationToken, out var main, out var translation) ||
-            string.IsNullOrWhiteSpace(main))
-        {
-            return null;
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        var document = LyricsTextParser.Parse(
-            main,
-            translation,
-            request: request,
-            durationSeconds: request.DurationSeconds,
-            filterInfoLines: request.FilterInfoLines);
-        return document.Lines.Count > 0 ? new LyricsResult(LyricsSourceCatalog.QQMusic, document) : null;
-    }
-
-    private async Task<(string? Main, string? Translation)> FetchLyricAsync(
+    private async Task<(string? Main, string? Translation, bool ConfirmedNoLyrics)> FetchLyricAsync(
         QQMusicSearchResult match,
         CancellationToken cancellationToken)
     {
@@ -106,7 +65,7 @@ public sealed class QQMusicLyricsProvider : ILyricsProvider
                 var response = await _api.GetLyricsAsync(match.Id);
                 if (!string.IsNullOrWhiteSpace(response?.Lyrics))
                 {
-                    return (response!.Lyrics, response.Trans);
+                    return (response!.Lyrics, response.Trans, false);
                 }
             }
             catch (OperationCanceledException)
@@ -122,13 +81,14 @@ public sealed class QQMusicLyricsProvider : ILyricsProvider
         cancellationToken.ThrowIfCancellationRequested();
         if (string.IsNullOrWhiteSpace(match.Mid))
         {
-            return (null, null);
+            return (null, null, false);
         }
 
         try
         {
             var legacy = (await _api.GetLyric(match.Mid))?.Decode();
-            return (legacy?.Lyric, legacy?.Trans);
+            if (legacy is not { Code: 0 }) return (null, null, false);
+            return (legacy.Lyric, legacy.Trans, string.IsNullOrWhiteSpace(legacy.Lyric));
         }
         catch (OperationCanceledException)
         {
@@ -136,7 +96,7 @@ public sealed class QQMusicLyricsProvider : ILyricsProvider
         }
         catch
         {
-            return (null, null);
+            return (null, null, false);
         }
     }
 }

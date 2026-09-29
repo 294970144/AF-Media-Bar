@@ -40,7 +40,8 @@ public sealed class KugouLyricsProvider : ILyricsProvider
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        var candidate = await FindCandidateAsync(kugou.Hash, request, cancellationToken);
+        var (candidate, confirmedNoLyrics) = await FindCandidateAsync(kugou.Hash, request, cancellationToken);
+        if (confirmedNoLyrics) return LyricsResult.NoLyrics(SourceName, match.Score);
         if (candidate is null ||
             string.IsNullOrWhiteSpace(candidate.Id) ||
             string.IsNullOrWhiteSpace(candidate.AccessKey))
@@ -77,7 +78,7 @@ public sealed class KugouLyricsProvider : ILyricsProvider
         return document.Lines.Count > 0 ? new LyricsResult(SourceName, document) { MatchScore = match!.Score } : null;
     }
 
-    private async Task<SearchLyricsResponse.Candidate?> FindCandidateAsync(
+    private async Task<(SearchLyricsResponse.Candidate? Candidate, bool ConfirmedNoLyrics)> FindCandidateAsync(
         string hash,
         LyricsRequest request,
         CancellationToken cancellationToken)
@@ -96,14 +97,15 @@ public sealed class KugouLyricsProvider : ILyricsProvider
         }
         catch
         {
-            return null;
+            return (null, false);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
         var candidates = response?.Candidates;
+        if (response is not { Status: 200, ErrorCode: 0 } || candidates is null) return (null, false);
         if (candidates is not { Count: > 0 })
         {
-            return null;
+            return (null, true);
         }
 
         var usable = candidates
@@ -111,17 +113,17 @@ public sealed class KugouLyricsProvider : ILyricsProvider
             .ToList();
         if (usable.Count == 0)
         {
-            return null;
+            return (null, false);
         }
 
         var targetSeconds = request.DurationSeconds;
         if (targetSeconds is not { } target || !double.IsFinite(target) || target <= 0)
         {
-            return usable[0];
+            return (usable[0], false);
         }
 
-        return usable
+        return (usable
             .OrderBy(candidate => Math.Abs(candidate.Duration - target))
-            .First();
+            .First(), false);
     }
 }

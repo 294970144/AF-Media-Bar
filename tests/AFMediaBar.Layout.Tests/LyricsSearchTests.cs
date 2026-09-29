@@ -85,6 +85,21 @@ public sealed class LyricsSearchTests
     private static QQMusicSearchResult Candidate(string title, string[] artists, string album, int duration) =>
         new(title, artists, album, null, duration, "fixture", "fixture");
 
+    [TestMethod]
+    public async Task QQSearchRejects84ButAccepts85BeforeLyricsAreDownloaded()
+    {
+        var request = new LyricsRequest("Song", "Artist", "Album", 200, null);
+        var below = Candidate("Song", ["Artist"], "", 206400);
+        Assert.AreEqual(84, LyricsMetadataScore.Calculate(request, [below.Title], below.Artists, [below.Album], 206.4));
+        Assert.IsNull(await LyricsSearch.MatchAsync(request, new FixtureSearcher(below), CancellationToken.None,
+            LyricsRetrievalPolicy.PreferredMinimumScore));
+        var accepted = Candidate("Song", ["Artist"], "", 205500);
+        var match = await LyricsSearch.MatchAsync(request, new FixtureSearcher(below, accepted), CancellationToken.None,
+            LyricsRetrievalPolicy.PreferredMinimumScore);
+        Assert.AreSame(accepted, match!.Candidate);
+        Assert.AreEqual(85, match.Score);
+    }
+
     private sealed class FixtureSearcher(params ISearchResult[] candidates) : Searcher
     {
         public List<string> Queries { get; } = [];

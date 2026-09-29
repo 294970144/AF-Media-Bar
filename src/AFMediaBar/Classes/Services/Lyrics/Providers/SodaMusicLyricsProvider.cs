@@ -47,10 +47,11 @@ public sealed class SodaMusicLyricsProvider : ILyricsProvider
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        if (detail is not { StatusCode: 0, Track: not null }) return null;
         var main = detail?.Lyric?.Content;
         if (string.IsNullOrWhiteSpace(main))
         {
-            return null;
+            return LyricsResult.NoLyrics(SourceName, match.Score);
         }
 
         var document = LyricsTextParser.Parse(
