@@ -165,6 +165,4 @@ AF Media Bar 使用 [MIT License](LICENSE) 开源。
 | :---: | :---: |
 | <img src="src/AFMediaBar/Assets/Sponsor/wechat-pay.png" alt="微信收款码" width="220"> | <img src="src/AFMediaBar/Assets/Sponsor/alipay-pay.png" alt="支付宝收款码" width="220"> |
 
-爱发电赞助链接：[爱发电](https://ifdian.net/a/amorfate)
-
 </div>

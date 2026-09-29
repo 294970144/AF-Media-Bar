@@ -403,7 +403,7 @@ public static class SettingsSearchIndex
             "Common.Group.Support",
             "Search.About.Support.Description",
             language,
-            ["赞助我", "请我喝咖啡", "打赏", "二维码", "微信", "wechat", "支付宝", "alipay", "爱发电", "afdian", "支持"]),
+            ["赞助我", "请我喝咖啡", "打赏", "二维码", "微信", "wechat", "支付宝", "alipay", "支持"]),
         Create(
             SettingsPageKey.About,
             4,

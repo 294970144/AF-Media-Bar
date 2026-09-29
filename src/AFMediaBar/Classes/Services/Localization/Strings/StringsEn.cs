@@ -64,10 +64,8 @@ internal static class StringsEn
         table.Add("About.Row.Skip.Clear", "Stop skipping");
         table.Add("About.Row.Skip.Description", "Skipping affects only the automatic notice; a manual check still reports that version");
         table.Add("About.Licenses.Open", "Open project");
-        table.Add("About.Support.Afdian", "Afdian");
         table.Add("About.Support.Alipay", "Alipay");
-        table.Add("About.Support.Open", "Open link");
-        table.Add("About.Support.Pending", "The payment codes and the support link are supplied by the author later; the path above is where the file belongs");
+        table.Add("About.Support.Pending", "Payment code image missing; the path above shows where to place the file");
         table.Add("About.Support.SponsorNote", "Sponsorships above 10 CNY can join the sponsor list; please leave your ID in the payment note");
         table.Add("About.Support.WeChat", "WeChat");
         table.Add("Credits.Contributions", "{0} commits");
@@ -659,7 +657,7 @@ internal static class StringsEn
         table.Add("Search.About.Licenses.Description", "The open-source packages and derived code this program uses, with their licenses");
         table.Add("Search.About.ProjectInfo.Description", "The repository, the feedback entry, and help");
         table.Add("Search.About.Sponsors.Description", "The sponsor list, read from the file in the repository");
-        table.Add("Search.About.Support.Description", "WeChat and Alipay payment codes and the Afdian support link");
+        table.Add("Search.About.Support.Description", "WeChat and Alipay payment codes");
         table.Add("Search.Application.Application.Description", "Version information, update checks, automatic updates, launch at sign-in, and the interface language");
         table.Add("Search.Application.Diagnostics.Description", "Open the log folder (logs\\app.log, the file to send when something breaks) or return the working set to the system");
         table.Add("Search.Application.SettingsFile.Description", "Opening the settings folder and resetting every setting");

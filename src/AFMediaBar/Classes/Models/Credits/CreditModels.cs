@@ -50,14 +50,9 @@ public sealed record SponsorsDocument(int SchemaVersion, IReadOnlyList<SponsorIn
 public sealed record LicenseEntry(string Name, string Version, string License, string Url, string? Note = null);
 
 /// <summary>
-/// 关于页要展示的一份赞助入口：一个收款码或一个外部链接。
-/// One support entry the about page shows: a payment QR code or an external link.
+/// 关于页要展示的一份赞助收款码。
+/// One payment QR code shown on the about page.
 /// </summary>
 /// <param name="TitleKey">标题文案键 / Title string key.</param>
-/// <param name="AssetPath">收款码的包内路径；为空表示这是一个链接条目 / Pack path of the QR image, empty when this is a link entry.</param>
-/// <param name="Url">链接地址；为空表示待补充 / Link address, empty while it is still to be supplied.</param>
-public sealed record SupportEntry(string TitleKey, string AssetPath, string Url)
-{
-    /// <summary>这是否是一个收款码条目。/ Whether this is a QR-code entry.</summary>
-    public bool IsQrCode => !string.IsNullOrEmpty(AssetPath);
-}
+/// <param name="AssetPath">收款码的包内路径。/ Pack path of the QR image.</param>
+public sealed record SupportEntry(string TitleKey, string AssetPath);

@@ -64,10 +64,8 @@ internal static class StringsZhHans
         table.Add("About.Row.Skip.Clear", "取消跳过");
         table.Add("About.Row.Skip.Description", "跳过只影响自动提示，手动检查仍会显示该版本");
         table.Add("About.Licenses.Open", "查看项目");
-        table.Add("About.Support.Afdian", "爱发电");
         table.Add("About.Support.Alipay", "支付宝");
-        table.Add("About.Support.Open", "打开链接");
-        table.Add("About.Support.Pending", "收款码与赞助链接由作者后续补充；上方的路径就是文件应当放入的位置");
+        table.Add("About.Support.Pending", "收款码图片缺失；上方路径是应放入的文件位置");
         table.Add("About.Support.SponsorNote", "大于 10 元的赞助可以进入赞助者名单，请在备注中留下 id");
         table.Add("About.Support.WeChat", "微信");
         table.Add("Credits.Contributions", "提交 {0} 次");
@@ -659,7 +657,7 @@ internal static class StringsZhHans
         table.Add("Search.About.Licenses.Description", "本程序使用的开源软件包与衍生代码及其许可");
         table.Add("Search.About.ProjectInfo.Description", "仓库、反馈入口与使用帮助");
         table.Add("Search.About.Sponsors.Description", "赞助者名单，取自仓库里的名单文件");
-        table.Add("Search.About.Support.Description", "微信与支付宝收款码、爱发电赞助链接");
+        table.Add("Search.About.Support.Description", "微信与支付宝收款码");
         table.Add("Search.Application.Application.Description", "版本信息、检查更新、自动更新、开机自动启动与界面语言");
         table.Add("Search.Application.Diagnostics.Description", "打开日志文件夹（logs\\app.log，出现错误时发这个文件），或把工作集交还给系统");
         table.Add("Search.Application.SettingsFile.Description", "打开设置文件夹与重置全部设置");

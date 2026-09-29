@@ -13,9 +13,8 @@ using AFMediaBar.Resources;
 namespace AFMediaBar.ViewModels.Pages
 {
     /// <summary>
-    /// 「赞助我」里的一条：一个收款码（可能还没放进来）或一个外部链接（可能还没填）。
-    /// One entry under "support me": a payment code that may not have been added yet, or an external link that may not have been
-    /// filled in yet.
+    /// 「赞助我」里的一份收款码，图片可能尚未放入安装包。
+    /// One payment code under "support me"; its image may not have been packaged yet.
     /// </summary>
     public sealed class SupportEntryViewModel
     {
@@ -24,16 +23,12 @@ namespace AFMediaBar.ViewModels.Pages
         public SupportEntryViewModel(SupportEntry entry)
         {
             Title = Translations.Get(entry.TitleKey);
-            Url = entry.Url;
             ExpectedAssetPath = entry.AssetPath;
-            Image = entry.IsQrCode ? TryLoadImage(entry.AssetPath) : null;
+            Image = TryLoadImage(entry.AssetPath);
         }
 
         /// <summary>标题（按当前语言解析）。/ Title, resolved in the active language.</summary>
         public string Title { get; }
-
-        /// <summary>外部链接；为空表示待补充。/ The external link, empty while it is still to be supplied.</summary>
-        public string Url { get; }
 
         /// <summary>收款码在包内的预期路径，用于"还没放进来"的提示。/ The expected in-pack path of the payment code, shown while it has not been added yet.</summary>
         public string ExpectedAssetPath { get; }
@@ -41,17 +36,14 @@ namespace AFMediaBar.ViewModels.Pages
         /// <summary>收款码图片；没有图片时为空。/ The payment-code image, null when there is none.</summary>
         public ImageSource? Image { get; }
 
-        /// <summary>是否已经可以展示（有图片，或链接已填）。/ Whether this entry can be shown: it has an image, or its link is filled in.</summary>
-        public bool IsReady => Image is not null || !string.IsNullOrWhiteSpace(Url);
+        /// <summary>是否已经可以展示收款码。/ Whether the payment code can be shown.</summary>
+        public bool IsReady => Image is not null;
 
         /// <summary>是否需要提示"待补充"。/ Whether a "to be supplied" note is needed.</summary>
         public bool IsPending => !IsReady;
 
         /// <summary>是否已经放入收款码图片。/ Whether the payment-code image has been added.</summary>
         public bool HasImage => Image is not null;
-
-        /// <summary>是否已经填好可打开的链接。/ Whether an openable link has been filled in.</summary>
-        public bool HasUrl => ExternalLinkLauncher.IsOpenable(Url);
 
         /// <summary>
         /// 按候选名与候选扩展名依次尝试加载收款码。
@@ -190,7 +182,7 @@ namespace AFMediaBar.ViewModels.Pages
         /// <summary>开源许可清单（包 + 衍生代码）。这份清单不会变，因此是只读列表而不是可观察集合。/ The open-source license catalog: packages plus derived code. It never changes, so it is a read-only list rather than an observable collection.</summary>
         public IReadOnlyList<LicenseEntry> Licenses { get; }
 
-        /// <summary>「赞助我」的条目：两个收款码与一个爱发电链接。/ The "support me" entries: two payment codes and one Afdian link.</summary>
+        /// <summary>「赞助我」的条目：微信与支付宝收款码。/ The "support me" entries: WeChat and Alipay payment codes.</summary>
         public ObservableCollection<SupportEntryViewModel> SupportEntries { get; }
 
         /// <summary>是否已经拿到开发人员名单（决定该分组是否显示）。/ Whether the developer list has arrived, which decides if that group is shown.</summary>

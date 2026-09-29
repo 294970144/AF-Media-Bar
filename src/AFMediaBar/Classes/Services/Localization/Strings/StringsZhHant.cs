@@ -64,10 +64,8 @@ internal static class StringsZhHant
         table.Add("About.Row.Skip.Clear", "取消略過");
         table.Add("About.Row.Skip.Description", "略過只影響自動提示，手動檢查仍會顯示該版本");
         table.Add("About.Licenses.Open", "查看專案");
-        table.Add("About.Support.Afdian", "愛發電");
         table.Add("About.Support.Alipay", "支付寶");
-        table.Add("About.Support.Open", "開啟連結");
-        table.Add("About.Support.Pending", "收款碼與贊助連結由作者後續補充；上方的路徑就是檔案應當放入的位置");
+        table.Add("About.Support.Pending", "收款碼圖片缺失；上方路徑是應放入的檔案位置");
         table.Add("About.Support.SponsorNote", "大於 10 元的贊助可以進入贊助者名單，請在備註中留下 id");
         table.Add("About.Support.WeChat", "微信");
         table.Add("Credits.Contributions", "提交 {0} 次");
@@ -659,7 +657,7 @@ internal static class StringsZhHant
         table.Add("Search.About.Licenses.Description", "本程式使用的開源套件與衍生程式碼及其授權");
         table.Add("Search.About.ProjectInfo.Description", "倉庫、意見反應入口與使用說明");
         table.Add("Search.About.Sponsors.Description", "贊助者名單，取自倉庫裡的名單檔案");
-        table.Add("Search.About.Support.Description", "微信與支付寶收款碼、愛發電贊助連結");
+        table.Add("Search.About.Support.Description", "微信與支付寶收款碼");
         table.Add("Search.Application.Application.Description", "版本資訊、檢查更新、自動更新、開機自動啟動與介面語言");
         table.Add("Search.Application.Diagnostics.Description", "開啟日誌資料夾（logs\\app.log，出現錯誤時送這個檔案），或把工作集交還給系統");
         table.Add("Search.Application.SettingsFile.Description", "開啟設定資料夾與重設全部設定");

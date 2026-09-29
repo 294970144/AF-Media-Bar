@@ -186,9 +186,9 @@
                 </components:SettingsGroup>
 
                 <!--
-                    赞助我：两个收款码 + 一个爱发电链接。素材由用户后续放入 Assets/Sponsor/，
+                    赞助我：微信与支付宝收款码。素材由用户放入 Assets/Sponsor/，
                     缺哪一份就在那一格显示还缺哪个文件，而不是让整页打不开。
-                    Support me: two payment codes and one Afdian link. The user adds the images under Assets/Sponsor/ later, and a
+                    Support me: WeChat and Alipay payment codes. The user adds the images under Assets/Sponsor/, and a
                     missing one shows which file is still missing in its own cell instead of breaking the page.
                 -->
                 <components:SettingsGroup Header="{DynamicResource Loc.Common.Group.Support}" Icon="{ui:SymbolIcon Heart24}">
@@ -237,14 +237,6 @@
                                                 Text="{Binding ExpectedAssetPath}"
                                                 TextWrapping="Wrap"
                                                 Visibility="{Binding IsPending, Converter={StaticResource AfBooleanToVisibilityConverter}}" />
-                                            <ui:Button
-                                                Margin="0,8,0,0"
-                                                Command="{Binding DataContext.ViewModel.OpenUrlCommand, RelativeSource={RelativeSource AncestorType=Page}}"
-                                                CommandParameter="{Binding Url}"
-                                                Content="{DynamicResource Loc.About.Support.Open}"
-                                                Icon="{ui:SymbolIcon Open24}"
-                                                Style="{StaticResource AfSettingsButtonStyle}"
-                                                Visibility="{Binding HasUrl, Converter={StaticResource AfBooleanToVisibilityConverter}}" />
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>
