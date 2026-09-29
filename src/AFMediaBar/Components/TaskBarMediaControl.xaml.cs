@@ -1012,7 +1012,9 @@ namespace AFMediaBar.Components
             ApplyConfiguredTextAlignment(SongTitle, metadataAlignment);
             ApplyConfiguredTextAlignment(SongArtist, metadataAlignment);
             ApplyWebLyricsStyle();
-            if (isHorizontalTaskbar && SongMetadataPanel.Visibility == Visibility.Visible)
+            // Keep the outgoing live metadata and lyrics until their reveal clip has retracted.
+            if (!_restTransitionKeepsOutgoingText &&
+                isHorizontalTaskbar && SongMetadataPanel.Visibility == Visibility.Visible)
             {
                 if (experience.ContentLayout == TaskbarContentLayout.CompactInline &&
                     !string.IsNullOrEmpty(_actualArtist))
@@ -1030,7 +1032,7 @@ namespace AFMediaBar.Components
                         : Visibility.Collapsed;
                 }
             }
-            else if (!isHorizontalTaskbar)
+            else if (!_restTransitionKeepsOutgoingText && !isHorizontalTaskbar)
             {
                 SongTitle.Text = _actualTitle;
             }
@@ -1056,7 +1058,7 @@ namespace AFMediaBar.Components
             // before that. The head of the content would then stay on screen until the next advance frame snaps back to the window's
             // position, which is one visible jump each time the pointer enters the text area (hover entry calls this method too) and on
             // every snapshot poll.
-            if (isHorizontalTaskbar)
+            if (isHorizontalTaskbar && !_restTransitionKeepsOutgoingText)
                 ApplyMarqueeLayout(Math.Max(0, SongInfoStackPanel.Width));
         }
 
@@ -1108,6 +1110,15 @@ namespace AFMediaBar.Components
             SongTitleContainer.Width = textWidth;
             SongArtistContainer.Width = textWidth;
             SongLyricsPanel.Width = textWidth;
+            if (_restTransitionKeepsOutgoingText)
+            {
+                Canvas.SetLeft(SongInfoStackPanel, _outgoingTextLeft);
+                SongInfoStackPanel.Width = _outgoingTextWidth;
+                SongInfoSurface.Width = _outgoingTextWidth;
+                SongTitleContainer.Width = _outgoingTextWidth;
+                SongArtistContainer.Width = _outgoingTextWidth;
+                SongLyricsPanel.Width = _outgoingTextWidth;
+            }
 
             // 任务栏的媒体文字宽度由本节几何唯一决定：布局引擎按布局 schema 写入的 TextBlock 宽度仍包含
             // 频谱与性能组件占用的区间，比真实文字区更宽，会让标题按错误宽度裁剪、在容器边缘被硬切；
@@ -1116,8 +1127,8 @@ namespace AFMediaBar.Components
             // schema, which still covers the widget reserve and is wider than the real text area, so the title trims against
             // the wrong width and is hard-cut at the container edge. The hover path rewrites the correct width through the
             // marquee configuration, which is why the defect only shows up after a settings change.
-            SongTitle.Width = textWidth;
-            SongArtist.Width = textWidth;
+            SongTitle.Width = _restTransitionKeepsOutgoingText ? _outgoingTextWidth : textWidth;
+            SongArtist.Width = _restTransitionKeepsOutgoingText ? _outgoingTextWidth : textWidth;
 
             var textTop = Canvas.GetTop(SongInfoStackPanel);
             if (!double.IsFinite(textTop))
@@ -1158,7 +1169,8 @@ namespace AFMediaBar.Components
                     RetargetHoverRevealWidth(textWidth);
             }
 
-            ApplyMarqueeLayout(textWidth);
+            if (!_restTransitionKeepsOutgoingText)
+                ApplyMarqueeLayout(textWidth);
         }
 
         /// <summary>
@@ -1221,7 +1233,10 @@ namespace AFMediaBar.Components
             // box is collapsed rather than left blank.
             var artworkVisible = Visible(TaskbarRestComponent.Artwork);
             SetRestComponentVisible(SongImageBorder, artworkVisible);
-            SetRestComponentVisible(SongInfoStackPanel, Visible(TaskbarRestComponent.MediaText));
+            SetRestComponentVisible(SongInfoStackPanel,
+                Visible(TaskbarRestComponent.MediaText) || _restTransitionKeepsOutgoingText);
+            if (_restTransitionKeepsOutgoingText)
+                SongInfoStackPanel.IsHitTestVisible = false;
             if (wasArtworkVisible && !artworkVisible)
                 AnimateComponentHover(SongImageHoverOverlay, false);
         }
@@ -1635,7 +1650,12 @@ namespace AFMediaBar.Components
                 Dispatcher.Invoke(() =>
                 {
                     var wasConnected = _isConnected;
+                    if (!wasConnected && _restTransitionKeepsOutgoingText)
+                        return;
                     var restBefore = wasConnected ? CaptureRestVisuals(targetConnected: false) : null;
+                    if (wasConnected)
+                        PrepareRestConnectionTransition(restBefore, entering: false);
+                    var keepOutgoingText = _restTransitionKeepsOutgoingText;
                     if (wasConnected)
                         _quickLaunchTooltip.Content = null;
                     _actualTitle = string.Empty;
@@ -1645,13 +1665,16 @@ namespace AFMediaBar.Components
                     _canSkipPrevious = false;
                     _canSkipNext = false;
 
-                    SongTitle.Text = _actualTitle;
-                    SongMetadataPanel.Visibility = Visibility.Visible;
-                    SongLyricsPanel.Opacity = 0;
-                    SongLyricsPanel.IsHitTestVisible = false;
-                    UpdateWebLyricsPresentation(allowTransition: false);
-                    SongArtist.Text = _actualArtist;
-                    SongInfoStackPanel.Visibility = Visibility.Collapsed;
+                    if (!keepOutgoingText)
+                    {
+                        SongTitle.Text = string.Empty;
+                        SongMetadataPanel.Visibility = Visibility.Visible;
+                        SongLyricsPanel.Opacity = 0;
+                        SongLyricsPanel.IsHitTestVisible = false;
+                        UpdateWebLyricsPresentation(allowTransition: false);
+                        SongArtist.Text = string.Empty;
+                        SongInfoStackPanel.Visibility = Visibility.Collapsed;
+                    }
                     SongInfoStackPanel.IsHitTestVisible = false;
                     // 封面这一格此刻画的是快速启动小音符，它有自己的滚轮语义与提示。
                     // The artwork slot now draws the quick-launch note, which has wheel semantics and a tooltip of its own.
@@ -1667,13 +1690,11 @@ namespace AFMediaBar.Components
                     TaskbarNextButton.IsEnabled = false;
                     HideTaskbarHoverLayer(immediate: true);
                     UpdateTaskbarProgress();
-                    ApplyTaskbarExperienceSettings();
-                    if (wasConnected)
+                    ApplyTaskbarExperienceSettings(publishSize: restBefore is null);
+                    if (restBefore is not null)
                     {
-                        if (restBefore is not null)
-                            AnimateRestConnectionChange(restBefore);
-                        else
-                            AnimateArtworkConnectionTransition();
+                        PublishRestTransitionTargetSize();
+                        AnimateRestConnectionChange(restBefore);
                     }
 
                     // 任务栏无媒体时保持完全透明。
@@ -1700,6 +1721,8 @@ namespace AFMediaBar.Components
             Dispatcher.Invoke(() =>
             {
                 var restBefore = !wasConnected ? CaptureRestVisuals(targetConnected: true) : null;
+                if (!wasConnected)
+                    PrepareRestConnectionTransition(restBefore, entering: true);
                 string newTitle = !string.IsNullOrEmpty(snapshot.Title) ? snapshot.Title : "-";
                 string newArtist = !string.IsNullOrWhiteSpace(snapshot.Artist)
                     ? snapshot.Artist
@@ -1784,19 +1807,21 @@ namespace AFMediaBar.Components
                 TaskbarNextButton.IsEnabled = _canSkipNext;
                 TaskbarPlayPauseIcon.Symbol = _isPaused ? SymbolRegular.Play24 : SymbolRegular.Pause24;
                 UpdateTaskbarProgress();
-                ApplyTaskbarExperienceSettings();
+                ApplyTaskbarExperienceSettings(publishSize: restBefore is null);
                 if (!wasConnected)
                 {
                     if (restBefore is not null)
+                    {
+                        PublishRestTransitionTargetSize();
                         AnimateRestConnectionChange(restBefore);
-                    else
-                        AnimateArtworkConnectionTransition();
+                    }
                 }
                 if (textChanged && wasConnected)
                     AnimateEntrance();
 
                 Visibility = Visibility.Visible;
-                RaiseDesiredSizeChanged();
+                if (restBefore is null)
+                    RaiseDesiredSizeChanged();
             });
         }
 
@@ -1804,15 +1829,18 @@ namespace AFMediaBar.Components
         /// <param name="isForcedRefresh">是否绕过内容指纹去重。/ Whether the content-fingerprint dedupe is bypassed.</param>
         private void RaiseDesiredSizeChanged(bool isForcedRefresh = false, bool skipTransition = false)
         {
+            if (_restTransitionPreparing || _restTransitionActive && _restTransitionTargetPublished)
+                return;
+
             if (_layoutEngine?.CurrentOrientation is not { } orientation)
                 return;
 
             var lyricsVisible = SongLyricsPanel.Opacity > 0;
-            var visibleText = lyricsVisible ? _lyricsFrame.Current : SongTitle.Text;
-            var secondaryText = lyricsVisible
+            var visibleText = !_isConnected ? string.Empty : lyricsVisible ? _lyricsFrame.Current : SongTitle.Text;
+            var secondaryText = _isConnected && lyricsVisible
                 ? string.IsNullOrEmpty(_lyricsFrame.CurrentTranslation) ? _lyricsFrame.Next : _lyricsFrame.CurrentTranslation
                 : string.Empty;
-            var artist = !lyricsVisible && SongArtistContainer.Visibility == Visibility.Visible ? _actualArtist : string.Empty;
+            var artist = _isConnected && !lyricsVisible && SongArtistContainer.Visibility == Visibility.Visible ? _actualArtist : string.Empty;
             // Spectrum tuning and metric selection never change their reserved widths. Keeping
             // those values (or play/pause) in the fingerprint causes redundant host size
             // animations and visibly nudges title/artist/lyrics while sliders are adjusted.

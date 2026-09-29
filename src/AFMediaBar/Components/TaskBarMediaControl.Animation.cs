@@ -624,28 +624,6 @@ public partial class TaskBarMediaControl
         }
     }
 
-    /// <summary>连接状态切换时清理旧文字动画，并让当前可见的封面或音符淡入。/ Clears stale text motion and fades in the visible artwork or note when connection state changes.</summary>
-    private void AnimateArtworkConnectionTransition()
-    {
-        SongInfoStackPanel.BeginAnimation(OpacityProperty, null);
-        if (SongInfoStackPanel.RenderTransform is TranslateTransform textTransform)
-            textTransform.BeginAnimation(TranslateTransform.XProperty, null);
-
-        SongImageBorder.BeginAnimation(OpacityProperty, null);
-        SongImageBorder.Opacity = 1;
-        var motion = CurrentMotion;
-        if (!motion.UseTransitions || SongImageBorder.Visibility != Visibility.Visible)
-            return;
-
-        SongImageBorder.BeginAnimation(OpacityProperty, new DoubleAnimation
-        {
-            From = 0,
-            To = 1,
-            Duration = motion.StandardDuration,
-            EasingFunction = CreateEaseOut()
-        });
-    }
-
     private bool CanUseTaskbarComponentHover() =>
         _isConnected && _currentMode == WindowMode.Taskbar && !_isVertical;
 

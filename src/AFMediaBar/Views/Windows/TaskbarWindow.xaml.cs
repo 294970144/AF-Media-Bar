@@ -104,6 +104,7 @@ public partial class TaskbarWindow : Window
     private long _sizeAnimationLastTimestamp;
     private bool _applySettingsSizeImmediately;
     private MediaBarSizeRequest? _pendingSizeRequest;
+    private MediaBarSizeRequest? _pendingRestExitSizeRequest;
     private MediaBarSizeRequest? _lastDesiredSizeRequest;
     private IntPtr _inputRegionWindowHandle;
     private RECT _lastInputRegion;
@@ -648,6 +649,10 @@ public partial class TaskbarWindow : Window
 
     private void UpdatePositionCore(bool positionImmediately)
     {
+        // The connection transition owns one stable geometry interval. Repeated snapshot probes
+        // must not replay placement while its text clip and widget offsets are moving.
+        if (!positionImmediately && MediaControl.IsRestConnectionTransitionActive)
+            return;
         if (_isClosing || _isEnvironmentSuspended || _isDragging || IsTaskbarPresentationSuspended ||
             _hostActions.IsEnvironmentRecovering)
         {
@@ -882,6 +887,7 @@ public partial class TaskbarWindow : Window
         _lastSnapshot = snapshot;
         if (snapshot.IsConnected && !wasConnected)
         {
+            _pendingRestExitSizeRequest = null;
             _quickLaunchApplyTimer.Stop();
             _pendingQuickLaunch = null;
             _compactFlyout.Dismiss();
@@ -891,6 +897,8 @@ public partial class TaskbarWindow : Window
             _timer.Start();
 
         // Delegate UI update to the original media control and its taskbar-only overlay.
+        MediaControl.AllowRestConnectionTransition = !_isDragging && !IsTaskbarPresentationSuspended &&
+            !_hostActions.IsEnvironmentRecovering;
         MediaControl.UpdateSongInfo(snapshot);
         MediaControl.ApplyAppearanceSettings();
         // 新宿主构造时仍是断开快照；若性能组件没有配置为“无媒体时保留”，构造阶段不会取得指标租约。
@@ -1859,9 +1867,26 @@ public partial class TaskbarWindow : Window
             return;
 
         _lastDesiredSizeRequest = request;
+        if (!MediaControl.IsRestConnectionTransitionActive)
+            _pendingRestExitSizeRequest = null;
         if (_isDragging || IsTaskbarPresentationSuspended || DateTime.UtcNow < _skipOccupiedAreaProbeUntilUtc)
         {
             _pendingSizeRequest = request;
+            return;
+        }
+
+        if (MediaControl.IsRestConnectionTransitionActive && orientation == LayoutOrientation.Horizontal)
+        {
+            _sizeAnimationTimer.Stop();
+            if (MediaControl.IsRestConnectionTransitionEntering)
+            {
+                _pendingRestExitSizeRequest = null;
+                ApplyDesiredSizeRequest(request with { SkipTransition = true }, orientation);
+            }
+            else
+            {
+                _pendingRestExitSizeRequest = request;
+            }
             return;
         }
 
@@ -1870,8 +1895,24 @@ public partial class TaskbarWindow : Window
 
     private void MediaControl_RestTransitionFinished(object? sender, EventArgs e)
     {
-        if (!_isClosing)
-            ApplyMediaBarVisibility();
+        if (_isClosing)
+            return;
+
+        var appliedSize = false;
+        if (_pendingRestExitSizeRequest is { } request && _appliedOrientation is { } orientation)
+        {
+            _pendingRestExitSizeRequest = null;
+            if (_isDragging || IsTaskbarPresentationSuspended)
+                _pendingSizeRequest = request;
+            else
+            {
+                ApplyDesiredSizeRequest(request with { SkipTransition = true }, orientation);
+                appliedSize = true;
+            }
+        }
+        if (!appliedSize)
+            UpdatePositionImmediately();
+        ApplyMediaBarVisibility();
     }
 
     private void ApplyDesiredSizeRequest(MediaBarSizeRequest request, LayoutOrientation orientation)
