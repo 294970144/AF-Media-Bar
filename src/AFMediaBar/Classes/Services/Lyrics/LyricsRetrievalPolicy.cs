@@ -13,7 +13,7 @@ internal static class LyricsRetrievalPolicy
     // QQ 优质歌词库优先；备用源并发后按分数采纳。阶段、权重和门槛属于实现策略，
     // 避免用户组合出互相冲突的调度规则；后续扩展在此调整，不重新添加策略 UI 设置。
     internal const string PreferredSource = LyricsSourceCatalog.QQMusic;
-    // QQ 在线候选必须足够可信才能结束优先阶段；本地缓存沿用身份匹配后 100 分的规则。
+    // QQ 在线候选必须足够可信才能结束优先阶段；所有结果都必须经过真实元数据评分。
     internal const int PreferredMinimumScore = 85;
 
     public static LyricsRetrievalPlan Plan(IReadOnlyList<ILyricsProvider> providers, IReadOnlyList<ILyricsProvider> enabled)

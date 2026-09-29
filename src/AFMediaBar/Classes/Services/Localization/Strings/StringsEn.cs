@@ -496,7 +496,7 @@ internal static class StringsEn
         table.Add("Lyrics.Source.SodaMusic", "Soda Music");
         table.Add("Lyrics.Source.Unknown", "Unknown source");
         table.Add("Lyrics.Sources.AllDisabled.Callout", "Every lyric source is off: no lyric request is sent at all, and the media bar shows the title and artist only.");
-        table.Add("Lyrics.Sources.Callout", "Try enabled QQ Music first, starting with its local cache; online matches must score at least 85. Otherwise query other enabled sources in parallel and trust the highest score, including confirmed absence of lyrics.");
+        table.Add("Lyrics.Sources.Callout", "Try enabled QQ Music first; matches must score at least 85 before lyrics are downloaded. Otherwise query other enabled sources in parallel and trust the highest score, including confirmed absence of lyrics.");
         table.Add("Lyrics.Sources.Expander.Description", "Choose which sources may supply lyrics. Retrieval stages and scoring are managed by the app.");
         table.Add("Lyrics.Sources.Expander.Title", "Lyric sources");
         table.Add("Lyrics.Sources.MoveDown", "Move down");
