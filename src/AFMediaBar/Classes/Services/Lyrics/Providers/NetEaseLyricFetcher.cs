@@ -35,7 +35,7 @@ internal static class NetEaseLyricFetcher
     /// <param name="sourceName">来源标识 / Source identifier.</param>
     /// <param name="request">歌词请求 / Lyric request.</param>
     /// <param name="cancellationToken">取消令牌 / Cancellation token.</param>
-    /// <returns>歌词结果；没有可用行时为 null / The lyric result, or null without usable lines.</returns>
+    /// <returns>有歌词或明确无歌词的结果；请求/解析失败且无有效结果时为 null。</returns>
     public static async Task<LyricsResult?> FetchAndBuildAsync(
         Api api,
         string songId,
@@ -45,8 +45,8 @@ internal static class NetEaseLyricFetcher
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var legacyTask = TryGetAsync(() => api.GetLyric(songId));
-        var wordLevelTask = TryGetAsync(() => api.GetLyricNew(songId));
+        var legacyTask = TryGetAsync("GetLyric", () => api.GetLyric(songId));
+        var wordLevelTask = TryGetAsync("GetLyricNew", () => api.GetLyricNew(songId));
         await Task.WhenAll(legacyTask, wordLevelTask);
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -57,7 +57,7 @@ internal static class NetEaseLyricFetcher
     /// 请求单个端点；失败返回 null，让另一侧的结果继续可用。
     /// Requests one endpoint; a failure returns null so the other side's result stays usable.
     /// </summary>
-    private static async Task<LyricResult?> TryGetAsync(Func<Task<LyricResult?>> request)
+    private static async Task<LyricResult?> TryGetAsync(string endpoint, Func<Task<LyricResult?>> request)
     {
         try
         {
@@ -67,8 +67,9 @@ internal static class NetEaseLyricFetcher
         {
             throw;
         }
-        catch
+        catch (Exception exception)
         {
+            AppLogService.Current?.Warn("Lyrics", $"网易云歌词端点失败 / NetEase endpoint failed: endpoint={endpoint} {exception.GetType().Name}");
             return null;
         }
     }

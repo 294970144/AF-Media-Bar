@@ -43,7 +43,8 @@ public sealed class LyricsService
             {
                 var result = await TryProviderAsync(preferred, effectiveRequest, Remaining(started), work.Token).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
-                if (result is not null) return LogResult(result, started);
+                if (result is not null && result.MatchScore >= LyricsRetrievalPolicy.PreferredMinimumScore)
+                    return LogResult(result, started);
             }
             cancellationToken.ThrowIfCancellationRequested();
             var budget = Remaining(started);
@@ -72,7 +73,10 @@ public sealed class LyricsService
         try
         {
             task = provider.GetLyricsAsync(request, source.Token);
-            return await task.WaitAsync(budget, token).ConfigureAwait(false);
+            var result = await task.WaitAsync(budget, token).ConfigureAwait(false);
+            AppLogService.Current?.Info("Lyrics", $"来源取词结果 / provider result: source={provider.SourceName} " +
+                $"status={result?.Status.ToString() ?? "FailedOrUnmatched"} score={result?.MatchScore.ToString() ?? "none"}");
+            return result;
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -82,7 +86,7 @@ public sealed class LyricsService
         }
         catch (Exception exception)
         {
-            AppLogService.Current?.Verbose("Lyrics", $"来源未命中 / provider failed: {provider.SourceName} {exception.GetType().Name}");
+            AppLogService.Current?.Warn("Lyrics", $"来源取词失败 / provider failed: {provider.SourceName} {exception.GetType().Name}");
             return null;
         }
         finally
@@ -97,7 +101,8 @@ public sealed class LyricsService
     private static LyricsResult? LogResult(LyricsResult? result, long started)
     {
         AppLogService.Current?.Info("Lyrics", $"取词结束 / retrieval completed: source={result?.Source ?? "none"} " +
-            $"score={result?.MatchScore.ToString() ?? "none"} elapsed={Stopwatch.GetElapsedTime(started).TotalMilliseconds:0}ms");
+            $"score={result?.MatchScore.ToString() ?? "none"} status={result?.Status.ToString() ?? "FailedOrUnmatched"} " +
+            $"elapsed={Stopwatch.GetElapsedTime(started).TotalMilliseconds:0}ms");
         return result;
     }
 }

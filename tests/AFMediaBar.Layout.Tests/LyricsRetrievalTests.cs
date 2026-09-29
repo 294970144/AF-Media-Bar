@@ -19,13 +19,57 @@ public sealed class LyricsRetrievalTests
     [TestMethod]
     public async Task QQIsTriedFirstEvenWhenAnotherSourceHasAnExactIdOrHigherPriority()
     {
-        var qq = new Provider(LyricsSourceCatalog.QQMusic, _ => Task.FromResult<LyricsResult?>(Hit("QQ", 80)));
+        var qq = new Provider(LyricsSourceCatalog.QQMusic, _ => Task.FromResult<LyricsResult?>(Hit("QQ", 85)));
         var exact = new Provider(LyricsSourceCatalog.NetEase, _ => Task.FromResult<LyricsResult?>(Hit("exact", 100)));
         SettingsManager.SetLyricsSourceSettings(new([exact.SourceName, qq.SourceName]));
         var result = await new LyricsService(exact, qq).GetLyricsAsync(Request(), CancellationToken.None);
         Assert.AreEqual("QQ", result!.Source);
         Assert.AreEqual(1, qq.Calls);
         Assert.AreEqual(0, exact.Calls);
+    }
+
+    [TestMethod]
+    public async Task QQBelow85CannotEndThePreferredStage()
+    {
+        var qq = new Provider(LyricsSourceCatalog.QQMusic, _ => Task.FromResult<LyricsResult?>(Hit("QQ", 84)));
+        var fallback = new Provider("backup", _ => Task.FromResult<LyricsResult?>(Hit("backup", 63)));
+        var result = await new LyricsService(qq, fallback).GetLyricsAsync(Request(), CancellationToken.None);
+        Assert.AreEqual("backup", result!.Source);
+        Assert.AreEqual(1, fallback.Calls);
+    }
+
+    [TestMethod]
+    public async Task ConfirmedNoLyricsAtQQThresholdEndsRetrieval()
+    {
+        var qq = new Provider(LyricsSourceCatalog.QQMusic, _ => Task.FromResult<LyricsResult?>(LyricsResult.NoLyrics("QQ", 85)));
+        var fallback = new Provider("backup", _ => Task.FromResult<LyricsResult?>(Hit("backup", 100)));
+        var result = await new LyricsService(qq, fallback).GetLyricsAsync(Request(), CancellationToken.None);
+        Assert.AreEqual(LyricsResultStatus.NoLyrics, result!.Status);
+        Assert.AreEqual(0, fallback.Calls);
+    }
+
+    [TestMethod]
+    public async Task HighestScoringConfirmedNoLyricsBeatsLowerScoringLyrics()
+    {
+        var correct = new Provider(LyricsSourceCatalog.NetEaseSearch,
+            _ => Task.FromResult<LyricsResult?>(LyricsResult.NoLyrics("NeteaseSearch", 100)));
+        var wrong = new Provider(LyricsSourceCatalog.Kugou, _ => Task.FromResult<LyricsResult?>(Hit("Kugou", 63)));
+        var result = await new LyricsService(wrong, correct).GetLyricsAsync(Request(), CancellationToken.None);
+        Assert.AreEqual("NeteaseSearch", result!.Source);
+        Assert.AreEqual(100, result.MatchScore);
+        Assert.AreEqual(LyricsResultStatus.NoLyrics, result.Status);
+        Assert.AreEqual(0, result.Document.Lines.Count);
+    }
+
+    [TestMethod]
+    public async Task FailedSourceDoesNotVetoUsableLyricsAndLowerNoLyricsDoesNotVetoHigherScore()
+    {
+        var failed = new Provider("failed", _ => Task.FromException<LyricsResult?>(new FormatException("invalid payload")));
+        var lower = new Provider("lower", _ => Task.FromResult<LyricsResult?>(LyricsResult.NoLyrics("lower", 63)));
+        var higher = new Provider("higher", _ => Task.FromResult<LyricsResult?>(Hit("higher", 95)));
+        var result = await new LyricsService(failed, lower, higher).GetLyricsAsync(Request(), CancellationToken.None);
+        Assert.AreEqual("higher", result!.Source);
+        Assert.AreEqual(LyricsResultStatus.Available, result.Status);
     }
 
     [TestMethod]

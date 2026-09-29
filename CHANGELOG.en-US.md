@@ -12,6 +12,8 @@ Reliability fixes: media-session self-healing, spectrum level calibration, and l
 
 ### Changed
 
+- QQ Music online lyric downloads now require a match score of 85. Fallback selection trusts the highest score, including confirmed absence of lyrics, so instrumental tracks are not replaced by lower-scoring lyrics. Logs distinguish song matching, provider results, and final selection.
+
 - Media artwork now comes only from SMTC. Removed artwork URL downloads and caching from the independent NetEase source; when no same-track SMTC artwork is available, no artwork is shown. Memory reading still supplies track information, progress, and lyrics.
 
 - Lyrics now try enabled QQ Music first, retaining its local cache, then query other enabled sources in parallel and choose the highest matching score. Independent scoring reduces preview-duration influence and supplies search variants for translated names. Strictness, dispatch, adoption, batch, player-binding, and source-order controls and their obsolete settings fields are removed; old files with the same schema remain readable, but saving drops those fields.
