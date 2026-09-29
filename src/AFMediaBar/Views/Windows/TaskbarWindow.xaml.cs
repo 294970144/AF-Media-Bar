@@ -642,7 +642,11 @@ public partial class TaskbarWindow : Window
         }
     }
 
-    private void UpdatePosition(bool positionImmediately = false)
+    private void UpdatePosition() => UpdatePositionCore(positionImmediately: false);
+
+    private void UpdatePositionImmediately() => UpdatePositionCore(positionImmediately: true);
+
+    private void UpdatePositionCore(bool positionImmediately)
     {
         if (_isClosing || _isEnvironmentSuspended || _isDragging || IsTaskbarPresentationSuspended ||
             _hostActions.IsEnvironmentRecovering)
@@ -929,7 +933,7 @@ public partial class TaskbarWindow : Window
         }
 
         ApplyLayoutSettings(windowMode, orientationMode, taskbarHandle);
-        Dispatcher.BeginInvoke(UpdatePosition, DispatcherPriority.Background);
+        Dispatcher.BeginInvoke(() => UpdatePosition(), DispatcherPriority.Background);
     }
 
     private void ApplyLayoutSettings(WindowMode windowMode, LayoutOrientationMode orientationMode, IntPtr taskbarHandle)
@@ -998,7 +1002,7 @@ public partial class TaskbarWindow : Window
 
         if (orientationChanged && IsLoaded)
         {
-            Dispatcher.BeginInvoke(UpdatePosition, DispatcherPriority.Loaded);
+            Dispatcher.BeginInvoke(() => UpdatePosition(), DispatcherPriority.Loaded);
         }
 
         // 此宿主只呈现任务栏模式；旧模式值由设置归一化处理。
@@ -1127,7 +1131,7 @@ public partial class TaskbarWindow : Window
             _applySettingsSizeImmediately = previousImmediate;
         }
         // 设置改动会先写入控件宽度；位置与窗口裁剪区域必须在本次 UI 更新内一起落地。
-        UpdatePosition(positionImmediately: true);
+        UpdatePositionImmediately();
     }
 
     /// <summary>
@@ -1899,7 +1903,7 @@ public partial class TaskbarWindow : Window
             _sizeAnimationTimer.Stop();
             ApplyPrimaryLength(target);
             if (!_applySettingsSizeImmediately)
-                UpdatePosition(positionImmediately: true);
+                UpdatePositionImmediately();
             return;
         }
 
@@ -2110,7 +2114,7 @@ public partial class TaskbarWindow : Window
             durationMilliseconds: MotionPolicy.ResolveCurrent().PositionDuration.TotalMilliseconds);
         _sizeAnimationProgress = frame.Progress;
         ApplyPrimaryLength(frame.Value);
-        UpdatePosition(positionImmediately: true);
+        UpdatePositionImmediately();
         if (frame.IsCompleted)
         {
             _sizeAnimationTimer.Stop();
