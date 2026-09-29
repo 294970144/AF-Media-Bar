@@ -335,7 +335,7 @@ internal static class StringsEn
         table.Add("DisplayModes.Placement.Row.Monitor.Description", "Select one or more monitors; at least one target stays selected");
         table.Add("DisplayModes.Placement.Row.Offset.Description", "Fine-tunes the gap between the media bar and the icon area along the cross axis");
         table.Add("DisplayModes.Placement.Row.Offset.Title", "Edge offset");
-        table.Add("DisplayModes.Placement.Row.Orientation.Description", "Follows the taskbar orientation automatically, or forces horizontal or vertical");
+        table.Add("DisplayModes.Placement.Row.Orientation.Description", "Only horizontal layout is implemented; this option is temporarily unavailable");
         table.Add("DisplayModes.Placement.Row.Orientation.Title", "Orientation");
         table.Add("DisplayModes.Placement.Row.Reset.Description", "Returns to the position that automatic avoidance calculates");
         table.Add("DisplayModes.Rest.Component.Artwork", "Artwork");

@@ -254,6 +254,7 @@
                             <components:SettingsRow
                                 Description="{DynamicResource Loc.DisplayModes.Placement.Row.Orientation.Description}"
                                 Icon="{ui:SymbolIcon Orientation24}"
+                                IsEnabled="False"
                                 Title="{DynamicResource Loc.DisplayModes.Placement.Row.Orientation.Title}">
                                 <ComboBox
                                     MinWidth="200"

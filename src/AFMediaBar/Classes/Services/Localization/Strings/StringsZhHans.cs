@@ -335,7 +335,7 @@ internal static class StringsZhHans
         table.Add("DisplayModes.Placement.Row.Monitor.Description", "勾选一个或多个显示器；至少保留一个目标");
         table.Add("DisplayModes.Placement.Row.Offset.Description", "沿跨轴微调媒体栏与图标区之间的间距");
         table.Add("DisplayModes.Placement.Row.Offset.Title", "边缘偏移");
-        table.Add("DisplayModes.Placement.Row.Orientation.Description", "自动跟随任务栏方向，也可强制横向或纵向");
+        table.Add("DisplayModes.Placement.Row.Orientation.Description", "目前仅实现横向排列，暂时不可调整");
         table.Add("DisplayModes.Placement.Row.Orientation.Title", "排列方向");
         table.Add("DisplayModes.Placement.Row.Reset.Description", "恢复到自动避让计算出的位置");
         table.Add("DisplayModes.Rest.Component.Artwork", "封面");
