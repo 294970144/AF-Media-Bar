@@ -642,7 +642,7 @@ public partial class TaskbarWindow : Window
         }
     }
 
-    private void UpdatePosition()
+    private void UpdatePosition(bool positionImmediately = false)
     {
         if (_isClosing || _isEnvironmentSuspended || _isDragging || IsTaskbarPresentationSuspended ||
             _hostActions.IsEnvironmentRecovering)
@@ -701,8 +701,11 @@ public partial class TaskbarWindow : Window
 
             if (taskbarHandle != IntPtr.Zero && interop.Handle != IntPtr.Zero)
             {
-                Dispatcher.BeginInvoke(() => { CalculateAndSetPosition(taskbarHandle, interop.Handle); },
-                    DispatcherPriority.Background);
+                if (positionImmediately)
+                    CalculateAndSetPosition(taskbarHandle, interop.Handle);
+                else
+                    Dispatcher.BeginInvoke(() => { CalculateAndSetPosition(taskbarHandle, interop.Handle); },
+                        DispatcherPriority.Background);
             }
         }
         catch (Exception ex)
@@ -1106,7 +1109,11 @@ public partial class TaskbarWindow : Window
             // 布局状态未变化时 ApplyLayoutSettings 不会做任何工作。
             // Rest-layer settings include the media font size, so the layout has to be re-applied before the text update;
             // ApplyLayoutSettings does nothing when the layout state is unchanged.
-            ApplyLayoutSettings(SettingsManager.Current.WindowMode, SettingsManager.Current.LayoutOrientationMode);
+            var taskbarHandle = _lastTaskbarHandle;
+            if (taskbarHandle == IntPtr.Zero)
+                taskbarHandle = _taskBarService.GetSelectedTaskbarHandle(_targetMonitorDeviceId, out _);
+            ApplyLayoutSettings(SettingsManager.Current.WindowMode, SettingsManager.Current.LayoutOrientationMode,
+                taskbarHandle);
             ApplyExtraFeaturesSettings();
             MediaControl.UpdateSongInfo(_lastSnapshot);
             // 改设置就可能改变静置层还剩几个组件，因此"完全隐藏"的结论必须跟着重算一次：
@@ -1119,7 +1126,8 @@ public partial class TaskbarWindow : Window
         {
             _applySettingsSizeImmediately = previousImmediate;
         }
-        Dispatcher.BeginInvoke(UpdatePosition, DispatcherPriority.Background);
+        // 设置改动会先写入控件宽度；位置与窗口裁剪区域必须在本次 UI 更新内一起落地。
+        UpdatePosition(positionImmediately: true);
     }
 
     /// <summary>
@@ -1890,7 +1898,8 @@ public partial class TaskbarWindow : Window
         {
             _sizeAnimationTimer.Stop();
             ApplyPrimaryLength(target);
-            UpdatePosition();
+            if (!_applySettingsSizeImmediately)
+                UpdatePosition(positionImmediately: true);
             return;
         }
 
@@ -2101,7 +2110,7 @@ public partial class TaskbarWindow : Window
             durationMilliseconds: MotionPolicy.ResolveCurrent().PositionDuration.TotalMilliseconds);
         _sizeAnimationProgress = frame.Progress;
         ApplyPrimaryLength(frame.Value);
-        UpdatePosition();
+        UpdatePosition(positionImmediately: true);
         if (frame.IsCompleted)
         {
             _sizeAnimationTimer.Stop();
