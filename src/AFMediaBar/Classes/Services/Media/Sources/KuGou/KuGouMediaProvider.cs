@@ -20,7 +20,7 @@ public sealed class KuGouMediaProvider : IMediaSourceProvider, IMemoryPrunable
     /// <c>TimelineUpdatedAt</c> (see <c>TaskbarExperiencePolicy.GetPosition</c>), and polling only re-anchors to the real position
     /// periodically. 233ms matches the NetEase provider.
     /// </summary>
-    private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(233);
+    private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(100);
 
     /// <summary>空闲档位的轮询周期，与网易云提供器一致：空闲时两秒一次足够在按下播放后很快跟上。/ The poll period at the idle level, matching the NetEase provider: once every two seconds still follows a play press closely.</summary>
     private const int IdlePollIntervalMilliseconds = 2_000;

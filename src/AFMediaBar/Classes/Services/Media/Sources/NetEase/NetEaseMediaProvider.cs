@@ -23,7 +23,7 @@ public sealed class NetEaseMediaProvider : IIndependentMediaSourceProvider, IMem
     public IMediaSourcePolicy SourcePolicy => _sourcePolicy;
 
     private const string MemoryPlayerSourceId = NetEaseSourcePolicy.SourceId;
-    private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(233);
+    private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(100);
 
     /// <summary>
     /// 空闲档位的轮询周期。空闲意味着已经有五分钟没有媒体、十分钟没有用户操作：此时连"有没有在放"都不需要每秒问四次，
