@@ -15,6 +15,8 @@ public sealed class TaskbarExperiencePolicyTests
         var compact = TaskbarDensityMetrics.From(TaskbarInformationDensity.Minimal);
         var information = TaskbarDensityMetrics.From(TaskbarInformationDensity.Information);
         Assert.IsTrue(information.ButtonSize > compact.ButtonSize);
+        Assert.IsTrue(information.IconSize > compact.IconSize);
+        Assert.IsTrue(information.IconSize < information.ButtonSize);
         Assert.IsTrue(information.ProgressWidth > compact.ProgressWidth);
         Assert.IsTrue(information.HoverLayerHeight > compact.HoverLayerHeight);
         Assert.IsTrue(information.SectionGap > compact.SectionGap);

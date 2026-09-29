@@ -350,9 +350,9 @@ internal static class StringsEn
         table.Add("DisplayModes.Rest.Component.Volume.Description", "Opens the volume menu on click and adjusts the current source's volume on the wheel");
         table.Add("DisplayModes.Rest.ContentLayout.AdaptiveStack", "Adaptive stack");
         table.Add("DisplayModes.Rest.ContentLayout.CompactInline", "Compact inline");
-        table.Add("DisplayModes.Rest.Density.Balanced", "Balanced");
-        table.Add("DisplayModes.Rest.Density.Information", "Information first");
-        table.Add("DisplayModes.Rest.Density.Minimal", "Minimal");
+        table.Add("DisplayModes.Rest.Density.Balanced", "Medium");
+        table.Add("DisplayModes.Rest.Density.Information", "Large");
+        table.Add("DisplayModes.Rest.Density.Minimal", "Small");
         table.Add("DisplayModes.Rest.Group.Description", "The always-visible base layer that carries the artwork, the title, and the lyrics");
         table.Add("DisplayModes.Rest.Group.Status", "Always on");
         table.Add("DisplayModes.Rest.Idle.Expander.Description", "Which components stay on the media bar while no media source exists; with nothing checked the whole bar is hidden");
@@ -366,7 +366,7 @@ internal static class StringsEn
         table.Add("DisplayModes.Rest.Order.Reset.Title", "Restore the default order");
         table.Add("DisplayModes.Rest.Row.Alignment.Description", "Sets how the media text is aligned inside the media bar");
         table.Add("DisplayModes.Rest.Row.Alignment.Title", "Title and artist alignment");
-        table.Add("DisplayModes.Hover.Row.Size.Description", "Sets hover button and progress sizes; also affects small rest-layer buttons");
+        table.Add("DisplayModes.Hover.Row.Size.Description", "Sets hover button, icon, and progress sizes; also affects small rest-layer buttons");
         table.Add("DisplayModes.Hover.Row.Size.Title", "Control size");
         table.Add("DisplayModes.Hover.Row.Spacing.Description", "Horizontal gap between hover buttons and the progress bar");
         table.Add("DisplayModes.Hover.Row.Spacing.Title", "Hover button spacing");

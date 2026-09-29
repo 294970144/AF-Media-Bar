@@ -350,9 +350,9 @@ internal static class StringsZhHans
         table.Add("DisplayModes.Rest.Component.Volume.Description", "点击打开音量菜单，在其上滚动调节当前来源的音量");
         table.Add("DisplayModes.Rest.ContentLayout.AdaptiveStack", "自适应堆叠");
         table.Add("DisplayModes.Rest.ContentLayout.CompactInline", "紧凑行内");
-        table.Add("DisplayModes.Rest.Density.Balanced", "均衡");
-        table.Add("DisplayModes.Rest.Density.Information", "信息优先");
-        table.Add("DisplayModes.Rest.Density.Minimal", "精简");
+        table.Add("DisplayModes.Rest.Density.Balanced", "中");
+        table.Add("DisplayModes.Rest.Density.Information", "大");
+        table.Add("DisplayModes.Rest.Density.Minimal", "小");
         table.Add("DisplayModes.Rest.Group.Description", "始终显示的基础层，承载封面、标题与歌词");
         table.Add("DisplayModes.Rest.Group.Status", "始终开启");
         table.Add("DisplayModes.Rest.Idle.Expander.Description", "没有媒体来源时媒体栏上还留哪些组件；一个都不勾选时整条媒体栏隐藏");
@@ -366,7 +366,7 @@ internal static class StringsZhHans
         table.Add("DisplayModes.Rest.Order.Reset.Title", "恢复默认顺序");
         table.Add("DisplayModes.Rest.Row.Alignment.Description", "设置媒体文字在媒体栏内的对齐方式");
         table.Add("DisplayModes.Rest.Row.Alignment.Title", "标题与歌手对齐");
-        table.Add("DisplayModes.Hover.Row.Size.Description", "调整悬停按钮与进度条的尺寸档位，也影响静置层的小按钮");
+        table.Add("DisplayModes.Hover.Row.Size.Description", "调整悬停按钮、图标与进度条的尺寸，也影响静置层的小按钮");
         table.Add("DisplayModes.Hover.Row.Size.Title", "控件尺寸");
         table.Add("DisplayModes.Hover.Row.Spacing.Description", "悬停层按钮及进度条之间的水平间距");
         table.Add("DisplayModes.Hover.Row.Spacing.Title", "悬停按钮间距");

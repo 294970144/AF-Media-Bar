@@ -934,6 +934,13 @@ namespace AFMediaBar.Components
             TaskbarOutputDeviceSurface.Height = metrics.ButtonSize;
             TaskbarVolumeSurface.Width = metrics.ButtonSize;
             TaskbarVolumeSurface.Height = metrics.ButtonSize;
+            TaskbarOutputDeviceGlyph.FontSize = metrics.IconSize;
+            TaskbarVolumeGlyph.FontSize = metrics.IconSize;
+            TaskbarPreviousIcon.FontSize = metrics.IconSize;
+            TaskbarPlayPauseIcon.FontSize = metrics.IconSize;
+            TaskbarNextIcon.FontSize = metrics.IconSize;
+            TaskbarHoverDeviceGlyph.FontSize = metrics.IconSize;
+            TaskbarHoverVolumeGlyph.FontSize = metrics.IconSize;
             // 静置层进度条只在媒体报告了时长、且开关打开时显示；开关是用户对"静置层要不要这条进度"的回答。
             // The rest-layer progress bar appears only while the session reports a duration and the switch is on; the switch is the
             // user's answer to "should the rest layer carry this progress line at all".

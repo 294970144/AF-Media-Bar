@@ -6,15 +6,16 @@ namespace AFMediaBar.Classes.Services;
 /// <summary>信息密度对应的实际组件尺寸。 / Actual component sizes for an information-density preset.</summary>
 public readonly record struct TaskbarDensityMetrics(
     double ButtonSize,
+    double IconSize,
     double ProgressWidth,
     double HoverLayerHeight,
     double SectionGap)
 {
     public static TaskbarDensityMetrics From(TaskbarInformationDensity density) => density switch
     {
-        TaskbarInformationDensity.Minimal => new(22, 76, 36, 6),
-        TaskbarInformationDensity.Information => new(28, 118, 42, 10),
-        _ => new(24, 96, 40, 8)
+        TaskbarInformationDensity.Minimal => new(22, 12, 76, 36, 6),
+        TaskbarInformationDensity.Information => new(28, 18, 118, 42, 10),
+        _ => new(24, 14, 96, 40, 8)
     };
 }
 
