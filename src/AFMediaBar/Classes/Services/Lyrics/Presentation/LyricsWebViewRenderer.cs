@@ -64,9 +64,8 @@ public sealed class LyricsWebViewRenderer(WebView2CompositionControl webView) : 
                 _webView.CreationProperties = new CoreWebView2CreationProperties
                 {
                     UserDataFolder = Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "AFMediaBar",
-                        "EBWebView")
+                         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "AFMediaBar")
                 };
             }
 
