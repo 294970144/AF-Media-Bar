@@ -471,6 +471,11 @@ public readonly record struct TaskbarExperienceSettings(
     /// <summary>静置层是否显示播放态频谱。 / Whether the rest layer shows the playing spectrum.</summary>
     public bool SpectrumVisible { get; init; } = true;
 
+    /// <summary>有媒体时静置层是否显示封面；不影响无媒体时的小音符。/ Whether the rest layer shows artwork while media is connected; the idle note has its own setting.</summary>
+    public bool ArtworkVisible { get => _artworkVisible ?? true; init => _artworkVisible = value; }
+
+    private readonly bool? _artworkVisible;
+
     /// <summary>静置层是否显示性能组件。 / Whether the rest layer shows the performance component.</summary>
     public bool PerformanceVisible { get; init; } = true;
 

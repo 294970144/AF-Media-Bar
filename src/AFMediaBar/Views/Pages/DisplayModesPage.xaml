@@ -319,6 +319,13 @@
                             <components:SettingsDiagram Margin="0,0,0,12" Kind="LayerRest" />
 
                             <components:SettingsRow
+                                Description="{DynamicResource Loc.DisplayModes.Rest.Row.Artwork.Description}"
+                                Icon="{ui:SymbolIcon Image24}"
+                                Title="{DynamicResource Loc.DisplayModes.Rest.Row.Artwork.Title}">
+                                <ui:ToggleSwitch IsChecked="{Binding ViewModel.RestArtworkVisible, Mode=TwoWay}" />
+                            </components:SettingsRow>
+
+                            <components:SettingsRow
                                 Description="{DynamicResource Loc.DisplayModes.Rest.Row.Progress.Description}"
                                 Icon="{ui:SymbolIcon Play24}"
                                 Title="{DynamicResource Loc.DisplayModes.Rest.Row.Progress.Title}">

@@ -1057,6 +1057,12 @@
   <data name="DisplayModes.Rest.Row.Progress.Description" xml:space="preserve">
     <value>在静置层底部显示只读进度；无时长时隐藏。</value>
   </data>
+  <data name="DisplayModes.Rest.Row.Artwork.Description" xml:space="preserve">
+    <value>有媒体时显示封面；不影响无媒体时的小音符。</value>
+  </data>
+  <data name="DisplayModes.Rest.Row.Artwork.Title" xml:space="preserve">
+    <value>显示封面</value>
+  </data>
   <data name="DisplayModes.Rest.Row.Progress.Title" xml:space="preserve">
     <value>显示播放进度</value>
   </data>
@@ -2048,10 +2054,10 @@
     <value>正在下载更新 {0}%</value>
   </data>
   <data name="Update.Tray.Failed" xml:space="preserve">
-    <value>更新失败，点击重试</value>
+    <value>更新失败，点击查看</value>
   </data>
   <data name="Update.Tray.Ready" xml:space="preserve">
-    <value>更新已就绪（v{0}），点击重启安装</value>
+    <value>更新已就绪（v{0}），点击查看</value>
   </data>
   <data name="Update.Tray.Verifying" xml:space="preserve">
     <value>正在校验安装包 {0}%</value>

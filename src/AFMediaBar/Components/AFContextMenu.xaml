@@ -13,9 +13,17 @@
              BorderThickness="1"
              DataContext="{Binding RelativeSource={RelativeSource Self}}">
 
+    <ContextMenu.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </ContextMenu.Resources>
+
     <ui:MenuItem x:Name="SessionsMenuItem"
                  Header="{DynamicResource Loc.Common.SwitchMediaSource}"
                  Icon="{ui:SymbolIcon MusicNote216}" />
+
+    <ui:MenuItem x:Name="QuickLaunchMenuItem"
+                 Header="{DynamicResource Loc.Common.Group.QuickLaunch}"
+                 Icon="{ui:SymbolIcon Rocket24}" />
 
     <Separator />
 
@@ -30,8 +38,8 @@
 
     <ui:MenuItem Header="{Binding ViewModel.UpdateMenuHeader}"
                  Icon="{ui:SymbolIcon ArrowSync24}"
-                 IsEnabled="{Binding ViewModel.IsUpdateMenuEnabled}"
-                 Command="{Binding ViewModel.UpdateMenuCommand}" />
+                 Visibility="{Binding ViewModel.IsUpdateMenuVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
+                 Click="UpdateMenuItem_Click" />
 
     <ui:MenuItem Header="{DynamicResource Loc.Common.Settings}"
                  Icon="{ui:SymbolIcon Settings24}"

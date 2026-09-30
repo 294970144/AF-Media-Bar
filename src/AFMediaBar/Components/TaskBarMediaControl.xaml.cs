@@ -1288,7 +1288,8 @@ namespace AFMediaBar.Components
                 experience.SpectrumVisible,
                 experience.PerformanceVisible,
                 experience.OutputDeviceVisible,
-                experience.VolumeVisible);
+                experience.VolumeVisible,
+                experience.ArtworkVisible);
 
         /// <summary>
         /// 一个静置层组件占用的固定宽度；媒体文字不吃固定宽度，它取剩余长度。

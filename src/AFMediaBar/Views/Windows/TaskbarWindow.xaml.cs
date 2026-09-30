@@ -158,6 +158,7 @@ public partial class TaskbarWindow : Window
         PlayerMenu.OpenSettingsRequested += PlayerMenu_OpenSettingsRequested;
         PlayerMenu.OpenUpdateSettingsRequested += PlayerMenu_OpenUpdateSettingsRequested;
         PlayerMenu.ReloadTaskbarHostRequested += PlayerMenu_ReloadTaskbarHostRequested;
+        PlayerMenu.QuickLaunchRequested += PlayerMenu_QuickLaunchRequested;
         // 组合滚轮结束时的合成点击必须被吞掉：静置层点击与右键菜单都要问同一个判定，它们分别属于控件与宿主。
         // The click synthesized when a chord wheel ends has to be swallowed: the rest-layer click and the context menu both ask the
         // same authority, and they live in the control and the host respectively.
@@ -1557,12 +1558,19 @@ public partial class TaskbarWindow : Window
         ShowQuickLaunchResult(result);
     }
 
-    private void ShowQuickLaunchResult(QuickLaunchResult result)
+    private async void PlayerMenu_QuickLaunchRequested(QuickLaunchEntry entry)
+    {
+        var result = await _sourceActivationService.LaunchAsync(entry);
+        if (_isClosing) return;
+        ShowQuickLaunchResult(result, GetMediaBarScreenPhysicalBounds());
+    }
+
+    private void ShowQuickLaunchResult(QuickLaunchResult result, TrayIconBounds? anchor = null)
     {
         if (_isClosing || result == QuickLaunchResult.Success) return;
         _compactFlyout.ShowQuickLaunch(
             SettingsManager.Current.QuickLaunch.Entries ?? [],
-            MediaControl.GetQuickLaunchAnchor());
+            anchor ?? MediaControl.GetQuickLaunchAnchor());
         _compactFlyout.ShowQuickLaunchStatus(DescribeQuickLaunchResult(result));
     }
 
@@ -2195,7 +2203,10 @@ public partial class TaskbarWindow : Window
         {
             e.Handled = true;
             PlayerMenu.IsOpen = false;
+            return;
         }
+
+        PlayerMenu.ApplyQuickLaunchEntries(SettingsManager.Current.QuickLaunch.Entries ?? []);
     }
 
     private static bool IsMediaAction(DependencyObject? source)
@@ -2240,6 +2251,7 @@ public partial class TaskbarWindow : Window
         MediaControl.VolumeWheelRequested -= MediaControl_VolumeWheelRequested;
         MediaControl.QuickLaunchMenuRequested -= MediaControl_QuickLaunchMenuRequested;
         MediaControl.QuickLaunchWheelRequested -= MediaControl_QuickLaunchWheelRequested;
+        PlayerMenu.QuickLaunchRequested -= PlayerMenu_QuickLaunchRequested;
         MediaControl.OpenTaskManagerRequested -= MediaControl_OpenTaskManagerRequested;
         MediaControl.WheelRequested -= MediaControl_WheelRequested;
         MediaControl.DesiredSizeChanged -= MediaControl_DesiredSizeChanged;

@@ -6,9 +6,9 @@ All notable changes to AF Media Bar are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.2.2] - 2026-09-30
+## [1.3.0] - 2026-09-30
 
-This release focuses on reliability and everyday polish, with additional lyric, appearance, and interaction settings.
+This release rebuilds lyric display and media-state transitions, adds appearance and interaction settings, and fixes media, audio, and layout issues.
 
 ### Added
 
@@ -17,6 +17,8 @@ This release focuses on reliability and everyday polish, with additional lyric, 
 - NetEase Cloud Music track information and lyrics through memory reading without SMTC, including the Store version. Kugou memory reading now provides progress with a shorter polling interval.
 - A separate Components page for idle widgets, with visual controls such as bar width, spacing, and interaction button size in Appearance. Hover-button spacing now has a slider.
 - A wheel-hint switch and disabled choices for tray actions. Installed fonts now have previews and Chinese names; Latin and Chinese font selections apply to their respective scripts.
+- A rest-layer artwork switch, on by default. Hiding artwork moves media text left; the existing idle-component list still controls the note when no media is connected.
+- A Quick Launch submenu below Switch Media Source in the media bar and tray context menus, populated from the latest bound entries each time they open.
 
 ### Changed
 
@@ -26,6 +28,7 @@ This release focuses on reliability and everyday polish, with additional lyric, 
 - Independent NetEase artwork URL downloads were removed; artwork comes from the same-track SMTC session. Matching tolerates guest-artist differences while rejecting artwork from another track.
 - Spectrum analysis adapts FFT length to the sample rate, improves band integration and high-frequency balance, shows relative levels at low volume, and follows the endpoint that is actually audible.
 - Reorganized Settings navigation, descriptions, and About content. Project information appears first, two sponsors were added, and Afdian links were removed. The unimplemented orientation option and tray modifier-wheel setting are temporarily disabled.
+- Removed manual update checking from the taskbar context menu. An update entry appears only when a newer version is known and opens the update page; manual checking remains available in Application settings.
 
 ### Fixed
 
@@ -42,6 +45,7 @@ This release focuses on reliability and everyday polish, with additional lyric, 
 - Taskbar UIA probes reuse one background MTA worker and coalesce pending work per taskbar. Media adapters and source arbitration use shared contracts.
 - LRU caches validate size and cost; transient failures expire. SMTC lyric cache keys include complete matching metadata, fallback lookups can retry, and artwork-color keys include theme and extraction parameters.
 - Moved all three interface languages into `Resources/*.resx` while retaining runtime language switching. Removed inactive Dynamic Island runtime code and raised the log retention limit to the latest 2,000 entries.
+- Settings schema remains 2: 1.2.1 settings still load, obsolete lyric fields disappear when saved again, and new options use defaults. The public update-manifest schema remains 1.
 
 ## [1.2.1] - 2026-09-21
 
@@ -178,7 +182,7 @@ The first release of the rebuilt interface and interaction model: taskbar lyrics
 - Restricted native library lookup to System32.
 - Removed generic execution of media-provided `.exe` source identifiers.
 
-[1.2.2]: https://github.com/Fervent-Tempo/AF-Media-Bar/compare/v1.2.1...v1.2.2
+[1.3.0]: https://github.com/Fervent-Tempo/AF-Media-Bar/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/Fervent-Tempo/AF-Media-Bar/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Fervent-Tempo/AF-Media-Bar/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/Fervent-Tempo/AF-Media-Bar/compare/v1.1.0...v1.1.1
