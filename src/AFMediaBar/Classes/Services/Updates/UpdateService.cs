@@ -134,17 +134,14 @@ public sealed class UpdateService : IDisposable
         RefreshInstallInfo();
         SettingsManager.SettingsChanged += OnSettingsChanged;
 
-        if (pending is not null &&
-            File.Exists(pending.Path) &&
-            UpdateVersionPolicy.IsUpdateAvailable(CurrentVersion, pending.Version) &&
-            !UpdateCheckSchedulePolicy.IsSkipped(SettingsManager.Current.Update, pending.Version))
+        if (ReadUsablePendingInstaller() is { } readyPending)
         {
             // 上次运行已经下载并校验过：直接进入"就绪"，用户不必重新下载 70 MB。清单本身会在下一次检查时补回来，
             // 因此这里用记录里的版本与哈希构造一个最小的清单，只用于驱动"就绪"状态与安装交接。
             // The previous run already downloaded and verified this file, so it starts out ready instead of making
             // the user download 70 MB again. The full manifest returns with the next check, so the pending record's
             // version and hash build the minimal manifest that drives the ready state and the install hand-off.
-            PublishState(CreateReadyState(pending));
+            PublishState(CreateReadyState(readyPending));
         }
 
         _scheduleTimer = new DispatcherTimer(DispatcherPriority.Background, _dispatcher)
@@ -183,6 +180,20 @@ public sealed class UpdateService : IDisposable
         {
             if (_disposed || _state.IsBusy)
             {
+                return;
+            }
+
+            // 已下载并校验完成的更新不会被后续检查覆盖：Ready 状态下再检查只会把"点击重启安装"入口换成
+            // Available / UpToDate（清单源慢一拍时尤其如此，例如备用源 jsDelivr 缓存着发布前的旧清单），
+            // 用户会以为更新失效。待安装安装包仍然有效时这里直接放过；安装它只需重启应用或点托盘入口。
+            // An already downloaded and verified update is never overwritten by a later check: checking again while
+            // Ready would replace the "click to restart and install" entry with Available / UpToDate (especially when a
+            // manifest source lags, for example the fallback source jsDelivr serving a pre-release cached manifest) and
+            // the user would think the update failed. With the pending installer still valid this returns; installing it
+            // only needs a restart or the tray entry.
+            if (UpdateReadyRetentionPolicy.ShouldRetainReadyState(_state.Phase, IsPendingInstallerUsable()))
+            {
+                Debug.WriteLine("[Update] Ready update retained; skipping the check while its installer is pending.");
                 return;
             }
 
@@ -818,6 +829,29 @@ public sealed class UpdateService : IDisposable
     private void RefreshInstallInfo()
     {
         _installInfo = _probe.Probe();
+    }
+
+    /// <summary>待安装安装包是否仍然可用：记录在、文件在、版本确实更新且没有被跳过。
+    /// Whether the pending installer is still usable: the record exists, the file exists, the version really is newer,
+    /// and the user has not skipped it.</summary>
+    private bool IsPendingInstallerUsable() => ReadUsablePendingInstaller() is not null;
+
+    /// <summary>读取仍可安装的待安装记录；不可用时返回 null。/ Reads the pending record while it is still usable; null otherwise.</summary>
+    private UpdatePendingFileRecord? ReadUsablePendingInstaller()
+    {
+        var pending = _store.ReadPendingRecord();
+        if (pending is null)
+        {
+            return null;
+        }
+
+        return UpdateReadyRetentionPolicy.IsPendingInstallerUsable(
+            recordExists: true,
+            fileExists: File.Exists(pending.Path),
+            versionIsNewer: UpdateVersionPolicy.IsUpdateAvailable(CurrentVersion, pending.Version),
+            isSkipped: UpdateCheckSchedulePolicy.IsSkipped(SettingsManager.Current.Update, pending.Version))
+            ? pending
+            : null;
     }
 
     private (bool CanInstall, bool UseRunAs, string? BlockedReason) ResolveInstallDecision()
