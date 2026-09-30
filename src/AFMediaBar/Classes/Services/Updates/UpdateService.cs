@@ -404,7 +404,23 @@ public sealed class UpdateService : IDisposable
             }
 
             var record = _store.ReadPendingRecord();
-            if (record is null || !File.Exists(record.Path))
+            if (record is null)
+            {
+                return false;
+            }
+
+            // 记录指出去的位置必须仍在更新目录里。指向别处时只丢掉记录本身：那里的文件不是我们放的，程序没有
+            // 理由去动它。
+            // The recorded location has to stay inside the update directory. Anything else drops the record and
+            // nothing more: whatever lives there was not put there by us, so there is no reason to touch it.
+            if (!_store.IsTrustedInstallerPath(record.Path))
+            {
+                Debug.WriteLine("[Update] Pending record points outside the update directory; discarding it.");
+                _store.ClearPendingRecord();
+                return false;
+            }
+
+            if (!File.Exists(record.Path))
             {
                 return false;
             }
@@ -421,6 +437,12 @@ public sealed class UpdateService : IDisposable
             }
 
             RefreshInstallInfo();
+
+            // 这里传的 asset 只表示"与记录指的是同一个文件"：启动时还没有清单，拿不到独立于记录的哈希，因此它
+            // 不构成任何完整性证据，真正的校验在 ResolvePendingInstallPlan 读回文件时完成。
+            // The asset passed here only says "the same file the record points at": no manifest has been fetched yet at
+            // startup, so no hash independent of the record exists and this argument is no integrity evidence at all.
+            // The real check happens in ResolvePendingInstallPlan, which reads the file back.
             plan = ResolvePendingInstallPlan(record, new UpdatePackageAsset(string.Empty, record.Size, record.Sha256));
         }
 
@@ -479,6 +501,17 @@ public sealed class UpdateService : IDisposable
         switch (_store.Evaluate(asset))
         {
             case UpdatePendingFileAction.Reuse:
+                // 长度和写入时间都对得上，只说明这段时间没人动过它；记录完全可能被一并改写过，所以这里真的把
+                // 文件读一遍，用哈希确认它仍是当初通过校验的那一份。
+                // Matching length and write time only say nobody touched it since; the record may well have been
+                // rewritten together with it, so the file is read back and confirmed by hash to still be the one that
+                // passed verification.
+                if (!_store.MatchesRecordedHash(record))
+                {
+                    Debug.WriteLine("[Update] Pending installer no longer matches its recorded hash; skipping this install attempt.");
+                    return null;
+                }
+
                 break;
 
             // 文件被改动过：不做同步重算 70 MB 哈希的阻塞操作，本次不安装，留给下一次启动或用户的显式请求。
