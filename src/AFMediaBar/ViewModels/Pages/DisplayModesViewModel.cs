@@ -159,6 +159,13 @@ public partial class DisplayModesViewModel : ObservableObject
         set => UpdateExperience(SettingsManager.Current.TaskbarExperience with { RestProgressVisible = value });
     }
 
+    /// <summary>有媒体时是否显示静置层封面；无媒体时的小音符由另一个设置控制。/ Whether to show artwork with media; the idle note is controlled separately.</summary>
+    public bool RestArtworkVisible
+    {
+        get => SettingsManager.Current.TaskbarExperience.ArtworkVisible;
+        set => UpdateExperience(SettingsManager.Current.TaskbarExperience with { ArtworkVisible = value });
+    }
+
     /// <summary>静置层是否显示频谱组件。 / Whether the rest layer shows the spectrum component.</summary>
     public bool SpectrumVisible
     {
@@ -725,6 +732,7 @@ public partial class DisplayModesViewModel : ObservableObject
         OnPropertyChanged(nameof(HoverLayerEnabled)); OnPropertyChanged(nameof(FullLayerEnabled));
         OnPropertyChanged(nameof(FullPanelEntryVisible));
         OnPropertyChanged(nameof(RestProgressVisible));
+        OnPropertyChanged(nameof(RestArtworkVisible));
         OnPropertyChanged(nameof(SpectrumVisible)); OnPropertyChanged(nameof(PerformanceVisible));
         OnPropertyChanged(nameof(HoverPlayPauseVisible)); OnPropertyChanged(nameof(HoverPreviousNextVisible));
         OnPropertyChanged(nameof(HoverOutputDeviceVisible)); OnPropertyChanged(nameof(HoverAudioControlVisible));

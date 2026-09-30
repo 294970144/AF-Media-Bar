@@ -42,7 +42,7 @@ Download a release package rather than GitHub's generated Source code archive. T
 | Sources and clicks | Switch media sessions; assign artwork and title/lyric clicks to play/pause, activate the media app, or open the full menu |
 | Audio and system | Click or scroll to switch the default output device, adjust the current media app's volume, and view spatial audio; four spectrum styles and a performance metrics component |
 | Layout and appearance | Avoid taskbar icons and system areas; select a display, auto-hide when nothing plays, and adjust fonts, accent colour, and window material |
-| Shortcuts | Hover for controls, open the full layer for more information, use the note icon for quick launch, and quickly switch output devices |
+| Shortcuts | Hover for controls, open the full layer for more information, use the note icon or the media bar and tray context menus for quick launch, and quickly switch output devices |
 
 **Limits:** Most players need to publish a Windows GSMTC session; some require “system media controls” or “media keys” in their settings. NetEase Cloud Music can also be discovered through memory reading, including the Store version without SMTC. Memory data takes priority for track information and lyrics; artwork and playback controls require its SMTC support. Artwork is read only from SMTC, without separate downloads; no artwork is shown when SMTC has none for the same track. NetEase appears once in the source list, and hiding it with source filtering enabled stops memory reading. Taskbar is the only runtime mode; Dynamic Island, Desktop Card, and Floating Orb in Settings are placeholders.
 

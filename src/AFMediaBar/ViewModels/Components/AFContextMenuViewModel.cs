@@ -1,23 +1,21 @@
 ﻿using AFMediaBar.Classes.Models;
+using AFMediaBar.Classes.Models.Updates;
 using AFMediaBar.Classes.Services;
+using AFMediaBar.Classes.Services.Localization;
 using AFMediaBar.Classes.Services.Updates;
-using AFMediaBar.Resources;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
-using static Lyricify.Lyrics.Providers.Web.Musixmatch.GetTokenResponse;
 
 namespace AFMediaBar.ViewModels.Components;
 
-/// <summary>维护托盘菜单的媒体选择与更新命令，不拥有媒体或更新服务。/ Tray menu state and commands; service lifetimes belong to the host.</summary>
+/// <summary>维护任务栏右键菜单的媒体选择与更新提示，不拥有媒体或更新服务。/ Holds media selection and update notice state for the taskbar menu; services belong to the host.</summary>
 public partial class AFContextMenuViewModel : ObservableObject
 {
     private readonly MediaSessionService _mediaSessionService;
     private readonly UpdateService _updateService;
 
-    [ObservableProperty] private string _updateMenuHeader =
-        Translations.Get("Update.Tray.Check");
+    [ObservableProperty] private string _updateMenuHeader = string.Empty;
 
-    [ObservableProperty] private bool _isUpdateMenuEnabled = true;
+    [ObservableProperty] private bool _isUpdateMenuVisible;
 
     [ObservableProperty] private bool _isReloadTaskbarHostEnabled = true;
 
@@ -25,16 +23,14 @@ public partial class AFContextMenuViewModel : ObservableObject
 
     public AFContextMenuViewModel(
         MediaSessionService mediaSessionService,
-        UpdateService updateService)
+        UpdateService updateService,
+        LocalizationService localization)
     {
         _mediaSessionService = mediaSessionService;
         _updateService = updateService;
-    }
-
-    [RelayCommand]
-    private void UpdateMenu()
-    {
-        ExecuteUpdateAction();
+        _updateService.UpdateStateChanged += ApplyUpdateState;
+        localization.LanguageChanged += (_, _) => ApplyUpdateState(_updateService.CurrentState);
+        ApplyUpdateState(_updateService.CurrentState);
     }
 
     [RelayCommand]
@@ -49,41 +45,9 @@ public partial class AFContextMenuViewModel : ObservableObject
         await _mediaSessionService.ReconnectAsync();
     }
 
-
-
-    private void ExecuteUpdateAction()
+    private void ApplyUpdateState(UpdateState state)
     {
-        switch (UpdatePresentationPolicy.ResolveTrayAction(
-                    _updateService.CurrentState))
-        {
-            case UpdateTrayAction.Check:
-                _ = CheckForUpdatesAsync();
-                break;
-
-            case UpdateTrayAction.Cancel:
-                _updateService.CancelDownload();
-                break;
-
-            case UpdateTrayAction.InstallAndRestart:
-                _updateService.RequestInstallAndExit();
-                break;
-
-            case UpdateTrayAction.OpenUpdatePage:
-                // Navigation
-                break;
-        }
-    }
-
-    private async Task CheckForUpdatesAsync()
-    {
-        try
-        {
-            await _updateService.CheckAsync(manual: true);
-        }
-        catch (Exception exception)
-        {
-            Debug.WriteLine(
-                $"[Update] Manual check failed: {exception}");
-        }
+        IsUpdateMenuVisible = UpdatePresentationPolicy.ShouldShowTrayNotice(state);
+        UpdateMenuHeader = IsUpdateMenuVisible ? UpdatePresentationPolicy.ResolveTrayHeader(state) : string.Empty;
     }
 }

@@ -165,6 +165,7 @@ namespace AFMediaBar.Views.Windows
             TrayMenu.OpenSettingsRequested += ViewModel_OpenSettingsRequested;
             TrayMenu.OpenUpdateSettingsRequested += ViewModel_OpenUpdateSettingsRequested;
             TrayMenu.ReloadTaskbarHostRequested += TrayMenu_ReloadTaskbarHostRequested;
+            TrayMenu.QuickLaunchRequested += TrayMenu_QuickLaunchRequested;
 
             // 快照事件已在服务内调度到 UI 线程，这里只负责转发给任务栏窗口。
             App.Services.GetRequiredService<MediaSessionService>().SnapshotChanged += MediaSessionService_OnSnapshotChanged;
@@ -302,6 +303,7 @@ namespace AFMediaBar.Views.Windows
             TrayMenu.OpenSettingsRequested -= ViewModel_OpenSettingsRequested;
             TrayMenu.OpenUpdateSettingsRequested -= ViewModel_OpenUpdateSettingsRequested;
             TrayMenu.ReloadTaskbarHostRequested -= TrayMenu_ReloadTaskbarHostRequested;
+            TrayMenu.QuickLaunchRequested -= TrayMenu_QuickLaunchRequested;
             _taskbarViewModel.OpenSettingsRequested -= ViewModel_OpenSettingsRequested;
             _taskbarViewModel.OpenUpdateSettingsRequested -= ViewModel_OpenUpdateSettingsRequested;
             _updateService.UpdateStateChanged -= UpdateService_OnStateChanged;
@@ -954,6 +956,7 @@ namespace AFMediaBar.Views.Windows
 
             _audioControlFlyout.Hide();
             TrayMenu.ApplySessions(App.Services.GetRequiredService<MediaSessionService>().CurrentSessionOptions);
+            TrayMenu.ApplyQuickLaunchEntries(SettingsManager.Current.QuickLaunch.Entries ?? []);
             TrayMenu.IsReloadTaskbarHostEnabled =
                 SettingsManager.Current.WindowMode == WindowMode.Taskbar;
             TrayMenu.PlacementTarget = this;
@@ -963,6 +966,19 @@ namespace AFMediaBar.Views.Windows
 
         private void TrayMenu_ReloadTaskbarHostRequested(object? sender, EventArgs e) =>
             RequestTaskbarHostReload();
+
+        private async void TrayMenu_QuickLaunchRequested(QuickLaunchEntry entry)
+        {
+            var result = await _sourceActivationService.LaunchAsync(entry);
+            if (_isClosing || result == QuickLaunchResult.Success)
+                return;
+
+            _trayIconService.TryShowNotification(
+                Translations.Get("Panel.QuickLaunch.Title"),
+                Translations.Get(result == QuickLaunchResult.InvalidTarget
+                    ? "Shell.QuickLaunch.Status.InvalidTarget"
+                    : "Shell.QuickLaunch.Status.Failed"));
+        }
 
         private void MouseInputMonitor_OnLeftButtonPressed(object? sender, NativeMouseButtonEventArgs e)
         {

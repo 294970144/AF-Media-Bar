@@ -6,9 +6,6 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using AFMediaBar.ViewModels.Components;
@@ -54,6 +51,8 @@ namespace AFMediaBar.Components
 
         public event EventHandler? ReloadTaskbarHostRequested;
 
+        public event Action<QuickLaunchEntry>? QuickLaunchRequested;
+
         public bool IsReloadTaskbarHostEnabled
         {
             get => ReloadTaskbarHostMenuItem.IsEnabled;
@@ -74,6 +73,33 @@ namespace AFMediaBar.Components
                     CommandParameter = option.Key
                 });
             }
+        }
+
+        public void ApplyQuickLaunchEntries(IReadOnlyList<QuickLaunchEntry> entries)
+        {
+            QuickLaunchMenuItem.Items.Clear();
+            if (entries.Count == 0)
+            {
+                QuickLaunchMenuItem.Items.Add(new System.Windows.Controls.MenuItem
+                {
+                    Header = Translations.Get("Panel.QuickLaunch.Empty"),
+                    IsEnabled = false
+                });
+                return;
+            }
+
+            foreach (var entry in entries)
+            {
+                var item = new System.Windows.Controls.MenuItem { Header = entry.DisplayName };
+                item.Click += (_, _) => QuickLaunchRequested?.Invoke(entry);
+                QuickLaunchMenuItem.Items.Add(item);
+            }
+        }
+
+        private void UpdateMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (UpdatePresentationPolicy.ShouldShowTrayNotice(_updateService.CurrentState))
+                OpenUpdateSettingsRequested?.Invoke(this, EventArgs.Empty);
         }
 
         private void ReloadTaskbarHostMenuItem_Click(object sender, RoutedEventArgs e) =>

@@ -1057,6 +1057,12 @@
   <data name="DisplayModes.Rest.Row.Progress.Description" xml:space="preserve">
     <value>Show read-only progress at the bottom of the rest layer; hide it when duration is unavailable.</value>
   </data>
+  <data name="DisplayModes.Rest.Row.Artwork.Description" xml:space="preserve">
+    <value>Show artwork while media is connected; the idle note has its own setting.</value>
+  </data>
+  <data name="DisplayModes.Rest.Row.Artwork.Title" xml:space="preserve">
+    <value>Show artwork</value>
+  </data>
   <data name="DisplayModes.Rest.Row.Progress.Title" xml:space="preserve">
     <value>Show playback progress</value>
   </data>
@@ -2048,10 +2054,10 @@
     <value>Downloading update {0}%</value>
   </data>
   <data name="Update.Tray.Failed" xml:space="preserve">
-    <value>Update failed, click to retry</value>
+    <value>Update failed, click to view</value>
   </data>
   <data name="Update.Tray.Ready" xml:space="preserve">
-    <value>Update ready (v{0}), click to restart and install</value>
+    <value>Update ready (v{0}), click to view</value>
   </data>
   <data name="Update.Tray.Verifying" xml:space="preserve">
     <value>Verifying the installer {0}%</value>

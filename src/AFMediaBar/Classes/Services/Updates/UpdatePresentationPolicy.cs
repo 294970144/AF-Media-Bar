@@ -133,6 +133,13 @@ public static class UpdatePresentationPolicy
         };
     }
 
+    /// <summary>仅在已发现新版本时显示右键菜单入口；失败时只有保留了新版本清单才继续显示。/ Shows the context-menu entry only for a known newer version, including a failed download with its manifest retained.</summary>
+    public static bool ShouldShowTrayNotice(UpdateState state) =>
+        state.Manifest is not null &&
+        UpdateVersionPolicy.IsUpdateAvailable(state.CurrentVersion, state.Manifest.Version) &&
+        state.Phase is UpdatePhase.Available or UpdatePhase.Downloading or UpdatePhase.Verifying or
+            UpdatePhase.Ready or UpdatePhase.ManualOnly or UpdatePhase.Failed;
+
     /// <summary>
     /// 托盘菜单项当前是否可点击：检查、下载与校验期间不可点击，因为再点一次不会改变正在发生的事。
     /// Whether the tray entry is clickable now: it is not during a check, download or verification, because

@@ -108,7 +108,29 @@ public sealed class UpdateScheduleAndInstallPolicyTests
         // click actually checks for updates.
         Assert.AreEqual("检查更新", UpdatePresentationPolicy.ResolveTrayHeader(State(UpdatePhase.Idle)));
         Assert.AreEqual("发现新版本 v1.2.0（点击查看）", UpdatePresentationPolicy.ResolveTrayHeader(State(UpdatePhase.Available)));
-        Assert.AreEqual("更新已就绪（v1.2.0），点击重启安装", UpdatePresentationPolicy.ResolveTrayHeader(State(UpdatePhase.Ready)));
+        Assert.AreEqual("更新已就绪（v1.2.0），点击查看", UpdatePresentationPolicy.ResolveTrayHeader(State(UpdatePhase.Ready)));
+    }
+
+    [TestMethod]
+    public void TaskbarUpdateNoticeAppearsOnlyWhenAReallyNewVersionIsKnown()
+    {
+        foreach (var phase in new[] { UpdatePhase.Idle, UpdatePhase.Checking, UpdatePhase.UpToDate, UpdatePhase.Skipped })
+            Assert.IsFalse(UpdatePresentationPolicy.ShouldShowTrayNotice(State(phase)));
+
+        foreach (var phase in new[] { UpdatePhase.Available, UpdatePhase.Downloading, UpdatePhase.Verifying,
+                     UpdatePhase.Ready, UpdatePhase.ManualOnly })
+            Assert.IsTrue(UpdatePresentationPolicy.ShouldShowTrayNotice(State(phase)), phase.ToString());
+
+        Assert.IsTrue(UpdatePresentationPolicy.ShouldShowTrayNotice(State(UpdatePhase.Failed)));
+        Assert.IsFalse(UpdatePresentationPolicy.ShouldShowTrayNotice(State(UpdatePhase.Failed) with { Manifest = null }));
+        Assert.IsFalse(UpdatePresentationPolicy.ShouldShowTrayNotice(State(UpdatePhase.Failed) with
+        {
+            Manifest = UpdateVersionPolicyTests.CreateManifest("1.1.1")
+        }));
+        Assert.IsFalse(UpdatePresentationPolicy.ShouldShowTrayNotice(State(UpdatePhase.Available) with
+        {
+            Manifest = UpdateVersionPolicyTests.CreateManifest("1.1.1")
+        }));
     }
 
     [TestMethod]

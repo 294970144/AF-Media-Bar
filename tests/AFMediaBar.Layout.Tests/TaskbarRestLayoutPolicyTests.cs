@@ -1,6 +1,8 @@
 using AFMediaBar.Classes.Services;
 using AFMediaBar.Classes.Settings;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace AFMediaBar.Layout.Tests;
 
@@ -228,6 +230,40 @@ public sealed class TaskbarRestLayoutPolicyTests
         Assert.IsFalse(TaskbarRestLayoutPolicy.IsVisible(TaskbarRestComponent.Artwork, idleNothing));
         Assert.IsFalse(TaskbarRestLayoutPolicy.IsVisible(TaskbarRestComponent.Performance, idleNothing));
         Assert.AreEqual(0, TaskbarRestLayoutPolicy.ResolveIdleComponents([]).Count);
+    }
+
+    [TestMethod]
+    public void HidingConnectedArtworkKeepsTextAndDoesNotHideTheIdleNote()
+    {
+        Assert.IsTrue(TaskbarExperienceSettings.Default.ArtworkVisible);
+        var connectedWithoutArtwork = Connected() with { ArtworkEnabled = false };
+        Assert.IsFalse(TaskbarRestLayoutPolicy.IsVisible(TaskbarRestComponent.Artwork, connectedWithoutArtwork));
+        Assert.IsTrue(TaskbarRestLayoutPolicy.IsVisible(TaskbarRestComponent.MediaText, connectedWithoutArtwork));
+        Assert.IsTrue(TaskbarRestLayoutPolicy.IsVisible(TaskbarRestComponent.Artwork, Idle(null)));
+        Assert.IsFalse(TaskbarRestLayoutPolicy.IsVisible(TaskbarRestComponent.Artwork, Idle([])));
+
+        var layout = TaskbarRestLayoutPolicy.Arrange(
+            TaskbarRestLayoutPolicy.DefaultOrder,
+            WidthOf,
+            component => TaskbarRestLayoutPolicy.IsVisible(component, connectedWithoutArtwork),
+            leadingInset: 4,
+            availableWidth: 300,
+            sectionGap: 8,
+            trailingMargin: 4);
+        Assert.AreEqual(4, layout.TextLeft, 0.001);
+        Assert.IsNull(layout.Find(TaskbarRestComponent.Artwork));
+    }
+
+    [TestMethod]
+    public void OlderSettingsWithoutArtworkSwitchKeepTheDefaultCover()
+    {
+        var saved = JsonNode.Parse(JsonSerializer.Serialize(TaskbarExperienceSettings.Default))!.AsObject();
+        saved.Remove(nameof(TaskbarExperienceSettings.ArtworkVisible));
+        var restored = JsonSerializer.Deserialize<TaskbarExperienceSettings>(saved.ToJsonString());
+        Assert.IsTrue(restored.ArtworkVisible);
+
+        var hidden = TaskbarExperienceSettings.Default with { ArtworkVisible = false };
+        Assert.IsFalse(JsonSerializer.Deserialize<TaskbarExperienceSettings>(JsonSerializer.Serialize(hidden)).ArtworkVisible);
     }
 
     /// <summary>媒体栏长度只由"可见组件集合"决定，与顺序无关：改顺序不该改变需要的长度，否则排一次序媒体栏就会变宽或变窄。

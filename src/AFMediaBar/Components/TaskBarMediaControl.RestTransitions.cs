@@ -81,7 +81,8 @@ public partial class TaskBarMediaControl
             experience.SpectrumVisible,
             experience.PerformanceVisible,
             experience.OutputDeviceVisible,
-            experience.VolumeVisible);
+            experience.VolumeVisible,
+            experience.ArtworkVisible);
         var visuals = new Dictionary<TaskbarRestComponent, RestVisual>();
         foreach (var component in TaskbarRestLayoutPolicy.DefaultOrder)
         {

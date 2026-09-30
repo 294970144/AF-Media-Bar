@@ -168,26 +168,27 @@ public static class TaskbarRestLayoutPolicy
     /// <param name="PerformanceEnabled">用户是否打开了性能组件。/ Whether the user enabled the performance component.</param>
     /// <param name="OutputDeviceEnabled">用户是否把设备按钮放进了静置层。/ Whether the user put the device button into the rest layer.</param>
     /// <param name="VolumeEnabled">用户是否把音量按钮放进了静置层。/ Whether the user put the volume button into the rest layer.</param>
+    /// <param name="ArtworkEnabled">有媒体时是否显示封面；无媒体时仍由保留列表决定小音符。/ Whether to show artwork with media; the idle list still controls the note.</param>
     public readonly record struct Visibility(
         bool MediaConnected,
         IReadOnlyList<TaskbarRestComponent>? IdleComponents,
         bool SpectrumEnabled,
         bool PerformanceEnabled,
         bool OutputDeviceEnabled,
-        bool VolumeEnabled);
+        bool VolumeEnabled,
+        bool ArtworkEnabled = true);
 
     /// <summary>
     /// 判定一个静置层组件这次是否可见。
     ///
-    /// 有媒体时封面与媒体文字始终在（它们是这条媒体栏存在的理由，因此不提供开关），其余按各自开关。没有媒体时由
+    /// 有媒体时媒体文字始终在，封面与其余组件按各自开关。没有媒体时由
     /// "没有媒体时显示"列表唯一决定，且媒体文字那时一定不显示——没有媒体时它没有任何内容可写。
     ///
     /// 没有媒体时 `Artwork` 这一项指的是**快速启动小音符**而不是曲目封面：封面那个框在无媒体时画的正是音符
     /// （`UpdateSongInfo` 的断开分支），所以"封面一定不能显示"与"列表里可以勾选小音符"并不矛盾——它们是同一个框的两种内容。
     /// Decides whether one rest-layer component is visible this time.
     ///
-    /// While media is connected the artwork and the media text are always there — they are the reason this bar exists, so they carry no switch —
-    /// and the rest follow their own switches. Without media the "shown without media" list decides alone, and the media text is never shown then:
+    /// While media is connected the media text remains and artwork and other components follow their switches. Without media the "shown without media" list decides alone, and the media text is never shown then:
     /// with no media it has nothing to write.
     ///
     /// Without media the `Artwork` entry means the **quick-launch note** rather than a track's cover: that box draws the note while disconnected
@@ -212,7 +213,7 @@ public static class TaskbarRestLayoutPolicy
 
         return component switch
         {
-            TaskbarRestComponent.Artwork => true,
+            TaskbarRestComponent.Artwork => visibility.ArtworkEnabled,
             TaskbarRestComponent.MediaText => true,
             TaskbarRestComponent.Spectrum => visibility.SpectrumEnabled,
             TaskbarRestComponent.Performance => visibility.PerformanceEnabled,
