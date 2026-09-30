@@ -1,5 +1,5 @@
-name: 提交问题 / Bug Report
-description: 报告 AF Media Bar 中可以复现的问题。 / Report a reproducible problem in AF Media Bar.
+name: 报告问题 / Bug report
+description: 告诉我们哪里出了问题。 / Tell us what went wrong.
 title: "[Bug]: "
 labels:
   - bug
@@ -7,92 +7,27 @@ body:
   - type: markdown
     attributes:
       value: |
-        请先搜索现有 Issue，确认没有重复报告。安全漏洞请按照 SECURITY.md 的说明私下提交，不要在此公开。
-        Please search existing Issues first. Do not disclose security vulnerabilities here; follow SECURITY.md instead.
+        提交前请搜索相似 Issue。安全问题请[私下报告](https://github.com/Fervent-Tempo/AF-Media-Bar/security/advisories/new)。
+        Search for similar issues first. [Report security issues privately](https://github.com/Fervent-Tempo/AF-Media-Bar/security/advisories/new).
 
-  - type: input
-    id: version
+  - type: textarea
+    id: description
     attributes:
-      label: AF Media Bar 版本 / AF Media Bar Version
-      description: 填写 Release 版本（例如 1.0.0），或提供构建所使用的提交哈希。 / Use the Release version (for example, 1.0.0), or provide the commit hash used to build it.
-      placeholder: 1.0.0
-    validations:
-      required: true
-
-  - type: input
-    id: windows
-    attributes:
-      label: Windows 版本 / Windows Version
-      description: 打开“运行”并执行 winver，填写版本、版本号和系统内部版本。 / Run winver and include the edition, version, and OS build.
-      placeholder: Windows 11 24H2, OS Build 26100.x
-    validations:
-      required: true
-
-  - type: input
-    id: player
-    attributes:
-      label: 媒体播放器或来源 / Media Player or Source
-      description: 填写应用名称和版本。若通过浏览器播放，请同时填写浏览器和网站。 / Include the application and version. For browser playback, include the browser and website.
-      placeholder: NetEase Cloud Music 3.x / Microsoft Edge 1xx + website
-    validations:
-      required: true
-
-  - type: dropdown
-    id: area
-    attributes:
-      label: 受影响的功能 / Affected Area
-      options:
-        - 媒体发现或控制 / Media discovery or controls
-        - 封面或媒体信息 / Artwork or metadata
-        - 任务栏位置或显示 / Taskbar placement or visibility
-        - 输出设备切换 / Output device switching
-        - 应用音量 / Application volume
-        - 音频可视化 / Audio visualizer
-        - 指标或资源占用 / Metrics or resource usage
-        - 启动或托盘图标 / Startup or tray icon
-        - 其他 / Other
+      label: 问题描述 / What happened
+      description: 说说实际发生了什么，以及你原本希望怎样。 / Describe what happened and what you expected.
     validations:
       required: true
 
   - type: textarea
     id: steps
     attributes:
-      label: 复现步骤 / Reproduction Steps
-      description: 提供能够稳定触发问题的最简步骤。 / Provide the smallest reliable sequence that triggers the problem.
-      placeholder: |
-        1. Start ...
-        2. Play ...
-        3. Click ...
-    validations:
-      required: true
-
-  - type: textarea
-    id: expected
-    attributes:
-      label: 预期行为 / Expected Behavior
-    validations:
-      required: true
-
-  - type: textarea
-    id: actual
-    attributes:
-      label: 实际行为 / Actual Behavior
-      description: 请提供完整的错误文本，并说明重启程序后问题是否仍然存在。 / Include the exact error text and whether the problem remains after restarting.
+      label: 复现方法 / How to reproduce
+      description: 简单写下操作过程；如果偶尔出现，也请说明。 / List the steps, or say if it happens only sometimes.
     validations:
       required: true
 
   - type: textarea
     id: context
     attributes:
-      label: 其他信息 / Additional Context
-      description: 可添加截图、录屏、任务栏美化工具、音频设备和相关设置。请先移除隐私信息。 / Add screenshots, recordings, taskbar customization tools, audio devices, and relevant settings. Remove private information first.
-
-  - type: checkboxes
-    id: checklist
-    attributes:
-      label: 提交前确认 / Checklist
-      options:
-        - label: 我从本仓库的 Releases 页面下载了 AF Media Bar，或根据上述提交自行构建。 / I downloaded AF Media Bar from this repository's Releases page or built it from the referenced commit.
-          required: true
-        - label: 我已搜索现有 Issue，确认没有相同的问题。 / I searched existing Issues for the same problem.
-          required: true
+      label: 环境与附件 / Environment and attachments
+      description: 如果方便，请提供 AF Media Bar 和 Windows 版本、播放器或网站，以及截图、录屏或错误信息。分享前请删除隐私信息。 / If available, add app and Windows versions, player or website, screenshots, recordings, or errors. Remove private information first.

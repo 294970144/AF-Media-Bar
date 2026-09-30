@@ -1,5 +1,3 @@
-> English release notes follow the Chinese section.
-
 # AF Media Bar 1.3.0 — 歌词与媒体栏体验更新
 
 这次更新改进了歌词显示、播放状态切换和媒体栏尺寸调整，也修复了多项媒体与音频问题。
@@ -38,42 +36,12 @@
 - 排列方向目前仅支持横向；托盘组合滚轮设置暂时禁用。
 - 隐私说明与卸载方式见 [README](https://github.com/Fervent-Tempo/AF-Media-Bar#readme)。
 
----
+## 贡献者
 
-# AF Media Bar 1.3.0 — Lyrics and Taskbar Polish
+感谢 @Miaoyww、@DustOn-CL、@x1a0Y4NGren、@cXp1r 和 @sonlige 为本次更新做出贡献。
 
-This release improves lyric display, playback transitions, and bar resizing, along with fixes for media and audio behavior.
+## 首次贡献
 
-## 🎵 More polished lyrics
-
-Lyrics now use WebView2 for consistent syllable highlighting, translations, and romanization. Adjust line spacing, character spacing, and display width; improved lyric matching finds more songs.
-
-## ✨ Smoother transitions
-
-The idle note gives way to artwork, lyrics, and playback details in one continuous motion, then reverses when playback ends. Rapid width adjustments also cause less jitter, clipping, and jumping.
-
-## 🧩 Easier settings
-
-Control wheel-gesture hints and interaction button size, with a separate page for component settings. Artwork can now be hidden in the rest layer without changing the idle note setting.
-
-## 🔧 Other updates
-
-- Browser media clears sooner after closing, and the idle note no longer shows an empty tooltip.
-- The fixed-width limit follows available taskbar space; notification artwork keeps its original aspect ratio.
-- More reliable media-session recovery, lyric timing, and artwork matching. The spectrum responds at low volume, and the tray tooltip reflects the current output device and volume.
-- The media bar and tray context menus now have a Quick Launch submenu for bound apps. Their update entry appears only when a newer version is known and opens the update page.
-
-## Download and install
-
-See the [English README](https://github.com/Fervent-Tempo/AF-Media-Bar/blob/main/README.en-US.md#readme) for requirements and installation. Both packages include the .NET runtime.
-
-- `AFMediaBar-Setup-v1.3.0-win-x64.exe` — installer.
-- `AFMediaBar-v1.3.0-win-x64.zip` — portable build.
-
-Verify downloads against `SHA256SUMS.txt` from the same Release. Do not use GitHub's generated source archives.
-
-## Known limitations
-
-- Only `win-x64` is published; vertical taskbars and floating modes are not implemented yet.
-- Layout orientation is currently horizontal only; the tray modifier-wheel setting is temporarily disabled.
-- See the [English README](https://github.com/Fervent-Tempo/AF-Media-Bar/blob/main/README.en-US.md#readme) for privacy and uninstalling.
+- @sonlige：首次贡献见 [#55](https://github.com/Fervent-Tempo/AF-Media-Bar/pull/55)。
+- @x1a0Y4NGren：首次贡献见 [#51](https://github.com/Fervent-Tempo/AF-Media-Bar/pull/51)。
+- @cXp1r：首次贡献见 [#76](https://github.com/Fervent-Tempo/AF-Media-Bar/pull/76)。
