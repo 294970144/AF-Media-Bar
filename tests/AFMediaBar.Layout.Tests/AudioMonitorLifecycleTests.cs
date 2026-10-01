@@ -41,6 +41,14 @@ public sealed class AudioMonitorLifecycleTests
         Assert.IsFalse(monitor.GetSpectrum(bands, bands.Length));
         Assert.IsTrue(bands.All(value => value == 0));
         monitor.Dispose();
-        await monitor.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(5));
+        try
+        {
+            await monitor.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        catch (OperationCanceledException)
+        {
+            // BackgroundService may report cancellation when Dispose races its first worker tick.
+        }
+        Assert.IsTrue(monitor.ExecuteTask!.IsCompleted);
     }
 }
