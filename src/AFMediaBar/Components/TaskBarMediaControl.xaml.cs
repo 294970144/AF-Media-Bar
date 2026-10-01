@@ -141,7 +141,6 @@ namespace AFMediaBar.Components
                 _wheelTooltipTimer.Stop();
                 CloseWheelTooltips();
                 _marqueeTimer.Stop();
-                StopWebLyrics();
                 StopMarqueeAnimations();
                 StopRestTransitions();
             };
@@ -1404,6 +1403,8 @@ namespace AFMediaBar.Components
         {
             _backgroundPruneLevel = level;
             ApplyTimerSuspensionState();
+            UpdateWebLyricsPowerState();
+            UpdateWebLyricsPresentation(allowTransition: false);
         }
 
         /// <summary>
@@ -1447,6 +1448,8 @@ namespace AFMediaBar.Components
             }
 
             ApplyTimerSuspensionState();
+            UpdateWebLyricsPowerState();
+            UpdateWebLyricsPresentation(allowTransition: false);
         }
 
         private void ApplyTimerSuspensionState()
