@@ -58,6 +58,17 @@ public sealed class LyricsWebViewRenderer(WebView2CompositionControl webView) : 
         try
         {
             _webView.DefaultBackgroundColor = System.Drawing.Color.Transparent;
+            // WebView2目录统一指到本应用其余本地数据（日志、缓存、更新包）所在的 %LOCALAPPDATA%\AFMediaBar 下。
+            if (_webView.CreationProperties is null)
+            {
+                _webView.CreationProperties = new CoreWebView2CreationProperties
+                {
+                    UserDataFolder = Path.Combine(
+                         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "AFMediaBar")
+                };
+            }
+
             await _webView.EnsureCoreWebView2Async();
             if (_disposed || _webView.CoreWebView2 is null)
                 return;
