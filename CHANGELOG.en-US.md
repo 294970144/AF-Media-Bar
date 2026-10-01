@@ -6,6 +6,13 @@ All notable changes to AF Media Bar are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Improved
+
+- Create the WebView2 lyrics view only when lyrics are available. Release it immediately when lyrics are disabled or after 30 seconds without lyrics; attempt suspension while the display is off or the session is locked, then refresh the current lyrics on return.
+- Stop the spectrum sampling timer when the component is not visible, and avoid repeated taskbar placement requests from media progress snapshots.
+
 ## [1.3.0] - 2026-09-30
 
 This release rebuilds lyric display and media-state transitions, adds appearance and interaction settings, and fixes media, audio, and layout issues.
