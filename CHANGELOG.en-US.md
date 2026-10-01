@@ -10,7 +10,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Improved
 
-- Create the WebView2 lyrics view only when lyrics are available. Release it immediately when lyrics are disabled or after 30 seconds without lyrics; attempt suspension while the display is off or the session is locked, then refresh the current lyrics on return.
+- Create the WebView2 lyrics view only when lyrics are available. Release it immediately when lyrics are disabled or after 30 seconds without lyrics; attempt suspension while the display is off or the session is locked, then refresh the current lyrics on return. Skip repeated style scripts when appearance values have not changed.
 - Stop the spectrum sampling timer when the component is not visible, and avoid repeated taskbar placement requests from media progress snapshots.
 
 ## [1.3.0] - 2026-09-30

@@ -36,6 +36,7 @@ public sealed class LyricsWebViewRenderer(WebView2CompositionControl webView) : 
     };
 
     private readonly WebView2CompositionControl _webView = webView ?? throw new ArgumentNullException(nameof(webView));
+    private LyricsWebStyle? _lastStyle;
     private string? _pendingStyle;
     private string? _pendingLyrics;
     private bool _initializationStarted;
@@ -98,6 +99,12 @@ public sealed class LyricsWebViewRenderer(WebView2CompositionControl webView) : 
     public void ApplyStyle(LyricsWebStyle style)
     {
         ArgumentNullException.ThrowIfNull(style);
+        if (_disposed || Equals(_lastStyle, style))
+            return;
+
+        // Snapshot updates can reapply appearance without changing it; skip the WebView2
+        // round trip and CSS/layout work until an actual style value changes.
+        _lastStyle = style;
         _pendingStyle = SerializeMessage("style", new
         {
             style.FontFamily,

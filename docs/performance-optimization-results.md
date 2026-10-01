@@ -25,6 +25,15 @@
 
 20 秒 .NET CPU 采样里，任务栏 UIA 区域探测的归因样本在定位改动前约 286 ms，之后约 51 ms。该统计是采样估计，并非精确耗时；它支持“减少无几何变化快照引起的探测”这条因果判断。频谱不可见时停表尚未单独隔离测量。
 
+## 参考文章后的核对
+
+参考 [WebView2 应用资源占用优化指南](https://emohe.cn/posts/webview2%E4%BC%98%E5%8C%96/) 逐项对照代码，并以 [WebView2 官方性能建议](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/performance) 和 [进程模型](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/process-model) 核对 API 行为：
+
+- **已覆盖**：按需创建和释放 WebView2、后台尽力挂起、单实例应用、本地用户数据目录、隐藏歌词时停止无限频谱动画。多个歌词控件使用相同用户数据目录和默认选项；官方进程模型指出这已能共享浏览器进程，因此没有仅为“显式共享”增加一个环境单例。
+- **本轮补充**：媒体快照可能重复应用完全相同的 `LyricsWebStyle`。渲染器现在按值跳过重复样式，避免无变化时的 JSON 序列化、跨进程 `ExecuteScriptAsync` 与页面 CSS 更新。新建渲染器仍会发送完整首帧样式；此项未单独量化 CPU/GPU 收益。
+- **未采用**：禁用 GPU、Edge 附加服务、限制 V8 堆、调整磁盘缓存及其他 browser flags。歌词有过渡与逐字动画；微软不建议生产应用依赖这些标志，也建议保留硬件加速。页面资源已经内嵌，未请求远程网页。单独给临时窗口创建用户数据目录也不适用于当前仅有的任务栏歌词视图。
+- **后续仅在证据支持时实验**：`PostWebMessageAsJson` 或更小的进度补丁可能降低桥接开销，但现有执行队列会合并过期帧并观察脚本异常；直接换成无确认的投递可能堆积旧帧，影响快速唤醒。[官方 API 说明](https://learn.microsoft.com/en-us/dotnet/api/microsoft.web.webview2.core.corewebview2.memoryusagetargetlevel?view=webview2-dotnet-1.0.4191.47)要求 `MemoryUsageTargetLevel.Low` 与当前 `TrySuspendAsync`/`Resume` 二选一，不混用。长期内存增长若出现，再分析 JS heap、DOM 和事件订阅，而不按时间盲目刷新歌词视图。
+
 ## 验证与限制
 
 - `dotnet restore .\src\AFMediaBar.slnx -r win-x64`：通过。
