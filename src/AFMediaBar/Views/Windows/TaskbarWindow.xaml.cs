@@ -236,7 +236,6 @@ public partial class TaskbarWindow : Window
         _sizeAnimationTimer.Tick += (_, _) => AdvanceSizeAnimation();
         _spectrumTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
         _spectrumTimer.Tick += OnSpectrumTimerTick;
-        _spectrumTimer.Start();
 
         // 窗口也可能在档位已经生效时被创建（屏幕关闭期间 Explorer 重建了任务栏）：那时不能等下一次档位变化，
         // 否则刚启动的计时器会一直转到一个没人看得见的窗口上。这里只走"停"的一侧，不触发恢复路径。
@@ -611,6 +610,7 @@ public partial class TaskbarWindow : Window
     {
         SetupWindow();
         _setupComplete = true;
+        SynchronizeSpectrumTimer();
         Dispatcher.BeginInvoke(_foregroundSamplingSession.RequestRefresh, DispatcherPriority.ContextIdle);
     }
 
@@ -902,6 +902,7 @@ public partial class TaskbarWindow : Window
             !_hostActions.IsEnvironmentRecovering;
         MediaControl.UpdateSongInfo(snapshot);
         MediaControl.ApplyAppearanceSettings();
+        SynchronizeSpectrumTimer();
         // 新宿主构造时仍是断开快照；若性能组件没有配置为“无媒体时保留”，构造阶段不会取得指标租约。
         // 重放当前媒体快照会改变控件算出的组件显隐，因此必须在显隐落地后同步一次租约。这里不强制续租，
         // 否则约 240 ms 一次的媒体快照会不断重置性能指标轮换与刷新间隔。
@@ -910,8 +911,10 @@ public partial class TaskbarWindow : Window
         // This path must not force renewal, or media snapshots arriving about every 240 ms would continually reset metric rotation and cadence.
         SynchronizeMetricsSubscription(SettingsManager.Current.PerformanceComponent.Normalize());
 
-        // Update position after UI change
-        Dispatcher.BeginInvoke(() => UpdatePosition(), DispatcherPriority.Background);
+        // A media progress snapshot does not change taskbar geometry. Size changes already
+        // request placement through DesiredSizeChanged; the periodic timer covers Shell changes.
+        if (snapshot.IsConnected != wasConnected)
+            Dispatcher.BeginInvoke(() => UpdatePosition(), DispatcherPriority.Background);
 
         // 修改 Visibility 前在 UI 线程再次检查；Explorer 可能在媒体回调与显示步骤之间销毁子 HWND。
         // Recheck on the UI thread immediately before touching Window.Visibility. Explorer
@@ -1129,6 +1132,7 @@ public partial class TaskbarWindow : Window
                 taskbarHandle);
             ApplyExtraFeaturesSettings();
             MediaControl.UpdateSongInfo(_lastSnapshot);
+            SynchronizeSpectrumTimer();
             // 改设置就可能改变静置层还剩几个组件，因此"完全隐藏"的结论必须跟着重算一次：
             // 只在快照变化时同步会让"把无媒体保留组件全部取消"这一步要等下一首歌才生效。
             // A settings change can change how many components the rest layer keeps, so the "hide completely" verdict has to be recomputed
@@ -1301,8 +1305,6 @@ public partial class TaskbarWindow : Window
         WindowHelper.SetInputTransparent(this, false);
         if (!_timer.IsEnabled)
             _timer.Start();
-        if (!_spectrumTimer.IsEnabled)
-            _spectrumTimer.Start();
         ApplyExtraFeaturesSettings();
         UpdatePosition();
         Dispatcher.BeginInvoke(_foregroundSamplingSession.RequestRefresh, DispatcherPriority.ContextIdle);
@@ -1643,6 +1645,24 @@ public partial class TaskbarWindow : Window
         // rest-layer visibility is TaskbarRestLayoutPolicy, and reading PerformanceVisible here instead would keep sampling for nothing while the
         // performance component is not kept without media.
         SynchronizeMetricsSubscription(performance);
+        SynchronizeSpectrumTimer();
+    }
+
+    private void SynchronizeSpectrumTimer()
+    {
+        var shouldRun = !_isClosing && !_isEnvironmentSuspended && !IsBackgroundPruned &&
+                        !IsTaskbarPresentationSuspended && _appliedOrientation == LayoutOrientation.Horizontal &&
+                        MediaControl.IsSpectrumComponentVisible;
+        if (shouldRun)
+        {
+            if (!_spectrumTimer.IsEnabled)
+                _spectrumTimer.Start();
+        }
+        else
+        {
+            _spectrumTimer.Stop();
+            ClearSpectrum(SettingsManager.Current.SpectrumComponent.Normalize().BandCount);
+        }
     }
 
     private void SynchronizeMetricsSubscription(PerformanceComponentSettings performance)
