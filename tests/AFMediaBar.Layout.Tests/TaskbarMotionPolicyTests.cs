@@ -47,6 +47,23 @@ public sealed class TaskbarMotionPolicyTests
     }
 
     [TestMethod]
+    public void RepeatedLocationEventsCannotRestoreInputBeforeTimedSamplesSettle()
+    {
+        var monitor = new Rect(0, 0, 1920, 1080);
+        var moving = Rect(0, 1040, 1920, 1088);
+        var state = TaskbarMotionPolicy.Observe(default, Rect(0, 1032, 1920, 1080), monitor, LayoutOrientation.Horizontal);
+        state = TaskbarMotionPolicy.Observe(state, moving, monitor, LayoutOrientation.Horizontal, allowStableSample: false);
+        for (var notification = 0; notification < 20; notification++)
+            state = TaskbarMotionPolicy.Observe(state, moving, monitor, LayoutOrientation.Horizontal, allowStableSample: false);
+        Assert.IsTrue(state.IsMoving);
+        Assert.AreEqual(0, state.StableSamples);
+        state = TaskbarMotionPolicy.Observe(state, moving, monitor, LayoutOrientation.Horizontal);
+        Assert.IsTrue(state.IsMoving);
+        state = TaskbarMotionPolicy.Observe(state, moving, monitor, LayoutOrientation.Horizontal);
+        Assert.IsFalse(state.IsMoving);
+    }
+
+    [TestMethod]
     public void OnlyTheEdgeTriggerStripCountsAsHidden()
     {
         var monitor = new Rect(0, 0, 1920, 1080);
@@ -62,12 +79,10 @@ public sealed class TaskbarMotionPolicyTests
     }
 
     /// <summary>
-    /// 宿主窗口显隐的判定：任务栏收起、展开或稳定隐藏时都 MUST 由宿主自己隐藏窗口；只有可见任务栏重新稳定后才显示。
-    /// The host visibility rule: the host MUST hide itself while the taskbar hides, reveals, or remains hidden, and may become visible only after
-    /// the visible taskbar has settled again.
+    /// 没有可复用几何时，运动期间必须保持隐藏；稳定收起即使有几何也不能显示。
     /// </summary>
     [TestMethod]
-    public void HostWindowStaysHiddenForTheWholeTaskbarMotion()
+    public void HostWindowStaysHiddenDuringMotionWithoutReusablePlacement()
     {
         Assert.AreEqual(
             TaskbarHostVisibility.Collapsed,
@@ -82,7 +97,7 @@ public sealed class TaskbarMotionPolicyTests
         Assert.AreEqual(
             TaskbarHostVisibility.Collapsed,
             TaskbarHostVisibilityPolicy.Resolve(Hiding(), restLayerEmpty: false),
-            "a cross-process child must not be trusted to follow the Shell composition animation frame by frame");
+            "without stable geometry the host must not guess placement during Shell motion");
 
         Assert.AreEqual(
             TaskbarHostVisibility.Visible,
@@ -97,6 +112,47 @@ public sealed class TaskbarMotionPolicyTests
         Assert.AreEqual(TaskbarHostVisibility.Collapsed, TaskbarHostVisibilityPolicy.Resolve(Hiding(), restLayerEmpty: true));
         Assert.AreEqual(TaskbarHostVisibility.Collapsed, TaskbarHostVisibilityPolicy.Resolve(Revealing(), restLayerEmpty: true));
         Assert.AreEqual(TaskbarHostVisibility.Collapsed, TaskbarHostVisibilityPolicy.Resolve(Hidden(), restLayerEmpty: true));
+    }
+
+    [TestMethod]
+    public void ReusablePlacementFollowsBothDirectionsButSettledHidingAlwaysCollapses()
+    {
+        Assert.AreEqual(TaskbarHostVisibility.Visible,
+            TaskbarHostVisibilityPolicy.Resolve(Hiding(), restLayerEmpty: false, hasReusablePlacement: true));
+        Assert.AreEqual(TaskbarHostVisibility.Collapsed,
+            TaskbarHostVisibilityPolicy.Resolve(Hiding(), restLayerEmpty: false, hasReusablePlacement: false));
+        Assert.AreEqual(TaskbarHostVisibility.Visible,
+            TaskbarHostVisibilityPolicy.Resolve(Revealing(), restLayerEmpty: false, hasReusablePlacement: true),
+            "a previously hidden host can follow reveal only with its validated taskbar-relative placement");
+        Assert.AreEqual(TaskbarHostVisibility.Collapsed,
+            TaskbarHostVisibilityPolicy.Resolve(Hidden(), restLayerEmpty: false, hasReusablePlacement: true),
+            "settled hiding must remove the native window instead of trusting parent movement");
+        Assert.AreEqual(TaskbarHostVisibility.Collapsed,
+            TaskbarHostVisibilityPolicy.Resolve(Hiding(), restLayerEmpty: true, hasReusablePlacement: true));
+        Assert.AreEqual(TaskbarHostVisibility.Collapsed,
+            TaskbarHostVisibilityPolicy.Resolve(Revealing(), restLayerEmpty: true, hasReusablePlacement: true));
+    }
+
+    [TestMethod]
+    public void OnlyCrossAxisTranslationReusesStablePlacementOnEveryTaskbarEdge()
+    {
+        Assert.IsTrue(TaskbarMotionPolicy.CanReusePlacement(Rect(0, 1032, 1920, 1080),
+            Rect(0, 1078, 1920, 1126), LayoutOrientation.Horizontal));
+        Assert.IsTrue(TaskbarMotionPolicy.CanReusePlacement(Rect(-1920, 0, 0, 48),
+            Rect(-1920, -46, 0, 2), LayoutOrientation.Horizontal));
+        Assert.IsTrue(TaskbarMotionPolicy.CanReusePlacement(Rect(0, 0, 48, 1080),
+            Rect(-46, 0, 2, 1080), LayoutOrientation.Vertical));
+        Assert.IsTrue(TaskbarMotionPolicy.CanReusePlacement(Rect(1872, 0, 1920, 1080),
+            Rect(1918, 0, 1966, 1080), LayoutOrientation.Vertical));
+
+        Assert.IsFalse(TaskbarMotionPolicy.CanReusePlacement(Rect(0, 1032, 1920, 1080),
+            Rect(0, 1040, 1920, 1080), LayoutOrientation.Horizontal), "resizing invalidates the native region");
+        Assert.IsFalse(TaskbarMotionPolicy.CanReusePlacement(Rect(0, 1032, 1920, 1080),
+            Rect(1920, 1032, 3840, 1080), LayoutOrientation.Horizontal), "moving to another monitor requires placement");
+        Assert.IsFalse(TaskbarMotionPolicy.CanReusePlacement(Rect(0, 0, 48, 1080),
+            Rect(0, 1080, 48, 2160), LayoutOrientation.Vertical));
+        Assert.IsFalse(TaskbarMotionPolicy.CanReusePlacement(default,
+            Rect(0, 1078, 1920, 1126), LayoutOrientation.Horizontal));
     }
 
     /// <summary>任务栏稳定在屏幕上、且静置层有内容：窗口显示。/ A taskbar settled on screen with a non-empty rest layer shows the window.</summary>

@@ -19,6 +19,13 @@ const document = read('index.html')
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.setContent(document);
+    const waitForPaint = async milliseconds => {
+      // Headless Edge may defer offscreen compositor frames. Paint before and after
+      // each settled sample so geometry reflects the final layout rather than its previous frame.
+      await page.screenshot();
+      await page.waitForTimeout(milliseconds);
+      await page.screenshot();
+    };
     const frame = async (next = '', translation = '', translationMode = false, index = 0, animate = false) => {
       await page.evaluate(({ next, translation, translationMode, index, animate }) => {
         window.taskbarLyrics.receive({ version: 1, type: 'lyrics', payload: {
@@ -52,17 +59,17 @@ const document = read('index.html')
     };
     await check('single line is vertically centered', async () => {
       await frame();
-      await page.waitForTimeout(650);
+      await waitForPaint(650);
       centered(await geometry());
     });
     await check('missing translation has no placeholder', async () => {
       await frame('', '  ', true);
-      await page.waitForTimeout(650);
+      await waitForPaint(650);
       centered(await geometry());
     });
     await check('two visible rows stay above and below the center', async () => {
       await frame('', 'translation', true);
-      await page.waitForTimeout(650);
+      await waitForPaint(650);
       const result = await geometry();
       assert.ok(result.centerError < -3);
       assert.equal(result.secondaryText, 'translation');
@@ -70,34 +77,48 @@ const document = read('index.html')
     });
     await check('row-count setting changes animate the centering', async () => {
       await frame('', '', false, 0, true);
+      // Pause and seek the CSS timeline: screenshot latency and headless compositor
+      // throttling otherwise make intermediate wall-clock geometry samples unreliable.
+      const transition = await page.evaluateHandle(() => {
+        const animation = document.getElementById('track').getAnimations()
+          .find(animation => animation.transitionProperty === 'translate');
+        if (!animation) throw new Error('row-count change must create a centering transition');
+        animation.pause();
+        animation.currentTime = 0;
+        return animation;
+      });
+      await page.screenshot();
       const start = await geometry();
-      await page.waitForTimeout(160);
+      await transition.evaluate(animation => { animation.currentTime = 160; });
+      await page.screenshot();
       const middle = await geometry();
-      await page.waitForTimeout(650);
+      await transition.evaluate(animation => animation.finish());
+      await transition.dispose();
+      await waitForPaint(650);
       const end = await geometry();
       centered(end);
       assert.ok(start.centerError < middle.centerError && middle.centerError < end.centerError - 0.1,
-        'centering should interpolate instead of jumping');
+        `centering should interpolate instead of jumping (${start.centerError}, ${middle.centerError}, ${end.centerError})`);
     });
     await check('rolling from a single row to a translation pair', async () => {
       await frame('', 'translation', true, 1, true);
       await page.waitForTimeout(150);
       assert.ok((await geometry()).animating, 'rolling animation should remain active');
-      await page.waitForTimeout(850);
+      await waitForPaint(850);
       assert.equal((await geometry()).secondaryText, 'translation');
     });
     await check('rolling from a translation pair to a single row', async () => {
       await frame('', '', false, 2, true);
       await page.waitForTimeout(150);
       assert.ok((await geometry()).animating);
-      await page.waitForTimeout(850);
+      await waitForPaint(850);
       const result = await geometry();
       centered(result);
       assert.equal(result.currentText, 'original 2');
     });
     await check('next-line mode shows its second row', async () => {
       await frame('next lyric');
-      await page.waitForTimeout(650);
+      await waitForPaint(650);
       const result = await geometry();
       assert.ok(result.centerError < -3);
       assert.equal(result.secondaryText, 'next lyric');
@@ -105,18 +126,18 @@ const document = read('index.html')
     });
     await check('translation roll with missing incoming translation ends centered', async () => {
       await frame('', 'translation', true);
-      await page.waitForTimeout(650);
+      await waitForPaint(650);
       await frame('', '', true, 3, true);
-      await page.waitForTimeout(1000);
+      await waitForPaint(1000);
       centered(await geometry());
     });
     await check('single row remains centered after height, spacing and offset changes', async () => {
       for (const height of [32, 48, 60]) {
         await page.setViewportSize({ width: 320, height });
         await page.evaluate(() => window.taskbarLyrics.receive({ version: 1, type: 'style', payload: {
-          lyricsPanePaddingTop: 4, primaryOffsetY: 2, lineGapPercent: 25
+          lyricsPaneTopPadding: 4, primaryOffsetY: 2, lineGapPercent: 25
         } }));
-        await page.waitForTimeout(650);
+        await waitForPaint(650);
         centered(await geometry());
       }
     });

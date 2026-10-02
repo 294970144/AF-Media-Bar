@@ -2005,6 +2005,11 @@ namespace AFMediaBar.Components
 
         private void InteractionSurface_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
         {
+            if (_isHostVisibilitySuspended || !IsHitTestVisible)
+            {
+                e.Handled = true;
+                return;
+            }
             // 捕获状态或延迟路由可能在指针已离开媒体栏后仍送来滚轮事件；以当前指针位置作最后一道门禁。
             // Capture or delayed routing can deliver a wheel event after the pointer has left the bar; check its current position.
             if (!new Rect(InteractionSurface.RenderSize).Contains(Mouse.GetPosition(InteractionSurface)))

@@ -235,7 +235,15 @@ public partial class TaskBarMediaControl
             LyricsWebViewHost.Child is not WebView2CompositionControl webView)
             return;
 
-        var hidden = _backgroundPruneLevel >= MemoryPruneLevel.DisplayOff || _isHostVisibilitySuspended;
+        // The host owns visibility while following Shell motion. Keep the current composition
+        // frame instead of replacing lyrics with metadata in the middle of the taskbar slide.
+        if (_isHostVisibilitySuspended && _backgroundPruneLevel < MemoryPruneLevel.DisplayOff)
+        {
+            renderer.PauseDelivery();
+            return;
+        }
+
+        var hidden = _backgroundPruneLevel >= MemoryPruneLevel.DisplayOff;
         if (hidden)
         {
             renderer.PauseDelivery();
@@ -291,7 +299,11 @@ public partial class TaskBarMediaControl
 
     private void UpdateWebLyricsPresentation(bool allowTransition = true)
     {
+        // Resource release still applies while the host's presentation is frozen.
         ApplyWebLyricsLifetime();
+        if (_isHostVisibilitySuspended)
+            return;
+
         // Keep the outgoing live lyrics until the connection clip has fully retracted.
         if (_restTransitionKeepsOutgoingText)
             return;
