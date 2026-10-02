@@ -16,7 +16,10 @@ public enum MediaSessionReconcileAction
     ForceUpdate = 1,
 
     /// <summary>整只重建媒体目录：ForceUpdate 救不回来的库失效状态最后手段。/ Rebuild the whole media catalog: the last resort for a library broken state that ForceUpdate cannot fix.</summary>
-    RestartCatalog = 2
+    RestartCatalog = 2,
+
+    /// <summary>绕过库字典、直接向 Windows 索取会话：事件链路已断时的唯一出路。/ Bypass the library dictionary and ask Windows for sessions directly: the only way out once the event chain is broken.</summary>
+    RebuildFromWinRt = 3
 }
 
 /// <summary>
@@ -137,10 +140,11 @@ public static class MediaSessionReconcilePolicy
     /// <summary>
     /// 根据一次系统探测的结果决定动作。
     /// 系统确实没有会话时不动（那是"没有媒体"，不是"库坏了"）；查询失败（负值）时做一次保守的 ForceUpdate；
-    /// 系统有会话而 ForceUpdate 连续失败时升级为重建整个目录。
+    /// 系统有会话而 ForceUpdate 连续失败时升级为重建整个目录；重建次数用尽且冷却期已过后，才启用绕过库字典的兜底读。
     /// Picks the action from the result of one system probe.
     /// Genuinely zero sessions means "no media" rather than "the library is broken", so nothing happens; a failed query (negative)
-    /// does one conservative ForceUpdate; and sessions that keep failing after ForceUpdate escalate to a full catalog rebuild.
+    /// does one conservative ForceUpdate; sessions that keep failing after ForceUpdate escalate to a full catalog rebuild; and only once
+    /// the rebuild budget is spent and its cooldown has elapsed does the fallback read that bypasses the library dictionary kick in.
     /// </summary>
     /// <param name="osSessionCount">操作系统当前发布的会话数；0 为确实没有媒体，负值为查询失败。/ Sessions the OS publishes; zero is genuinely no media, negative is a failed query.</param>
     /// <param name="consecutiveFailedReconciles">连续"ForceUpdate 后仍断连且系统有会话"的次数。/ Consecutive reconciles that stayed disconnected while the OS had sessions.</param>
@@ -162,14 +166,22 @@ public static class MediaSessionReconcilePolicy
             return MediaSessionReconcileAction.ForceUpdate;
         }
 
+        // 重建预算已用尽说明换新字典救不回这个状态，病因在字典之外（事件链路已断），此时才绕开字典直接读系统。
+        // A spent rebuild budget means replacing the dictionary cannot recover this state and the cause lies outside the dictionary (the
+        // event chain is broken), which is the only point where reading the OS directly is worth bypassing it.
+        if (consecutiveCatalogRestarts >= CatalogRestartLimit)
+        {
+            return sinceLastCatalogRestart < CatalogRestartCooldown
+                ? MediaSessionReconcileAction.ForceUpdate
+                : MediaSessionReconcileAction.RebuildFromWinRt;
+        }
+
         if (consecutiveFailedReconciles < CatalogRestartFailureThreshold)
         {
             return MediaSessionReconcileAction.ForceUpdate;
         }
 
-        return consecutiveCatalogRestarts >= CatalogRestartLimit && sinceLastCatalogRestart < CatalogRestartCooldown
-            ? MediaSessionReconcileAction.ForceUpdate
-            : MediaSessionReconcileAction.RestartCatalog;
+        return MediaSessionReconcileAction.RestartCatalog;
     }
 
     /// <summary>单次"探测到恢复"是否慢到需要退避。/ Whether one probe-and-recover attempt was slow enough to warrant backoff.</summary>

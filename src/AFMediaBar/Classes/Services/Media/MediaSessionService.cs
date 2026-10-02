@@ -47,6 +47,21 @@ public sealed class MediaSessionService : IDisposable
     private EventHandler? _browserPresentationTimerTick;
     private int _mediaRevision;
     private (int OsSessionCount, TimeSpan Elapsed)? _pendingReconcileStatus;
+
+    /// <summary>
+    /// 是否正在走绕过第三方库字典的兜底读路径。
+    ///
+    /// 它在字典重建预算用尽、而系统确实发布了会话时置位：此时病因在库的事件链路之外，换新字典无用，
+    /// 刷新因此改为直接向 Windows 索取会话。会话真正读回来时由 <see cref="FinalizeReconcileStatus"/> 清掉，
+    /// 读路径随即回到库的正常事件链路，兜底包装的会话也随之释放。
+    /// Whether the read path is bypassing the third-party dictionary.
+    ///
+    /// It is set once the rebuild budget is spent while the OS does publish sessions: the cause then lies outside the library's event
+    /// chain and a fresh dictionary cannot help, so refreshes ask Windows for sessions directly. Once a session really comes back,
+    /// <see cref="FinalizeReconcileStatus"/> clears this and the read path returns to the library's normal event chain, releasing the
+    /// fallback wrappers along with it.
+    /// </summary>
+    private bool _useWinRtFallback;
     // 释放标记与 generation 会被后台流程读取（取消/过期判定），因此声明为 volatile：写入在 UI 线程，读取在后台线程。
     // The disposal flag and the generation are read by the background flow (cancellation and staleness checks), so both are volatile:
     // written on the UI thread and read on the background thread.
@@ -293,6 +308,10 @@ public sealed class MediaSessionService : IDisposable
         _catalog.AnyTimelinePropertyChanged -= OnAnyTimelinePropertyChanged;
         _selection.RefreshRequested -= OnSelectionRefreshRequested;
         _snapshotBuilder.EnrichmentCompleted -= OnSnapshotEnrichmentCompleted;
+        // 兜底路径构造的会话由 AF 持有，目录的退订流程不会碰它们，退出时必须显式释放。
+        // The fallback's sessions are AF's to own and the catalog's retirement never touches them, so disposal releases them explicitly.
+        ReleaseFallbackSessions(_lastSessions);
+        _lastSessions = [];
         SettingsManager.SettingsChanged -= OnSettingsChanged;
         foreach (var provider in _sourceProviders)
         {
@@ -473,6 +492,12 @@ public sealed class MediaSessionService : IDisposable
             {
                 _catalog.ForceUpdate();
             }
+
+            // RebuildFromWinRt 在后台不做任何库调用：这一档的前提正是"库调用救不回来"，再调一次只会白等。
+            // 真正的动作是置位兜底模式（由 CompleteReconcile 在 UI 线程完成），随后的刷新改走直接读系统的路径。
+            // RebuildFromWinRt makes no library call here: reaching this tier means exactly that library calls do not help, so another one
+            // would only waste time. The real action is setting the fallback flag, which CompleteReconcile applies on the UI thread, after
+            // which refreshes read the OS directly.
         }
         catch (Exception ex)
         {
@@ -536,6 +561,18 @@ public sealed class MediaSessionService : IDisposable
                 "Media",
                 $"[看门狗] 系统有会话但目录读不到，已重建媒体目录（连续第 {_consecutiveCatalogRestarts} 次，上限 {MediaSessionReconcilePolicy.CatalogRestartLimit}）");
         }
+        else if (action == MediaSessionReconcileAction.RebuildFromWinRt)
+        {
+            // 字典重建预算已用尽仍读不到，病因只能在字典之外：WinRT 事件链路已断，换新字典也没用。
+            // 从此刷新一律走兜底读，直到会话真正恢复（FinalizeReconcileStatus 会清掉这个标记）。
+            // The rebuild budget is spent and the catalog still reads empty, so the cause lies outside the dictionary: the WinRT event
+            // chain is broken and a fresh dictionary cannot help. Refreshes now read through the fallback until a session really comes
+            // back, which clears this flag.
+            _useWinRtFallback = true;
+            AppLogService.Current?.Info(
+                "Media",
+                "[看门狗] 媒体目录重建后仍读不到会话，已切换为直接读取系统会话（不再依赖第三方库事件）");
+        }
 
         try
         {
@@ -564,6 +601,18 @@ public sealed class MediaSessionService : IDisposable
             _consecutiveFailedReconciles = 0;
             _consecutiveCatalogRestarts = 0;
             _lastCatalogRestartTimestamp = 0;
+            // 会话真的读回来了：退回库的正常事件链路。兜底路径包装的会话是 AF 自己构造的，
+            // 库不负责回收，必须在这里显式释放，否则每轮兜底读都会留下一批持有原生事件订阅的实例。
+            // A session really came back: return to the library's normal event chain. The fallback's wrappers were constructed by AF and
+            // the library does not reclaim them, so they are released here — otherwise every fallback round would leak a batch of
+            // instances holding native event subscriptions.
+            if (_useWinRtFallback)
+            {
+                _useWinRtFallback = false;
+                ReleaseFallbackSessions(_lastSessions);
+                _lastSessions = [];
+            }
+
             // 只有真正把会话捞回来时才写一行：空闲时看门狗会持续以低频重试，逐次记录会把日志刷满。
             // Only a recovered session earns a line: while idle the watchdog keeps retrying at a low cadence, and logging every
             // attempt would fill the file.
@@ -582,6 +631,15 @@ public sealed class MediaSessionService : IDisposable
             _consecutiveFailedReconciles = 0;
             _consecutiveCatalogRestarts = 0;
             _lastCatalogRestartTimestamp = 0;
+            // 系统确实没有会话时兜底读路径帮不上忙（它读的还是系统），退回正常链路避免每次刷新都白构造一批包装实例。
+            // With genuinely no sessions the fallback cannot help either (it reads the same OS state), so return to the normal chain
+            // rather than constructing a batch of wrappers on every refresh for nothing.
+            if (_useWinRtFallback)
+            {
+                _useWinRtFallback = false;
+                ReleaseFallbackSessions(_lastSessions);
+                _lastSessions = [];
+            }
         }
 
         // 慢调用统计覆盖"探测到恢复"的整段耗时（含系统查询）；恢复正常耗时就清零，因此退避不会累积成永久性的慢节奏。
@@ -686,13 +744,55 @@ public sealed class MediaSessionService : IDisposable
         // An unavailable SMTC catalog must not block the independent memory source.
         try
         {
-            var sessions = _catalog.TryGetSnapshot(out var current) ? current : _lastSessions;
+            var sessions = ReadSessions();
             PublishDiscoveredSources(sessions);
             RefreshSnapshot(sessions);
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[MediaSessionService] Failed to refresh source catalog: {ex}");
+        }
+    }
+
+    /// <summary>
+    /// 按当前模式读取会话列表：正常走第三方库字典，进入兜底模式后直接向 Windows 索取。
+    ///
+    /// 兜底路径每次都会新建包装实例，因此上一轮兜底读到的会话必须先释放：它们不在库的字典里，
+    /// 库不会替 AF 回收，而每个包装实例都在原生会话上订阅了事件。
+    /// Reads the session list for the current mode: the library dictionary normally, Windows directly once the fallback is active.
+    ///
+    /// The fallback path creates fresh wrapper instances on every call, so the previous round's fallback sessions must be released
+    /// first: they are not in the library dictionary, the library will not reclaim them for AF, and each wrapper holds event
+    /// subscriptions on a native session.
+    /// </summary>
+    private MediaSession[] ReadSessions()
+    {
+        if (!_useWinRtFallback)
+        {
+            return _catalog.TryGetSnapshot(out var current) ? current : [.. _lastSessions];
+        }
+
+        var recovered = _catalog.GetSnapshotFromWinRt();
+        ReleaseFallbackSessions(recovered);
+        return recovered;
+    }
+
+    /// <summary>
+    /// 释放兜底路径构造的会话；库字典原有的会话由库自己持有，不在此释放。
+    /// Releases the sessions the fallback constructed; sessions owned by the library dictionary are the library's to release.
+    /// </summary>
+    /// <param name="sessions">本轮兜底读到的会话集合。/ The sessions this fallback round produced.</param>
+    private static void ReleaseFallbackSessions(IReadOnlyList<MediaSession> sessions)
+    {
+        foreach (var session in sessions)
+        {
+            // 库字典里的会话带有事件转发，重复释放会连带摘掉库自己的订阅，因此只释放兜底自己构造的那些。
+            // Sessions from the library dictionary carry event forwarding, and releasing those again would detach the library's own
+            // subscriptions, so only the ones the fallback constructed are released.
+            if (NativeSessionAdapter.IsFallbackOwned(session))
+            {
+                NativeSessionAdapter.Release(session);
+            }
         }
     }
 

@@ -159,6 +159,9 @@ public sealed class MediaSessionReconcilePolicyTests
     [TestMethod]
     public void CatalogRebuildCanRetryAfterCooldownWithoutResettingTheFailureCount()
     {
+        // 冷却期过后允许再重建一次目录——但重建预算已用尽时，这一档已是最后手段，因此改为绕开字典直读系统。
+        // Past the cooldown the catalog may be rebuilt again; the rebuild budget being spent makes that tier the last one though, so the
+        // action becomes reading the OS directly instead.
         var failures = MediaSessionReconcilePolicy.CatalogRestartFailureThreshold;
         var restarts = MediaSessionReconcilePolicy.CatalogRestartLimit;
         Assert.AreEqual(
@@ -166,9 +169,57 @@ public sealed class MediaSessionReconcilePolicyTests
             MediaSessionReconcilePolicy.DecideAction(1, failures, restarts,
                 MediaSessionReconcilePolicy.CatalogRestartCooldown - TimeSpan.FromMilliseconds(1)));
         Assert.AreEqual(
-            MediaSessionReconcileAction.RestartCatalog,
+            MediaSessionReconcileAction.RebuildFromWinRt,
             MediaSessionReconcilePolicy.DecideAction(1, failures, restarts,
                 MediaSessionReconcilePolicy.CatalogRestartCooldown));
+    }
+
+    [TestMethod]
+    public void ASpentRebuildBudgetEscalatesToTheDirectSystemRead()
+    {
+        // 字典重建到上限、冷却期已过、而系统确实发布了会话：换新字典已经证明救不回来，病因在字典之外
+        // （第三方库的事件链路断了），此时唯一还能拿到会话的办法是绕开字典直接问系统。
+        // The rebuild budget is spent, its cooldown elapsed, and the OS does publish sessions: replacing the dictionary has already
+        // proven useless and the cause lies outside it (the library's event chain is broken), so the only remaining way to reach a session
+        // is to bypass the dictionary and ask the OS.
+        Assert.AreEqual(
+            MediaSessionReconcileAction.RebuildFromWinRt,
+            MediaSessionReconcilePolicy.DecideAction(
+                osSessionCount: 1,
+                consecutiveFailedReconciles: 99,
+                consecutiveCatalogRestarts: MediaSessionReconcilePolicy.CatalogRestartLimit,
+                sinceLastCatalogRestart: MediaSessionReconcilePolicy.CatalogRestartCooldown));
+    }
+
+    [TestMethod]
+    public void TheDirectSystemReadStaysOutOfReachWhileTheLibraryPathStillWorks()
+    {
+        // 兜底档绝不能抢在库路径前面：重建预算未用尽时继续重建、冷却期未过时退回 ForceUpdate、
+        // 系统确实没有会话时完全不动作——三种情况都必须留在原有档位上。
+        // The fallback must never pre-empt the library path: while the rebuild budget remains the catalog is still rebuilt, during the
+        // cooldown the action falls back to ForceUpdate, and while the OS genuinely publishes no sessions nothing happens at all. All
+        // three must stay on their existing tier.
+        Assert.AreEqual(
+            MediaSessionReconcileAction.RestartCatalog,
+            MediaSessionReconcilePolicy.DecideAction(
+                osSessionCount: 1,
+                consecutiveFailedReconciles: 99,
+                consecutiveCatalogRestarts: MediaSessionReconcilePolicy.CatalogRestartLimit - 1,
+                sinceLastCatalogRestart: MediaSessionReconcilePolicy.CatalogRestartCooldown));
+        Assert.AreEqual(
+            MediaSessionReconcileAction.ForceUpdate,
+            MediaSessionReconcilePolicy.DecideAction(
+                osSessionCount: 1,
+                consecutiveFailedReconciles: 99,
+                consecutiveCatalogRestarts: MediaSessionReconcilePolicy.CatalogRestartLimit,
+                sinceLastCatalogRestart: TimeSpan.Zero));
+        Assert.AreEqual(
+            MediaSessionReconcileAction.None,
+            MediaSessionReconcilePolicy.DecideAction(
+                osSessionCount: 0,
+                consecutiveFailedReconciles: 99,
+                consecutiveCatalogRestarts: MediaSessionReconcilePolicy.CatalogRestartLimit,
+                sinceLastCatalogRestart: MediaSessionReconcilePolicy.CatalogRestartCooldown));
     }
 
     [TestMethod]

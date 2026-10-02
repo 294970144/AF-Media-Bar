@@ -1,5 +1,6 @@
 // Owns the SMTC manager, subscriptions and retirement leases; disposal retires active resources.
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Threading;
 using Windows.Media.Control;
 using WindowsMediaController;
@@ -187,6 +188,93 @@ public sealed class MediaSessionCatalog : IDisposable
         sessions = Array.Empty<MediaSession>();
         Debug.WriteLine("[MediaSessionCatalog] Failed to copy CurrentMediaSessions after retries.");
         return false;
+    }
+
+    /// <summary>
+    /// 返回一份绕过第三方库字典的会话快照：直接向 Windows 索取会话，再包装成库会话类型。
+    ///
+    /// 这是看门狗的最后一级手段。库的字典只在 WinRT 事件触发时才同步，而该事件链路存在上游未修的缺陷
+    /// （见库的 issue #6），一旦断掉，字典就再也追不上系统，而重建字典与 ForceUpdate 都治不了断掉的链路。
+    /// 直接读 <c>WindowsSessionManager</c> 完全不依赖任何事件，因此这条读路径在该状态下依然有效。
+    ///
+    /// 库字典里已有的会话原样保留（它们带有事件转发，重建会一并丢失），只对系统存在而字典缺失的会话补一个包装实例。
+    /// Returns a session snapshot that bypasses the third-party dictionary by asking Windows directly and wrapping the result.
+    ///
+    /// This is the watchdog's last resort. The library's dictionary only syncs when WinRT events fire, and that event chain carries an
+    /// unfixed upstream defect (see the library's issue #6): once it breaks, the dictionary can never catch up again, and neither rebuilding
+    /// the dictionary nor ForceUpdate repairs the broken chain. Reading <c>WindowsSessionManager</c> directly depends on no event at all, so
+    /// this read path stays functional in exactly that state.
+    ///
+    /// Sessions already present in the library dictionary are kept as they are (they carry event forwarding that a rebuild would drop), and
+    /// only sessions the OS publishes while the dictionary lacks them get a wrapper instance.
+    /// </summary>
+    /// <param name="sessions">合并后的会话快照；目录不可用时返回空数组。/ The merged session snapshot, empty when the catalog is unavailable.</param>
+    public MediaSession[] GetSnapshotFromWinRt()
+    {
+        using var lease = _managers.TryAcquire();
+        if (lease is null)
+        {
+            return [];
+        }
+
+        var manager = lease.Value;
+        var managerHandle = manager.WindowsSessionManager;
+        if (managerHandle is null)
+        {
+            return [];
+        }
+
+        List<GlobalSystemMediaTransportControlsSession> native;
+        try
+        {
+            native = [.. managerHandle.GetSessions()];
+        }
+        catch (Exception exception) when (exception is COMException or InvalidOperationException or ObjectDisposedException)
+        {
+            Debug.WriteLine($"[MediaSessionCatalog] Failed to enumerate native sessions: {exception.Message}");
+            return [];
+        }
+
+        // 库字典里的会话优先：它们带事件转发，重建包装会丢掉这些订阅。
+        // Sessions already in the library dictionary win: they carry event forwarding that rebuilding the wrapper would drop.
+        var result = new List<MediaSession>(native.Count);
+        var known = new HashSet<string>(StringComparer.Ordinal);
+        try
+        {
+            foreach (var session in manager.CurrentMediaSessions.Values.Where(MediaSessionGuard.IsUsable))
+            {
+                result.Add(session);
+                known.Add(session.Id ?? string.Empty);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            // 字典正在被 WinRT 事件线程改写；这一轮放弃合并，只用原生会话。
+            // The dictionary is being mutated on a WinRT event thread; skip the merge this round and use the native sessions alone.
+        }
+
+        var added = 0;
+        foreach (var controlSession in native)
+        {
+            if (string.IsNullOrEmpty(controlSession.SourceAppUserModelId) ||
+                known.Contains(controlSession.SourceAppUserModelId))
+            {
+                continue;
+            }
+
+            if (NativeSessionAdapter.TryWrap(controlSession, manager, out var wrapped) && wrapped is not null)
+            {
+                result.Add(wrapped);
+                added++;
+            }
+        }
+
+        if (added > 0)
+        {
+            Debug.WriteLine($"[MediaSessionCatalog] Recovered {added} session(s) directly from WinRT.");
+        }
+
+        return [.. result];
     }
 
     /// <summary>
