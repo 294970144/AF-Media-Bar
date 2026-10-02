@@ -567,6 +567,11 @@ public sealed class MediaSessionService : IDisposable
             // 只有真正把会话捞回来时才写一行：空闲时看门狗会持续以低频重试，逐次记录会把日志刷满。
             // Only a recovered session earns a line: while idle the watchdog keeps retrying at a low cadence, and logging every
             // attempt would fill the file.
+            //
+            // 同时清掉构建侧的丢弃记账：那一行只在累计到阈值时输出一次，不清就会把上一次故障的计数带进这一次。
+            // The build-side drop accounting is cleared here too: it prints one line only once the count reaches its threshold, so
+            // without a reset the previous failure's counts would carry into the next one.
+            MediaSessionDiagnostics.ResetBuildDrops();
             AppLogService.Current?.Info(
                 "Media",
                 $"[看门狗] 事件丢失后恢复媒体会话：耗时 {elapsed.TotalMilliseconds:0.0}ms");
@@ -703,6 +708,17 @@ public sealed class MediaSessionService : IDisposable
         try
         {
             _lastSessions = sessions.Where(MediaSessionGuard.IsUsable).ToArray();
+
+            // 一次刷新读到了会话却没能产出任何快照时必须留证：真机日志里出现过一个 4 分钟窗口，其间只有 2 条快照，
+            // 其余时间完全静默——连断连快照都没有发出，说明刷新根本没走到发布。这种形态靠只在动作触发点记录的诊断看不见。
+            // A refresh that read sessions but produced no snapshot at all must leave a trace: a real log held a four-minute window
+            // with only two snapshots in it and complete silence otherwise — not even a disconnected snapshot, which means the refresh
+            // never reached publication. A shape diagnostics recorded only at action points cannot see.
+            if (_lastSessions.Count > 0)
+            {
+                MediaSessionDiagnostics.NoteRefreshWithSessions(_sessionSnapshot.IsConnected);
+            }
+
             _smtcCandidates = _lastSessions.Select(session => new MediaSourceCandidate(
                 session.Id, MediaSessionGuard.GetSourceId(session), IsPlaying(session), session.Id)).ToArray();
             _candidates = BuildCandidates();
@@ -723,6 +739,17 @@ public sealed class MediaSessionService : IDisposable
             PublishSessions(_candidates);
             if (session is null || !_catalog.IsStarted)
             {
+                // 会话读到了却没被选中（或目录未就绪）：会话是在选择器这一层丢的，与字典无关，因此单独记一行。
+                // The sessions were read but none got selected (or the catalog is not ready): the session was lost at the selector
+                // rather than in the dictionary, so it gets its own line.
+                if (_lastSessions.Count > 0 && !_sessionSnapshot.IsConnected)
+                {
+                    MediaSessionDiagnostics.ReportSelectorDrop(
+                        _candidates.Count,
+                        _selection.SelectedKey,
+                        _catalog.IsStarted);
+                }
+
                 Publish(MediaSnapshot.Disconnected);
                 TryRequestFallbackLyrics();
                 return;
