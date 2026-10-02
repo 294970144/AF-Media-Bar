@@ -149,6 +149,69 @@ public sealed class MediaSessionCatalog : IDisposable
     }
 
     /// <summary>
+    /// 采集目录两侧的对照快照：Windows 报告了哪些会话、库字典里有哪些、其中哪些已读不出内容。
+    ///
+    /// 这是纯读取，不做任何恢复动作，因此可以在故障态反复采集。字典由 WinRT 事件线程改写，
+    /// 采集与 <see cref="TryGetSnapshot"/> 一样只能缩小竞态窗口：某一项读到一半失效时会把它归入"不可读"，
+    /// 而不会让整次采集失败。
+    /// Captures a two-sided snapshot of the catalog: which sessions Windows reports, which the library dictionary holds, and which of
+    /// those already read nothing.
+    ///
+    /// This is a pure read with no recovery action, so it can be collected repeatedly while broken. The dictionary is mutated on WinRT
+    /// event threads, so like <see cref="TryGetSnapshot"/> this only narrows the race window: an entry that goes stale mid-collection is
+    /// reported as unreadable rather than failing the whole collection.
+    /// </summary>
+    public MediaSessionCatalogState CaptureState()
+    {
+        using var lease = _managers.TryAcquire();
+        if (lease is null)
+        {
+            return MediaSessionCatalogState.Unavailable;
+        }
+
+        var manager = lease.Value;
+
+        List<string> osSourceIds = [];
+        try
+        {
+            if (manager.WindowsSessionManager is { } sessionManager)
+            {
+                osSourceIds.AddRange(sessionManager.GetSessions()
+                    .Select(static session => session.SourceAppUserModelId ?? string.Empty));
+            }
+        }
+        catch (Exception exception) when (exception is COMException or InvalidOperationException or ObjectDisposedException)
+        {
+            // 采不到系统侧就如实留空：诊断行里 os=0 与"系统确实没有会话"必须能区分开，因此不静默吞掉而是留下痕迹。
+            // Leaving the OS side empty when it cannot be read keeps "os=0" distinguishable from "the OS truly has no sessions", so the
+            // failure leaves a trace instead of being swallowed.
+            Debug.WriteLine($"[MediaSessionCatalog] Failed to enumerate native sessions for diagnostics: {exception.Message}");
+        }
+
+        List<string> librarySourceIds = [];
+        List<string> unusableSourceIds = [];
+        try
+        {
+            foreach (var session in manager.CurrentMediaSessions.Values)
+            {
+                var sourceId = session.Id ?? string.Empty;
+                librarySourceIds.Add(sourceId);
+                if (!MediaSessionGuard.IsUsable(session))
+                {
+                    unusableSourceIds.Add(sourceId);
+                }
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            // 字典正在被 WinRT 事件线程改写，这一轮采到多少算多少。
+            // The dictionary is being mutated on a WinRT event thread, so whatever this round collected stands.
+        }
+
+        return new MediaSessionCatalogState(osSourceIds, librarySourceIds, unusableSourceIds);
+    }
+
+    /// <summary>
     /// 返回当前动态会话集合的稳定数组快照，并剔除已被第三方库关闭的会话；目录尚未就绪时返回 <see langword="false"/>。
     /// 字典由 WinRT 事件线程改写而本方法在 UI 线程读取，因此剔除只能缩小竞态窗口，消费者仍须通过
     /// <see cref="MediaSessionGuard"/> 判定可用性。
@@ -193,17 +256,19 @@ public sealed class MediaSessionCatalog : IDisposable
     /// <summary>
     /// 返回一份绕过第三方库字典的会话快照：直接向 Windows 索取会话，再包装成库会话类型。
     ///
-    /// 这是看门狗的最后一级手段。库的字典只在 WinRT 事件触发时才同步，而该事件链路存在上游未修的缺陷
-    /// （见库的 issue #6），一旦断掉，字典就再也追不上系统，而重建字典与 ForceUpdate 都治不了断掉的链路。
-    /// 直接读 <c>WindowsSessionManager</c> 完全不依赖任何事件，因此这条读路径在该状态下依然有效。
+    /// 这条读路径与库的事件链路无关，因此在上游事件缺陷（库的 issue #6）影响下依然有效。
+    /// 需要说明的是：库 2.5.6 的 <c>ForceUpdate()</c> 本身就会调用 <c>GetSessions()</c>，并不依赖事件，
+    /// 所以"事件链路断了"并不能单独解释重连与重建为何都无效；本路径是绕开字典的旁路读，不是对病因的断言。
+    /// 究竟丢在哪一环，由 <see cref="CaptureState"/> 的诊断行给出证据。
     ///
     /// 库字典里已有的会话原样保留（它们带有事件转发，重建会一并丢失），只对系统存在而字典缺失的会话补一个包装实例。
     /// Returns a session snapshot that bypasses the third-party dictionary by asking Windows directly and wrapping the result.
     ///
-    /// This is the watchdog's last resort. The library's dictionary only syncs when WinRT events fire, and that event chain carries an
-    /// unfixed upstream defect (see the library's issue #6): once it breaks, the dictionary can never catch up again, and neither rebuilding
-    /// the dictionary nor ForceUpdate repairs the broken chain. Reading <c>WindowsSessionManager</c> directly depends on no event at all, so
-    /// this read path stays functional in exactly that state.
+    /// This read path depends on none of the library's events, so it stays functional under the upstream event defect (the library's
+    /// issue #6). One caveat: the library's 2.5.6 <c>ForceUpdate()</c> calls <c>GetSessions()</c> itself and does not rely on events, so
+    /// "the event chain broke" cannot by itself explain why reconnecting and rebuilding both failed; this path is a bypass read around
+    /// the dictionary, not a claim about the cause. Which stage actually drops the session is answered by the diagnostic line from
+    /// <see cref="CaptureState"/>.
     ///
     /// Sessions already present in the library dictionary are kept as they are (they carry event forwarding that a rebuild would drop), and
     /// only sessions the OS publishes while the dictionary lacks them get a wrapper instance.

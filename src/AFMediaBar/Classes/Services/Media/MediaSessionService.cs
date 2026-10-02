@@ -188,8 +188,38 @@ public sealed class MediaSessionService : IDisposable
     /// <remarks>必须在 UI 线程调用（命令入口即如此）。/ Must be called on the UI thread, which is how the command path uses it.</remarks>
     public Task ReconnectAsync()
     {
+        // 重连前后各记一行：这是唯一能由用户直接触发的复现时刻，前后对照最能暴露"库调用没让字典变好"还是"字典其实正常、只是下游丢了"。
+        // One line before and one after: this is the only reproduction the user can trigger directly, and the pair best separates
+        // "the library call did not improve the dictionary" from "the dictionary was fine and something downstream dropped it".
+        LogDiagnostics("手动重连前/manual-reconnect-before");
         StartReconcile();
-        return _reconcileTask ?? Task.CompletedTask;
+        var task = _reconcileTask ?? Task.CompletedTask;
+        return LogAfterReconnectAsync(task);
+    }
+
+    /// <summary>
+    /// 等一次手动重连落地后再记一行诊断，使前后两行落在同一份日志里可直接比较。
+    /// 后台流程本身可能因取消或过期而丢弃结果，因此只保证"流程结束后"记录，不保证它改动了什么。
+    /// Writes the post-reconnect diagnostic line once the flow has finished, so both lines land in the same log ready to compare.
+    /// The background flow may drop its result through cancellation or staleness, so this only guarantees the line is written after the
+    /// flow ends, not that the flow changed anything.
+    /// </summary>
+    private async Task LogAfterReconnectAsync(Task reconcile)
+    {
+        try
+        {
+            await reconcile;
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or InvalidOperationException or ObjectDisposedException)
+        {
+            // 手动重连的失败由看门狗自己的日志与诊断行记录，这里不重复抛给调用方。
+            // A failed manual reconnect is already covered by the watchdog's own logging and diagnostic line, so it is not rethrown here.
+        }
+
+        if (!_isDisposed)
+        {
+            LogDiagnostics("手动重连后/manual-reconnect-after");
+        }
     }
 
     /// <summary>
@@ -557,6 +587,11 @@ public sealed class MediaSessionService : IDisposable
             // The OS has sessions while the catalog stays unreadable: a library broken state ForceUpdate cannot fix (a dead
             // dictionary entry), so the whole catalog was rebuilt. Past the limit the policy falls back to ForceUpdate instead
             // of rebuilding the catalog every few seconds (this looped forever while a fullscreen game blocked the OS query).
+            //
+            // 升级这一刻正是最需要证据的时刻：重建之后字典理应与系统一致，若仍然读不到，丢的就是别的环节。
+            // This escalation is exactly when the evidence matters: after a rebuild the dictionary ought to match the OS, so if the
+            // read still fails, some other stage is dropping it.
+            LogDiagnostics("watchdog-重建目录/restart-catalog");
             AppLogService.Current?.Info(
                 "Media",
                 $"[看门狗] 系统有会话但目录读不到，已重建媒体目录（连续第 {_consecutiveCatalogRestarts} 次，上限 {MediaSessionReconcilePolicy.CatalogRestartLimit}）");
@@ -569,6 +604,7 @@ public sealed class MediaSessionService : IDisposable
             // chain is broken and a fresh dictionary cannot help. Refreshes now read through the fallback until a session really comes
             // back, which clears this flag.
             _useWinRtFallback = true;
+            LogDiagnostics("watchdog-启用兜底/enable-fallback");
             AppLogService.Current?.Info(
                 "Media",
                 "[看门狗] 媒体目录重建后仍读不到会话，已切换为直接读取系统会话（不再依赖第三方库事件）");
@@ -611,6 +647,12 @@ public sealed class MediaSessionService : IDisposable
                 _useWinRtFallback = false;
                 ReleaseFallbackSessions(_lastSessions);
                 _lastSessions = [];
+                // 切回库链路的这一刻值得留证：若下一轮又读不到，就能看出是兜底期间的系统会话本身消失了，
+                // 还是库字典在事件恢复后仍然对不上。
+                // The moment the library path is restored is worth recording: if the next round reads nothing again, it shows whether
+                // the OS session itself disappeared while the fallback was active or the library dictionary still disagrees after the
+                // events came back.
+                LogDiagnostics("退出兜底/exit-fallback");
             }
 
             // 只有真正把会话捞回来时才写一行：空闲时看门狗会持续以低频重试，逐次记录会把日志刷满。
@@ -648,6 +690,50 @@ public sealed class MediaSessionService : IDisposable
         _consecutiveSlowReconciles = MediaSessionReconcilePolicy.IsSlowCall(elapsed)
             ? Math.Min(_consecutiveSlowReconciles + 1, MediaSessionReconcilePolicy.MaximumBackoffShift)
             : 0;
+    }
+
+    /// <summary>
+    /// 记录一行会话去向诊断：同一时刻对照 Windows 与库字典，并把每个来源判成"缺失 / 不可读 / 被过滤 / 未选中"。
+    ///
+    /// 这行的作用是把笼统的"系统有会话但目录读不到"拆开——那句话只说明系统侧非空，
+    /// 读不出可能发生在字典缺条目、<c>ControlSession</c> 被清空、来源过滤挡掉，或选择器没选中任何一项，
+    /// 四者需要完全不同的修法。只在故障态与手动重连时记录，正常播放不写，避免日志被刷满。
+    /// Writes one session-verdict diagnostic line: it puts Windows and the library dictionary side by side at a single instant and
+    /// sorts every source into missing, unreadable, filtered, or not selected.
+    ///
+    /// The point of this line is to break the vague "the OS has sessions but the catalog reads nothing" apart: that sentence only says
+    /// the OS side is non-empty, while the read can fail on a missing dictionary entry, a cleared <c>ControlSession</c>, the source
+    /// filter, or the selector picking nothing — four causes needing four different fixes. It is written only while broken and around a
+    /// manual reconnect so ordinary playback never floods the log.
+    /// </summary>
+    /// <param name="stage">阶段标签。/ Stage label.</param>
+    private void LogDiagnostics(string stage)
+    {
+        var log = AppLogService.Current;
+        if (log is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var state = _catalog.CaptureState();
+            var filter = SettingsManager.Current.SmtcSourceFilter;
+            var allowed = state.OsSourceIds
+                .Concat(state.LibrarySourceIds)
+                .Where(sourceId => _sources.IsAllowed(sourceId, filter))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            log.Info(
+                "Media",
+                MediaSessionDiagnosticsPolicy.Format(stage, state, allowed, _selectedSessionKey, _useWinRtFallback));
+        }
+        catch (Exception ex)
+        {
+            // 诊断本身绝不能把读路径带崩：采集失败只留一行痕迹，不抛。
+            // Diagnostics must never take the read path down: a failed collection leaves one trace line and nothing more.
+            log.Warn("Media", "会话诊断采集失败 / failed to collect session diagnostics", ex);
+        }
     }
 
     private void OnSourceSnapshotChanged(IMediaSourceProvider provider, MediaSnapshot? snapshot)
@@ -757,13 +843,15 @@ public sealed class MediaSessionService : IDisposable
     /// <summary>
     /// 按当前模式读取会话列表：正常走第三方库字典，进入兜底模式后直接向 Windows 索取。
     ///
-    /// 兜底路径每次都会新建包装实例，因此上一轮兜底读到的会话必须先释放：它们不在库的字典里，
-    /// 库不会替 AF 回收，而每个包装实例都在原生会话上订阅了事件。
+    /// 兜底路径每次都会新建包装实例，因此**上一轮**兜底读到的会话必须先释放：它们不在库的字典里，
+    /// 库不会替 AF 回收，而每个包装实例都在原生会话上订阅了三个事件。释放的是 <see cref="_lastSessions"/>
+    /// （上一轮），而不是本轮刚拿到的 <paramref name="recovered"/>——后者正是要交给消费者用的。
     /// Reads the session list for the current mode: the library dictionary normally, Windows directly once the fallback is active.
     ///
-    /// The fallback path creates fresh wrapper instances on every call, so the previous round's fallback sessions must be released
-    /// first: they are not in the library dictionary, the library will not reclaim them for AF, and each wrapper holds event
-    /// subscriptions on a native session.
+    /// The fallback path creates fresh wrapper instances on every call, so the **previous** round's sessions must be released first:
+    /// they are not in the library dictionary, the library will not reclaim them for AF, and each wrapper holds three event
+    /// subscriptions on a native session. What gets released is <see cref="_lastSessions"/> (the previous round), never
+    /// <paramref name="recovered"/>, which is exactly what the consumers are about to be handed.
     /// </summary>
     private MediaSession[] ReadSessions()
     {
@@ -772,8 +860,12 @@ public sealed class MediaSessionService : IDisposable
             return _catalog.TryGetSnapshot(out var current) ? current : [.. _lastSessions];
         }
 
+        // 先释放上一轮，再读这一轮：顺序反了会把刚构造好的包装实例立刻退订，兜底路径随即自毁。
+        // Release the previous round before reading this one: the other order unsubscribes the wrappers just constructed, and the
+        // fallback path destroys itself.
+        var previous = _lastSessions;
         var recovered = _catalog.GetSnapshotFromWinRt();
-        ReleaseFallbackSessions(recovered);
+        ReleaseFallbackSessions(previous);
         return recovered;
     }
 

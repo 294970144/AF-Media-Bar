@@ -18,7 +18,7 @@ public enum MediaSessionReconcileAction
     /// <summary>整只重建媒体目录：ForceUpdate 救不回来的库失效状态最后手段。/ Rebuild the whole media catalog: the last resort for a library broken state that ForceUpdate cannot fix.</summary>
     RestartCatalog = 2,
 
-    /// <summary>绕过库字典、直接向 Windows 索取会话：事件链路已断时的唯一出路。/ Bypass the library dictionary and ask Windows for sessions directly: the only way out once the event chain is broken.</summary>
+    /// <summary>绕开库字典、直接向 Windows 索取会话：前面几级都试过仍读不到时的旁路读。/ Bypass the library dictionary and ask Windows for sessions directly: a bypass read once every earlier tier has been tried and still reads nothing.</summary>
     RebuildFromWinRt = 3
 }
 
@@ -166,9 +166,15 @@ public static class MediaSessionReconcilePolicy
             return MediaSessionReconcileAction.ForceUpdate;
         }
 
-        // 重建预算已用尽说明换新字典救不回这个状态，病因在字典之外（事件链路已断），此时才绕开字典直接读系统。
-        // A spent rebuild budget means replacing the dictionary cannot recover this state and the cause lies outside the dictionary (the
-        // event chain is broken), which is the only point where reading the OS directly is worth bypassing it.
+        // 重建预算已用尽说明换新字典救不回这个状态，此时才绕开字典直接读系统。
+        // 注意这不等于"病因是事件链路断了"：2.5.6 的 ForceUpdate 本身就会调 GetSessions()，并不经过事件。
+        // 因此这一档是"前面都试过了"的旁路，而不是对病因的判断——真正的丢点由 CaptureState 的诊断行给出。
+        // A spent rebuild budget means replacing the dictionary cannot recover this state, which is the only point where reading the OS
+        // directly is worth bypassing it.
+        //
+        // Note this does not mean "the cause is a broken event chain": 2.5.6's ForceUpdate calls GetSessions() itself and does not go
+        // through events. This tier is therefore a bypass after everything else has been tried rather than a verdict on the cause; where
+        // the session is actually dropped is answered by the diagnostic line from CaptureState.
         if (consecutiveCatalogRestarts >= CatalogRestartLimit)
         {
             return sinceLastCatalogRestart < CatalogRestartCooldown
