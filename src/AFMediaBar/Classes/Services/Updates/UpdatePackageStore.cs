@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AFMediaBar.Classes.Models.Updates;
@@ -28,6 +29,8 @@ public sealed class UpdatePackageStore
     private const string PartSuffix = ".part";
     private const string InstallerPattern = "AFMediaBar-Setup-*.exe";
     private const string LogPattern = "install-*.log";
+    private const string TemporarySuffix = ".tmp";
+    private const int HashBufferSize = 64 * 1024;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -112,7 +115,14 @@ public sealed class UpdatePackageStore
         try
         {
             Directory.CreateDirectory(_directoryPath);
-            File.WriteAllText(PendingRecordPath, JsonSerializer.Serialize(record, JsonOptions));
+            var payload = JsonSerializer.Serialize(record, JsonOptions);
+
+            // 先写临时文件再整体替换：直接覆盖会在写入被中断时留下半截 JSON，下次启动读不出来，更新也就丢了。
+            // Write to a temporary file first and replace in one step: overwriting in place can leave half-written
+            // JSON behind when the write is interrupted, which the next start cannot read, losing the update.
+            var temporaryPath = PendingRecordPath + TemporarySuffix;
+            File.WriteAllText(temporaryPath, payload);
+            File.Move(temporaryPath, PendingRecordPath, overwrite: true);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -150,6 +160,15 @@ public sealed class UpdatePackageStore
         if (record is null)
         {
             return UpdatePendingFileAction.Download;
+        }
+
+        // 路径不可信时一律丢弃：记录是用户可写的，其中的路径可能被指向更新目录之外的任意位置。
+        // An untrusted path is discarded outright: the record is user-writable, so the path inside it may have been
+        // pointed anywhere outside this directory.
+        if (!IsTrustedInstallerPath(record.Path))
+        {
+            Debug.WriteLine("[Update] Pending installer path is outside the update directory; discarding the record.");
+            return UpdatePendingFileAction.Discard;
         }
 
         var exists = false;
@@ -246,6 +265,90 @@ public sealed class UpdatePackageStore
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             Debug.WriteLine($"[Update] Update directory cleanup failed: {exception.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 判断一个安装包路径是否可以信任：它必须位于本更新目录之内，并且是一个 <c>.exe</c>。
+    ///
+    /// <c>pending.json</c> 落在用户自己的目录里，因此记录中的路径只能当作"指向本目录下某个文件"的提示，
+    /// 绝不能当作可以照此执行的地址：少了这层约束，改写这一个文件就足以让下一次启动去运行别处的任意文件。
+    /// Decides whether an installer path may be trusted: it has to sit inside this update directory and be an
+    /// <c>.exe</c>.
+    ///
+    /// <c>pending.json</c> lives in the user's own directory, so a path read from the record is only a hint pointing
+    /// at a file inside this directory, never an address that may be executed as-is: without this constraint,
+    /// rewriting that single file would be enough to make the next start run an arbitrary file from elsewhere.
+    /// </summary>
+    /// <param name="path">待判断的路径。/ Path to judge.</param>
+    public bool IsTrustedInstallerPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathRooted(path))
+        {
+            return false;
+        }
+
+        try
+        {
+            var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(_directoryPath));
+            var candidate = Path.GetFullPath(path);
+
+            return candidate.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+                && candidate.EndsWith(".exe", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 把安装包真的读一遍，确认它的 SHA-256 与记录里写的一致。
+    ///
+    /// 记录自身的自洽说明不了文件有没有被换过：长度和写入时间都可以一并伪造，只有把字节读完算出来的哈希才描述
+    /// 文件本身。因此"可以直接复用"这个结论必须建立在真的读过一遍的基础之上。
+    /// Reads the installer back to confirm that its SHA-256 matches the recorded one.
+    ///
+    /// The record agreeing with itself says nothing about whether the file was swapped: both its length and its write
+    /// time can be forged together, and only a hash computed over the bytes describes the file itself. The decision to
+    /// reuse therefore has to rest on having actually read it.
+    /// </summary>
+    /// <param name="record">待安装记录。/ Pending record.</param>
+    public bool MatchesRecordedHash(UpdatePendingFileRecord record)
+    {
+        try
+        {
+            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            using var stream = new FileStream(
+                record.Path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                HashBufferSize,
+                FileOptions.SequentialScan);
+
+            var buffer = new byte[HashBufferSize];
+            while (true)
+            {
+                var count = stream.Read(buffer, 0, buffer.Length);
+                if (count == 0)
+                {
+                    break;
+                }
+
+                hash.AppendData(buffer, 0, count);
+            }
+
+            return string.Equals(
+                Convert.ToHexString(hash.GetHashAndReset()),
+                record.Sha256,
+                StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            Debug.WriteLine($"[Update] Pending installer could not be hashed: {exception.Message}");
+            return false;
         }
     }
 
