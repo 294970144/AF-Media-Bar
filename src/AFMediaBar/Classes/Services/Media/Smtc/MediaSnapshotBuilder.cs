@@ -148,6 +148,7 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable, IDisposable
         // the close event schedule the next refresh.
         if (controlSession is null)
         {
+            MediaSessionDiagnostics.ReportBuildDrop(session, MediaSessionBuildDropReason.NoControlSession);
             return null;
         }
 
@@ -159,8 +160,7 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable, IDisposable
             read = await Task.Run(async () =>
             {
                 var songInfo = await controlSession.TryGetMediaPropertiesAsync();
-                if (songInfo is null) return null;
-                var playbackInfo = controlSession.GetPlaybackInfo();
+                if (songInfo is null) return null;                var playbackInfo = controlSession.GetPlaybackInfo();
                 var timeline = controlSession.GetTimelineProperties();
                 var artwork = ArtworkLoader.GetThumbnail(songInfo.Thumbnail);
                 return new SmtcMediaRead(
@@ -188,12 +188,14 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable, IDisposable
         }
         catch (Exception exception) when (exception is COMException or InvalidOperationException or ObjectDisposedException)
         {
+            MediaSessionDiagnostics.ReportBuildDrop(session, MediaSessionBuildDropReason.ReadThrew, exception.GetType().Name);
             return null;
         }
 
         cancellationToken.ThrowIfCancellationRequested();
         if (read is null)
         {
+            MediaSessionDiagnostics.ReportBuildDrop(session, MediaSessionBuildDropReason.NoMediaProperties);
             return null;
         }
 
