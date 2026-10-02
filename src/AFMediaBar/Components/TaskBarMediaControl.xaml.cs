@@ -151,6 +151,16 @@ namespace AFMediaBar.Components
         }
 
         // === 内部状态缓存 Internal State Cache ===
+        // These immutable foregrounds are shared; hover surfaces own separate animatable brushes.
+        private static readonly SolidColorBrush DarkPlayerForeground = CreateFrozenBrush(Color.FromRgb(0x1C, 0x1C, 0x1C));
+
+        private static SolidColorBrush CreateFrozenBrush(Color color)
+        {
+            var brush = new SolidColorBrush(color);
+            brush.Freeze();
+            return brush;
+        }
+
         private string _actualTitle = string.Empty;   // 实际标题（不含歌词）Actual title (without lyrics)
         private string _actualArtist = string.Empty;  // 实际艺术家 Actual artist
 
@@ -1586,9 +1596,7 @@ namespace AFMediaBar.Components
             }
             else
             {
-                foreground = new SolidColorBrush(presentation.UsesLightText
-                    ? Colors.White
-                    : Color.FromRgb(0x1C, 0x1C, 0x1C));
+                foreground = presentation.UsesLightText ? Brushes.White : DarkPlayerForeground;
             }
 
             SongTitle.Foreground = foreground;
@@ -1607,7 +1615,7 @@ namespace AFMediaBar.Components
             SongInfoStackPanel.Background = Brushes.Transparent;
             SetWebLyricsAppearance(foreground, needsContrastShadow: false, usesLightText: presentation.UsesLightText);
 
-            MainBorder.Background = new SolidColorBrush(Colors.Transparent);
+            MainBorder.Background = Brushes.Transparent;
             TopBorder.BorderBrush = Brushes.Transparent;
             BackgroundImage.Visibility = Visibility.Collapsed;
         }
@@ -1623,10 +1631,10 @@ namespace AFMediaBar.Components
 
             _taskbarHoverPalette = palette;
             _appliedTaskbarHoverForeground = palette.Foreground;
-            Resources["TaskbarHoverForegroundBrush"] = new SolidColorBrush(_taskbarHoverPalette.Foreground);
-            Resources["TaskbarHoverButtonOverBrush"] = new SolidColorBrush(_taskbarHoverPalette.ButtonHover);
-            Resources["TaskbarHoverButtonPressedBrush"] = new SolidColorBrush(_taskbarHoverPalette.ButtonPressed);
-            Resources["TaskbarHoverHandleBrush"] = new SolidColorBrush(_taskbarHoverPalette.Handle);
+            Resources["TaskbarHoverForegroundBrush"] = CreateFrozenBrush(_taskbarHoverPalette.Foreground);
+            Resources["TaskbarHoverButtonOverBrush"] = CreateFrozenBrush(_taskbarHoverPalette.ButtonHover);
+            Resources["TaskbarHoverButtonPressedBrush"] = CreateFrozenBrush(_taskbarHoverPalette.ButtonPressed);
+            Resources["TaskbarHoverHandleBrush"] = CreateFrozenBrush(_taskbarHoverPalette.Handle);
             RefreshTaskbarHoverAppearance();
         }
 
@@ -1705,8 +1713,7 @@ namespace AFMediaBar.Components
                     // Keep the disconnected taskbar transparent; preserve the dynamic-island layout background.
                     if (_currentMode == WindowMode.Taskbar)
                     {
-                        MainBorder.Background = new SolidColorBrush(Colors.Transparent);
-                        MainBorder.Background.Opacity = 0;
+                        MainBorder.Background = Brushes.Transparent;
                         TopBorder.BorderBrush = Brushes.Transparent;
                     }
 
@@ -1742,7 +1749,6 @@ namespace AFMediaBar.Components
                     SongArtist.Text = _actualArtist;
                 }
 
-                SongTitle.Text = _actualTitle;
                 UpdateWebLyricsPresentation();
 
                 // 有媒体时封面与文字区一起构成"程序内的全局滚轮面"：曲名与歌手不再需要跟着提示走（它们已经在文字区里，
