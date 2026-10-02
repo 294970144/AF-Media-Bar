@@ -1,29 +1,29 @@
 {
   "schemaVersion": 1,
-  "version": "1.3.0",
-  "releaseDate": "2026-09-30",
+  "version": "1.3.1",
+  "releaseDate": "2026-10-03",
   "minimumSupportedVersion": "1.2.0",
   "mandatory": false,
-  "title": "AF Media Bar 1.3.0",
+  "title": "AF Media Bar 1.3.1",
   "changelog": [
-    "歌词改用 WebView2，逐字高亮、译文和音译显示更清晰",
-    "注：新歌词显示模式的内存和gpu占用仍较高，将在下版本优化，介意可忽略更新",
-    "无媒体与播放信息的切换更顺滑，调整媒体栏宽度更稳定",
-    "新增静置层封面开关、组件设置页和交互按钮大小调节",
-    "右键菜单可快速打开已绑定应用，发现新版本时显示更新入口",
-    "修复浏览器媒体关闭后的旧画面停留、低音量频谱及托盘提示问题",
-    "改进歌词匹配、媒体会话恢复和通知封面比例"
+    "歌词显示性能优化，减少 WebView2 的内存与 GPU 占用",
+    "注:安装目录下的 AFMediaBar.exe.WebView2，文件已不再需要，可手动删除。",
+    "媒体栏多项性能优化",
+    "自动隐藏任务栏动画回归",
+    "修复 WebView2 数据目录、封面恢复默认和空间音效状态判断问题",
+    "修复部分情况下无法显示歌词的问题"
+
   ],
-  "releaseNotesUrl": "https://github.com/Fervent-Tempo/AF-Media-Bar/releases/tag/v1.3.0",
+  "releaseNotesUrl": "https://github.com/Fervent-Tempo/AF-Media-Bar/releases/tag/v1.3.1",
   "releasePageUrl": "https://github.com/Fervent-Tempo/AF-Media-Bar/releases/latest",
   "downloads": {
-    "github": "https://github.com/Fervent-Tempo/AF-Media-Bar/releases/download/v1.3.0/AFMediaBar-v1.3.0-win-x64.zip"
+    "github": "https://github.com/Fervent-Tempo/AF-Media-Bar/releases/download/v1.3.1/AFMediaBar-v1.3.1-win-x64.zip"
   },
   "packages": [
     {
-      "url": "https://github.com/Fervent-Tempo/AF-Media-Bar/releases/download/v1.3.0/AFMediaBar-Setup-v1.3.0-win-x64.exe",
-      "size": 74067123,
-      "sha256": "3f5b53c602930f8e003f14fc6d8504c9d263c3b43137da1e289662f2c631c86a"
+      "url": "https://github.com/Fervent-Tempo/AF-Media-Bar/releases/download/v1.3.1/AFMediaBar-Setup-v1.3.1-win-x64.exe",
+      "size": 74073482,
+      "sha256": "53070ccde1b3c832dbf1a74c3aaa406cefc604f255ca166182f62dcd9898bcf6"
     }
   ]
 }
