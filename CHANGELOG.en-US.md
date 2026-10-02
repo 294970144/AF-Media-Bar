@@ -13,6 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Create the WebView2 lyrics view only when lyrics are available. Release it immediately when lyrics are disabled or after 30 seconds without lyrics; attempt suspension while the display is off or the session is locked, then refresh the current lyrics on return. Skip repeated style scripts when appearance values have not changed.
 - Stop the spectrum sampling timer when the component is not visible, and avoid repeated taskbar placement requests from media progress snapshots.
 - Reuse frozen static brushes and marquee text measurements in the WPF media bar, remeasure when fonts, language, or DPI change, reuse waveform point buffers, and avoid restarting spectrum bar animations for unchanged targets.
+- A downloaded and verified update is no longer overwritten by a later check: the check is skipped while the pending installer is still valid, so the tray and settings page keep the "ready — click to restart and install" entry.
 
 ## [1.3.0] - 2026-09-30
 
@@ -45,7 +46,6 @@ This release rebuilds lyric display and media-state transitions, adds appearance
 - Fixed a startup crash after resizing, stale browser media after closing a video, and tray tooltips that did not follow system output-device or volume changes. Hiding wheel-gesture hints keeps the current status and operation-result hints.
 - Media sessions recover after missed events. Catalog rebuilds now cool down after repeated failures instead of looping during situations such as exclusive fullscreen games.
 - Lyrics advance when a player's timeline stalls, the first line appears after a track change, missing album metadata no longer causes a false match, and QRC parsing and QQ Music empty translations are handled correctly.
-- A downloaded and verified update is no longer overwritten by a later check: the check is skipped while the pending installer is still valid, so the tray and settings page keep the "ready — click to restart and install" entry.
 - WebView2 graphics faults no longer exit the app; zero-size lyric layouts no longer crash it, and the hidden web spectrum stops consuming CPU in lyric mode.
 
 ### Internal and compatibility
