@@ -8,12 +8,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-10-03
+
+This release improves performance and taskbar auto-hide transitions, and fixes lyrics, audio, and update issues from 1.3.0.
+
 ### Improved
 
-- Create the WebView2 lyrics view only when lyrics are available. Release it immediately when lyrics are disabled or after 30 seconds without lyrics; attempt suspension while the display is off or the session is locked, then refresh the current lyrics on return. Skip repeated style scripts when appearance values have not changed.
-- Stop the spectrum sampling timer when the component is not visible, and avoid repeated taskbar placement requests from media progress snapshots.
-- Reuse frozen static brushes and marquee text measurements in the WPF media bar, remeasure when fonts, language, or DPI change, reuse waveform point buffers, and avoid restarting spectrum bar animations for unchanged targets.
-- A downloaded and verified update is no longer overwritten by a later check: the check is skipped while the pending installer is still valid, so the tray and settings page keep the "ready — click to restart and install" entry.
+- Load lyrics on demand and release the view when disabled or lyrics remain unavailable. Attempt suspension when the display is off or the session is locked.
+- Stop sampling hidden spectrum widgets and reduce repeated lyric styling, text measurement, spectrum animation, and taskbar positioning.
+- The media bar slides with the auto-hidden taskbar while keeping lyrics visible. Clicks, scrolling, and dragging are blocked during motion and restored once it settles.
+
+### Fixed
+
+- Fixed WebView2 data-directory errors when the installation directory is not writable.
+- Resetting Display Modes now restores the artwork switch.
+- Spatial audio no longer appears enabled when it is off.
+- Checking again preserves a ready update and its restart-and-install entry.
+- Recheck SHA-256 before installation and accept only valid packages in the application's update directory.
 
 ## [1.3.0] - 2026-09-30
 
