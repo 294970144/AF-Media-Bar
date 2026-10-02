@@ -74,6 +74,14 @@ public partial class IslandWindow : FluentWindow
     private bool _isExpanded;
     private double _lastShellRadius = CapsuleCornerRadiusDip;
 
+    // 上一次交给 GDI 的窗口区域尺寸（物理像素）。三者都没变就不重建区域：SizeChanged 一次布局可能
+    // 连着触发好几遍，而每次重建都要走一次 GDI 区域分配。
+    // The last window-region geometry handed to GDI, in physical pixels. All three unchanged means no rebuild:
+    // one layout pass can raise SizeChanged several times and each rebuild costs a GDI region allocation.
+    private int _lastRegionWidthPx = -1;
+    private int _lastRegionHeightPx = -1;
+    private int _lastRegionRadiusPx = -1;
+
     /// <summary>创建岛体窗口并接通外观、显示器与状态源。 / Creates the island window and wires appearance, monitors, and state.</summary>
     public IslandWindow(
         IslandWindowViewModel viewModel,
@@ -168,6 +176,10 @@ public partial class IslandWindow : FluentWindow
         // Both policies reset on re-show: a leftover pin or hide verdict from last time must not carry over.
         _hover.Reset();
         _visibility.Reset();
+        // 隐藏期间窗口区域可能被系统丢弃，重新显示时强制重建一次：否则去重逻辑会以为轮廓没变而跳过。
+        // The window region may have been dropped by the system while hidden, so force one rebuild on re-show:
+        // otherwise the de-duplication would think the silhouette is unchanged and skip it.
+        InvalidateCapsuleRegion();
         _viewModel.Start();
         Show();
         // 重新显示后再擦一次系统色描边：隐藏期间系统可能重建了非客户区，Show() 本身也可能触发激活路径。
@@ -213,18 +225,18 @@ public partial class IslandWindow : FluentWindow
             // Drop the pin while hidden, otherwise the island reappears stuck open for no visible reason.
             _hover.Reset();
             if (IsVisible)
-                Hide();
+                HideIsland();
             return;
         }
 
+        // 重新显示必须走 ShowIsland 而不是裸 Show：协调器（显示模式页切换、--island 启动开关）也调它，
+        // 两处若各走一条，重新显示时就会漏掉 ViewModel.Start、位置校准与探针起表——症状是岛体回来了却
+        // 不再更新媒体。
+        // Re-showing must go through ShowIsland rather than a bare Show: the coordinator (display-mode switches,
+        // the --island launch switch) calls it too, and two separate paths would let a re-show skip
+        // ViewModel.Start, placement and the probe — the symptom being an island that returns but stops updating.
         if (!IsVisible)
-        {
-            Show();
-            // 重新显示后高度得重新校准，否则弹簧会拿隐藏前的目标继续跑。
-            // Re-align the height after re-showing, or the spring would keep chasing its pre-hide target.
-            Height = IslandPlacementPolicy.CompactHeightDip;
-            _heightSpring.ResetTo(Height);
-        }
+            ShowIsland();
 
         // 形态只有一个写入者：按悬停策略给出的目标态设定，绝不自己取反。
         // The shape has exactly one writer: it is set from the hover policy's target and never inverted here.
@@ -250,9 +262,6 @@ public partial class IslandWindow : FluentWindow
         if (ActualWidth <= 0 || ActualHeight <= 0)
             return;
 
-        // TODO(prototype): 调试日志，正式发布前移除。 / Debug logging; remove before release.
-        AppLogService.Current?.Verbose("Island", $"重设窗口区域 / reapply region {ActualWidth:F0}x{ActualHeight:F0}");
-
         // 动画期间按弹簧进度在两种圆角之间插值，否则收起/展开时轮廓会在最后一帧突然换形状。
         // 与 Shell 的 XAML 圆角共用同一计算，两处才不会错位。
         // Interpolating between the two radii along the spring progress avoids the outline snapping to a new shape
@@ -263,10 +272,40 @@ public partial class IslandWindow : FluentWindow
         var widthPx = (int)Math.Ceiling(ActualWidth * dpi.PixelsPerDip);
         var heightPx = (int)Math.Ceiling(ActualHeight * dpi.PixelsPerDip);
         var radiusPx = (int)Math.Ceiling(Math.Min(radiusDip, ActualHeight / 2) * dpi.PixelsPerDip);
+
+        // 尺寸与半径都没变就跳过：SizeChanged 在布局时可能连着触发好几次，而重建窗口区域要走一次
+        // GDI CreateRoundRectRgn 分配。静止时轮廓本就不变，重建纯属白做。
+        // Skip when neither the size nor the radius moved: SizeChanged can fire several times per layout pass,
+        // and rebuilding the region costs a GDI CreateRoundRectRgn allocation. At rest the silhouette is
+        // unchanged, so rebuilding it is pure waste.
+        if (widthPx == _lastRegionWidthPx && heightPx == _lastRegionHeightPx && radiusPx == _lastRegionRadiusPx)
+            return;
+
+        _lastRegionWidthPx = widthPx;
+        _lastRegionHeightPx = heightPx;
+        _lastRegionRadiusPx = radiusPx;
+
+        // TODO(prototype): 调试日志，正式发布前移除。 / Debug logging; remove before release.
+        AppLogService.Current?.Verbose("Island", $"重设窗口区域 / reapply region {ActualWidth:F0}x{ActualHeight:F0}");
+
         var region = NativeMethods.CreateRoundRectRgn(0, 0, widthPx + 1, heightPx + 1, radiusPx, radiusPx);
         if (region == nint.Zero)
             return;
         NativeMethods.SetWindowRgn(source.Handle, region, true);
+    }
+
+    /// <summary>
+    /// 作废已记录的窗口区域几何，逼下一次 <see cref="ApplyCapsuleRegion"/> 真的重建一次。
+    /// 隐藏再显示、显示器热插拔这类外部变化不会体现为尺寸变化，去重逻辑就看不出轮廓其实该重建了。
+    /// Invalidates the recorded window-region geometry so the next <see cref="ApplyCapsuleRegion"/> really rebuilds.
+    /// External changes such as hide-then-show or a monitor hot-plug never show up as a size change, so the
+    /// de-duplication cannot tell that the silhouette should be rebuilt.
+    /// </summary>
+    private void InvalidateCapsuleRegion()
+    {
+        _lastRegionWidthPx = -1;
+        _lastRegionHeightPx = -1;
+        _lastRegionRadiusPx = -1;
     }
 
     /// <summary>
@@ -530,12 +569,17 @@ public partial class IslandWindow : FluentWindow
     /// </summary>
     private double ResolveShellRadiusDip()
     {
-        var target = _isExpanded ? ExpandedCornerRadiusDip : CapsuleCornerRadiusDip;
+        // 静止时取目标形态的定值。
+        // At rest, the target shape's fixed value applies.
         if (_heightSpring.IsSettled)
-            return target;
+            return _isExpanded ? ExpandedCornerRadiusDip : CapsuleCornerRadiusDip;
 
-        var from = _isExpanded ? ExpandedCornerRadiusDip : CapsuleCornerRadiusDip;
-        var to = _isExpanded ? CapsuleCornerRadiusDip : ExpandedCornerRadiusDip;
+        // 运动中在两个定值之间插值。插值方向与弹簧的起止一致：
+        // 展开时半径从胶囊的 23 走到展开态的 18，收起时反向。
+        // While moving, interpolate between the two fixed radii. The direction follows the spring: expanding goes
+        // from the capsule's 23 to the expanded 18, collapsing goes back.
+        var from = _isExpanded ? CapsuleCornerRadiusDip : ExpandedCornerRadiusDip;
+        var to = _isExpanded ? ExpandedCornerRadiusDip : CapsuleCornerRadiusDip;
         var progress = Math.Clamp(_heightSpring.Progress, 0d, 1d);
         return from + ((to - from) * progress);
     }
