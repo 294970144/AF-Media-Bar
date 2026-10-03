@@ -312,7 +312,7 @@ public sealed class TaskbarOccupiedAreaProbe : ITaskbarOccupiedAreaProbe, IDispo
 
             LastOverlaySignatures[taskbarHandle] = description;
         }
-        AppLogService.Current?.Info("Taskbar", $"任务栏上的外部窗口 / foreign windows over the taskbar: {description}");
+        AppLogService.Current?.Info("Taskbar", $"任务栏上的外部窗口: {description}");
         return true;
     }
 
@@ -360,7 +360,7 @@ public sealed class TaskbarOccupiedAreaProbe : ITaskbarOccupiedAreaProbe, IDispo
             {
                 var root = GetAncestor(taskbarHandle, GA_ROOT);
                 AppLogService.Current?.Warn("Taskbar",
-                    $"任务栏不在 Z 序枚举中 / taskbar missing from Z-order: hwnd=0x{taskbarHandle.ToInt64():X} root=0x{root.ToInt64():X} {DescribeWindow(taskbarHandle)}");
+                    $"任务栏不在 Z 序枚举中: hwnd=0x{taskbarHandle.ToInt64():X} root=0x{root.ToInt64():X} {DescribeWindow(taskbarHandle)}");
             }
         }
         return reachedTaskbar;

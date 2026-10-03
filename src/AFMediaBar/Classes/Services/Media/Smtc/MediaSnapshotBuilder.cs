@@ -203,7 +203,8 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable, IDisposable
         var sourceId = read.SourceId;
         var title = read.Title;
         var artist = read.Artist;
-        var request = new LyricsRequest(title, artist, read.Album, duration > 0 ? duration : null, null);
+        var request = new LyricsRequest(title, artist, read.Album, duration > 0 ? duration : null, null,
+            PlaybackSourceId: sourceId);
         var lyrics = GetLyrics(session.Id, sourceId, request, read.IsVideo);
 
         return new MediaSnapshot(
@@ -247,6 +248,7 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable, IDisposable
         if (!LyricsMediaEligibilityPolicy.ShouldFetch(sourceId, isVideo, SettingsManager.Current.AllowBrowserAndVideoLyrics))
             return null;
         // Structured keys include every matching input and cannot collide through separator characters.
+        request = request with { PlaybackSourceId = sourceId };
         var key = (sessionId, request);
         _lastLyricsKey = key;
         if (_lyricsCache.TryGetValue(key, out var cached))
@@ -302,9 +304,11 @@ public sealed class MediaSnapshotBuilder : IMemoryPrunable, IDisposable
             return;
         }
 
-        var request = new LyricsRequest(title, artist, string.Empty, durationSeconds is > 0 ? durationSeconds : null, null);
+        var request = new LyricsRequest(title, artist, string.Empty, durationSeconds is > 0 ? durationSeconds : null, null,
+            PlaybackSourceId: sourceId);
         // The service snapshot has no album field; reuse the matching request already read from SMTC.
         var key = _lastLyricsKey is { } last && last.SessionId == sessionId &&
+                  last.Request.PlaybackSourceId == sourceId &&
                   last.Request.Title == title && last.Request.Artist == artist &&
                   last.Request.DurationSeconds == request.DurationSeconds
             ? last : (sessionId, request);

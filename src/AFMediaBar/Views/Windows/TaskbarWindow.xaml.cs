@@ -438,7 +438,7 @@ public partial class TaskbarWindow : Window
                 _taskbarHiddenTrimTimer.Start();
                 if (!previous.IsHidden)
                     AppLogService.Current?.Info("Taskbar",
-                        $"任务栏已自动隐藏，宿主暂停 / taskbar auto-hidden; host suspended: {_targetMonitorDeviceId}");
+                        $"任务栏已自动隐藏，宿主暂停: {_targetMonitorDeviceId}");
             }
             else
             {
@@ -453,7 +453,7 @@ public partial class TaskbarWindow : Window
         _taskbarHiddenTrimTimer.Stop();
         if (previous.IsHidden || previous.IsMoving)
             AppLogService.Current?.Info("Taskbar",
-                $"任务栏动画稳定，宿主恢复 / taskbar motion settled; host resumed: {_targetMonitorDeviceId}");
+                $"任务栏动画稳定，宿主恢复: {_targetMonitorDeviceId}");
 
         // 运动期间只复用原生相对几何；稳定后先校正最终尺寸、定位和裁剪，最后恢复输入。
         _hasTaskbarPresentationPlacement = false;
@@ -576,7 +576,7 @@ public partial class TaskbarWindow : Window
         }
         catch (Exception exception)
         {
-            AppLogService.Current?.Warn("Audio", $"频谱采样失败 / spectrum sampling failed: {exception.Message}");
+            AppLogService.Current?.Warn("Audio", $"频谱采样失败: {exception.Message}");
             if (!_isClosing) ClearSpectrum(bandCount);
         }
         finally
