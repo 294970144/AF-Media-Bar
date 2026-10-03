@@ -8,6 +8,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+
+- Lowered the QQ Music lyrics immediate-acceptance threshold from 85 to 75; on a miss, fallbacks are queried in parallel and an enabled source matching the current player wins regardless of score. Without such a result, QQ remains in the score comparison and wins when highest or tied.
+
 ## [1.3.1] - 2026-10-03
 
 This release improves performance and taskbar auto-hide transitions, and fixes lyrics, audio, and update issues from 1.3.0.

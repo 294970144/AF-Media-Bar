@@ -4,7 +4,7 @@
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
     <!--
-        设置页矢量说明图 / Settings vector diagrams
+        设置页矢量说明图 / Settings vector diagrams 
 
         每张图都紧挨着它所解释的控件，并且自带唯一一句说明；页面不再需要另写一条说明来解释同一件事。
         所有颜色都取自主题画刷，因此浅色、深色、高对比度和系统主色变化都不需要额外处理。
