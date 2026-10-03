@@ -50,8 +50,15 @@ namespace AFMediaBar.Views.Pages
             InitializeComponent();
         }
 
-        /// <summary>页面首次加载时执行入场揭示。/ Reveals the page on first load.</summary>
-        private void OnPageLoaded(object sender, RoutedEventArgs e) => SettingsRevealAnimator.Play(sender as Panel);
+        /// <summary>
+        /// 页面首次加载时执行入场揭示，并刷新开机自启动的显示。
+        /// Reveals the page on first load and refreshes the run-at-startup display.
+        /// </summary>
+        private void OnPageLoaded(object sender, RoutedEventArgs e)
+        {
+            ViewModel.RefreshStartupState();
+            SettingsRevealAnimator.Play(sender as Panel);
+        }
 
         private void OpenSettingsFolder_Click(object sender, RoutedEventArgs e) => _persistence.OpenSettingsFolder();
 

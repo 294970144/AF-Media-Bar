@@ -199,19 +199,29 @@ namespace AFMediaBar.ViewModels.Pages
         /// <summary>
         /// 随 Windows 登录自动启动。设置是意图、注册表 Run 项是它的执行结果：写入注册表成功之后才更新设置，
         /// 失败时保留原值并给出原因，避免"开关看着打开了、实际没登记"。
+        ///
+        /// 读的时候多看一层审批记录：用户可以在任务管理器里禁用这一项，Windows 开机不会执行它，此时显示为关闭
+        ///——否则界面显示"开启"而实际不启动，是这个功能最容易被误判的地方。
         /// Whether the application starts with the Windows session. The setting is the intent and the registry Run entry is its
         /// effect, so the setting is only updated after the registry write succeeds; a failure keeps the previous value and states
         /// the reason instead of leaving a switch that looks on while nothing is registered.
+        ///
+        /// Reading also consults the approval record: the user can disable the item in Task Manager and Windows will not act on
+        /// it at logon, so the switch reads off — a switch showing "on" while nothing starts is the most misleading state here.
         /// </summary>
         public bool LaunchAtStartup
         {
-            get => SettingsManager.Current.LaunchAtStartup;
+            get => SettingsManager.Current.LaunchAtStartup && !_startupRegistration.IsDisabledInTaskManager;
             set
             {
-                if (SettingsManager.Current.LaunchAtStartup == value)
+                // 守卫比的是显示值而不是设置值：设置可能仍是"开"而任务管理器里已禁用（此时显示为关），
+                // 用户点开关就是在表达"我要开"，拿设置值去比会把这次点击当成无变化而直接返回。
+                // The guard compares the displayed value, not the stored one: a click on a switch that reads off while the
+                // stored setting says on means "turn it on", and comparing against the setting would swallow it as a no-op.
+                if (LaunchAtStartup == value)
                     return;
 
-                var failure = _startupRegistration.Apply(value);
+                var failure = _startupRegistration.Apply(value, userAsked: true);
                 if (failure is not null)
                 {
                     StartupStatusText = Translations.Format("About.Status.StartupFailed", failure);
@@ -281,6 +291,18 @@ namespace AFMediaBar.ViewModels.Pages
         public void ResetAll()
         {
             SettingsManager.ResetAll();
+            RefreshSettings();
+        }
+
+        /// <summary>
+        /// 页面打开时重读开机自启动的禁用状态并刷新显示：用户可能在程序运行期间去任务管理器改过开关，
+        /// 而那一刻没有任何服务能感知，只能现在重读一次。
+        /// Re-reads the run-at-startup disabled state on entry and refreshes the display: the user may have changed the item in
+        /// Task Manager while the program ran, which no service can notice at the time, so it has to be read again now.
+        /// </summary>
+        public void RefreshStartupState()
+        {
+            _startupRegistration.RefreshDisabledState();
             RefreshSettings();
         }
 
