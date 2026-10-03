@@ -35,18 +35,14 @@ public sealed class StartupRegistrationService
             if (key is null)
                 return Translations.Get("Service.Startup.RegistryKeyUnavailable");
 
-            if (enabled)
-            {
-                var command = StartupRegistrationPolicy.BuildCommandLine(executable);
-                if (key.GetValue(ValueName) as string == command)
-                    return null;
+            var registered = key.GetValue(ValueName) as string;
+            if (!StartupRegistrationPolicy.ShouldWrite(enabled, registered, executable))
+                return null;
 
-                key.SetValue(ValueName, command, RegistryValueKind.String);
-            }
-            else if (key.GetValue(ValueName) is not null)
-            {
+            if (enabled)
+                key.SetValue(ValueName, StartupRegistrationPolicy.BuildCommandLine(executable), RegistryValueKind.String);
+            else
                 key.DeleteValue(ValueName, throwOnMissingValue: false);
-            }
 
             return null;
         }
@@ -59,8 +55,12 @@ public sealed class StartupRegistrationService
 
     /// <summary>
     /// 读取当前是否已登记开机自动启动。注册表不可读时返回 null，调用方据此保留设置里的意图而不谎报状态。
+    /// 注意本方法只报告"是否指向当前可执行文件"，因此"被用户在任务管理器里禁用"这种系统级状态它看不到：
+    /// 那种状态写在另一个注册表位置，不由本服务管理。
     /// Reads whether run-at-startup is currently registered. An unreadable registry returns null so callers can keep the stored
-    /// intent instead of reporting a state they could not verify.
+    /// intent instead of reporting a state they could not verify. Note that this only reports whether the entry points at the
+    /// current executable, so a startup item the user disabled in Task Manager stays invisible here: that state lives in a
+    /// different registry location this service does not manage.
     /// </summary>
     public bool? IsRegistered()
     {

@@ -276,12 +276,29 @@ namespace AFMediaBar.ViewModels.Pages
 
         /// <summary>
         /// 恢复全部默认值，并刷新本页显示的两个更新开关。
-        /// Restores every default and refreshes the two update toggles shown on this page.
+        /// 恢复默认同样是一次「设置变了」，所以开机自启动要在这里补一次核对：设置回到默认开启而注册表里那条被删掉时，
+        /// 界面会显示为开、开机却不会启动。失败原因沿用同一处状态栏，与开关切换时的提示走同一条路。
+        /// Restores every default and refreshes the two update toggles shown on this page. A reset is a settings change like any
+        /// other, so run-at-startup is reconciled here as well: with the setting back to its enabled default and the registry entry
+        /// gone, the switch would read on while nothing starts at login. A failure reuses the same status text as the toggle.
         /// </summary>
         public void ResetAll()
         {
             SettingsManager.ResetAll();
+            ReconcileStartupRegistration();
             RefreshSettings();
+        }
+
+        /// <summary>
+        /// 按当前设置核对开机自启动登记，并把失败原因显示出来。
+        /// Reconciles the run-at-startup entry with the current setting and surfaces a failure reason.
+        /// </summary>
+        private void ReconcileStartupRegistration()
+        {
+            var failure = _startupRegistration.Apply(SettingsManager.Current.LaunchAtStartup);
+            StartupStatusText = failure is null
+                ? string.Empty
+                : Translations.Format("About.Status.StartupFailed", failure);
         }
 
         /// <summary>设置被重置后刷新本页开关的显示值。/ Refreshes the toggle shown on this page after the settings were reset.</summary>

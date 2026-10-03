@@ -140,4 +140,50 @@ public sealed class WheelTooltipAndStartupPolicyTests
         Assert.IsFalse(StartupRegistrationPolicy.Matches("\"C:\\Other\\AFMediaBar.exe\"", "C:\\Apps\\AFMediaBar.exe"));
         Assert.IsFalse(StartupRegistrationPolicy.Matches("\"C:\\Apps\\AFMediaBar.exe\"", "  "));
     }
+
+    /// <summary>
+    /// 开启时只有缺失或指向旧路径才写：已指向当前可执行文件的记录（含用户手写的参数）保持不动。
+    /// Writes while enabling only when the entry is missing or stale; an entry already pointing at the current executable,
+    /// including arguments the user added by hand, is left alone.
+    /// </summary>
+    [TestMethod]
+    public void StartupWriteIsSkippedWhenTheEntryAlreadyPointsAtThisExecutable()
+    {
+        const string executable = "C:\\Apps\\AFMediaBar.exe";
+
+        // 缺失与指向旧路径都要补写，这两种正是"修复"要处理的情形。
+        // A missing entry and a stale one both get written; those are exactly the states a repair has to handle.
+        Assert.IsTrue(StartupRegistrationPolicy.ShouldWrite(true, null, executable));
+        Assert.IsTrue(StartupRegistrationPolicy.ShouldWrite(true, "\"C:\\Old\\AFMediaBar.exe\"", executable));
+        Assert.IsTrue(StartupRegistrationPolicy.ShouldWrite(true, "  ", executable));
+
+        // 已指向当前程序时不写，用户手写的参数因此得以保留。
+        // Nothing is written while it already points here, so arguments the user added survive.
+        Assert.IsFalse(StartupRegistrationPolicy.ShouldWrite(
+            true, "\"C:\\Apps\\AFMediaBar.exe\"", executable));
+        Assert.IsFalse(StartupRegistrationPolicy.ShouldWrite(
+            true, "\"c:\\apps\\afmediabar.exe\"", executable));
+        Assert.IsFalse(StartupRegistrationPolicy.ShouldWrite(
+            true, "\"C:\\Apps\\AFMediaBar.exe\" --minimized", executable));
+    }
+
+    /// <summary>
+    /// 关闭时只要那一项在就删：值名属于本程序，即便它指向已不存在的路径，也是用户要求"别再开机启动"时最该清掉的一条。
+    /// When disabling, an existing entry is removed: the value name belongs to this application, so even one pointing at a path
+    /// that no longer exists is the record a user asking not to start at login wants gone.
+    /// </summary>
+    [TestMethod]
+    public void StartupWriteRemovesAnyEntryWhenDisabling()
+    {
+        const string executable = "C:\\Apps\\AFMediaBar.exe";
+
+        // 已经没有了就是目标状态，不必再删一次。
+        // An absent entry already is the target state, so there is nothing to delete.
+        Assert.IsFalse(StartupRegistrationPolicy.ShouldWrite(false, null, executable));
+
+        // 指向本程序、指向旧路径、指向别处，只要这一项在都删。
+        // Pointing here, pointing at an old path, or pointing elsewhere: an existing entry goes in every case.
+        Assert.IsTrue(StartupRegistrationPolicy.ShouldWrite(false, "\"C:\\Apps\\AFMediaBar.exe\"", executable));
+        Assert.IsTrue(StartupRegistrationPolicy.ShouldWrite(false, "\"C:\\Old\\AFMediaBar.exe\"", executable));
+    }
 }

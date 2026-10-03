@@ -31,6 +31,32 @@ public static class StartupRegistrationPolicy
                string.Equals(registered, executablePath.Trim().Trim('"'), StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// 判断登记与设置是否已经一致，即这次调用是否需要真的写注册表。
+    /// 写入之前先问这一句，是为了让"修复"只补真正缺失或指向旧路径的那一条：
+    /// 已指向本程序时不动注册表，既避免无谓的写入，也不会抹掉用户在注册表里手写的参数。
+    /// Decides whether the registry already agrees with the setting, so a repair only writes what is genuinely missing or stale.
+    /// Nothing is written while the entry still points at this application, which avoids pointless writes and never drops arguments
+    /// the user typed into the registry by hand.
+    /// </summary>
+    /// <param name="enabled">设置里的意图。/ The intent stored in the settings.</param>
+    /// <param name="registeredCommand">注册表里现有的命令行；项缺失时传 null。/ Command line currently in the registry, or null when the entry is absent.</param>
+    /// <param name="executablePath">当前可执行文件的完整路径。/ Full path of the current executable.</param>
+    public static bool ShouldWrite(bool enabled, string? registeredCommand, string executablePath)
+    {
+        // 关闭时只看"这一项在不在"，不看它指向谁：值名固定为本程序所有，登记项存在就是本程序的记录，
+        // 即便它指向一个早已不存在的路径——那恰恰是用户要求"别再开机启动"时最该清掉的一条。
+        // 指向别处的同名记录也一并清掉：留着它，开机的仍是某个程序，用户的意图没有兑现。
+        // When disabling, only the presence of the entry matters, not what it points at: the value name belongs to this
+        // application, so an existing entry is this application's record even when it points at a path that no longer exists
+        // — which is exactly the one to remove when the user asked not to start at login. A same-named record pointing elsewhere
+        // goes too: leaving it would still launch something at login, and the user's intent would not be honoured.
+        if (!enabled)
+            return registeredCommand is not null;
+
+        return !Matches(registeredCommand, executablePath);
+    }
+
     private static string? ExtractExecutable(string command)
     {
         var trimmed = command.Trim();
