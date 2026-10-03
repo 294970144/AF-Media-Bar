@@ -10,7 +10,7 @@ namespace AFMediaBar.Classes.Services.Lyrics;
 /// The QQ Music source: searches a track by title and artist, then retrieves the decrypted QRC syllable lyrics plus the
 /// separate translation.
 ///
-/// 75 分以上可直接结束优先阶段；低分候选也取词，供协调器与备用源比较。
+/// 达到 80 分可直接结束优先阶段；低分候选也取词，供协调器与备用源比较。
 /// 先尝试数字歌曲 id 的新接口，再尝试 songmid 的旧接口。
 /// 旧接口成功返回空正文时确认无歌词；请求或解析失败仍允许备用来源兜底。
 /// </summary>

@@ -59,7 +59,7 @@ namespace AFMediaBar.Components
                 // instead of letting a right-click settings action terminate the process.
                 AppLogService.Current?.Error(
                     "Settings",
-                    "说明条 XAML 资源不可用，已使用安全后备 / SettingsCallout XAML unavailable; using safe fallback",
+                    "说明条 XAML 资源不可用，已使用安全后备",
                     exception);
                 BuildFallbackContent();
             }

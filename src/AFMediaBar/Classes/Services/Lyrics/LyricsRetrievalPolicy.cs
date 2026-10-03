@@ -14,7 +14,7 @@ internal static class LyricsRetrievalPolicy
     // 避免用户组合出互相冲突的调度规则；后续扩展在此调整，不重新添加策略 UI 设置。
     internal const string PreferredSource = LyricsSourceCatalog.QQMusic;
     // QQ 达到此分数直接结束优先阶段；低分结果保留，与备用源按真实元数据评分比较。
-    internal const int PreferredMinimumScore = 75;
+    internal const int PreferredMinimumScore = 80;
 
     public static LyricsRetrievalPlan Plan(IReadOnlyList<ILyricsProvider> providers, IReadOnlyList<ILyricsProvider> enabled)
     {

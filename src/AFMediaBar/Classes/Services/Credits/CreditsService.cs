@@ -106,7 +106,7 @@ public sealed class CreditsService : IDisposable
         {
             _log?.Info(
                 "Credits",
-                $"使用覆盖地址 / credits override in effect（提交者快照 contributors snapshot={CreditsSourcePolicy.ResolveOverride(CreditsSourcePolicy.ContributorsSnapshotUrlOverrideVariable)}，" +
+                $"使用覆盖地址（提交者快照 contributors snapshot={CreditsSourcePolicy.ResolveOverride(CreditsSourcePolicy.ContributorsSnapshotUrlOverrideVariable)}，" +
                 $"赞助名单 sponsors={CreditsSourcePolicy.ResolveOverride(CreditsSourcePolicy.SponsorsUrlOverrideVariable)}）");
         }
 
@@ -179,7 +179,7 @@ public sealed class CreditsService : IDisposable
                 var reason = failures.Count > 0
                     ? string.Join(" ", failures)
                     : null;
-                _log?.Warn("Credits", $"名单获取失败 / credits fetch failed: {reason}");
+                _log?.Warn("Credits", $"名单获取失败: {reason}");
                 Publish(Current with { IsLoading = false, FailureReason = reason });
                 return;
             }
@@ -204,7 +204,7 @@ public sealed class CreditsService : IDisposable
 
             _log?.Info(
                 "Credits",
-                $"名单已更新 / credits updated（{contributors.Count} 位贡献者 contributors，{sponsors.Count} 位赞助者 sponsors，" +
+                $"名单已更新（{contributors.Count} 位贡献者 contributors，{sponsors.Count} 位赞助者 sponsors，" +
                 $"不完整 partial={isPartial}，手动 manual={isManual}）");
         }
         catch (OperationCanceledException)
@@ -215,7 +215,7 @@ public sealed class CreditsService : IDisposable
         {
             // 关于页的名单只是署名，任何失败都不该让页面出错，记一行即可。
             // These lists are attribution only, so no failure here should break the page; one log line is enough.
-            _log?.Warn("Credits", $"名单获取异常 / credits fetch threw: {exception.Message}");
+            _log?.Warn("Credits", $"名单获取异常: {exception.Message}");
             Publish(Current with { IsLoading = false, FailureReason = exception.Message });
         }
         finally
@@ -245,7 +245,7 @@ public sealed class CreditsService : IDisposable
             var parsed = CreditsJsonParser.ParseContributors(text);
             if (parsed.Succeeded)
             {
-                _log?.Info("Credits", $"贡献者取自接口 / contributors from the API（{parsed.Contributors!.Count}）");
+                _log?.Info("Credits", $"贡献者取自接口（{parsed.Contributors!.Count}）");
                 return parsed;
             }
 
@@ -266,7 +266,7 @@ public sealed class CreditsService : IDisposable
             var parsed = CreditsJsonParser.ParseContributors(text);
             if (parsed.Succeeded)
             {
-                _log?.Info("Credits", $"贡献者取自仓库快照 / contributors from the repository snapshot（{parsed.Contributors!.Count}）");
+                _log?.Info("Credits", $"贡献者取自仓库快照（{parsed.Contributors!.Count}）");
                 return parsed;
             }
 

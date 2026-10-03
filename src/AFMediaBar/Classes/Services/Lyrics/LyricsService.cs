@@ -84,7 +84,7 @@ public sealed class LyricsService
         {
             task = provider.GetLyricsAsync(request, source.Token);
             var result = await task.WaitAsync(budget, token).ConfigureAwait(false);
-            AppLogService.Current?.Info("Lyrics", $"来源取词结果 / provider result: source={provider.SourceName} " +
+            AppLogService.Current?.Info("Lyrics", $"来源取词结果: source={provider.SourceName} " +
                 $"status={result?.Status.ToString() ?? "FailedOrUnmatched"} score={result?.MatchScore.ToString() ?? "none"}");
             return result;
         }
@@ -96,7 +96,7 @@ public sealed class LyricsService
         }
         catch (Exception exception)
         {
-            AppLogService.Current?.Warn("Lyrics", $"来源取词失败 / provider failed: {provider.SourceName} {exception.GetType().Name}");
+            AppLogService.Current?.Warn("Lyrics", $"来源取词失败: {provider.SourceName} {exception.GetType().Name}");
             return null;
         }
         finally
@@ -110,7 +110,7 @@ public sealed class LyricsService
 
     private static LyricsResult? LogResult(LyricsResult? result, long started)
     {
-        AppLogService.Current?.Info("Lyrics", $"取词结束 / retrieval completed: source={result?.Source ?? "none"} " +
+        AppLogService.Current?.Info("Lyrics", $"取词结束: source={result?.Source ?? "none"} " +
             $"score={result?.MatchScore.ToString() ?? "none"} status={result?.Status.ToString() ?? "FailedOrUnmatched"} " +
             $"elapsed={Stopwatch.GetElapsedTime(started).TotalMilliseconds:0}ms");
         return result;

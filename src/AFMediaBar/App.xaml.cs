@@ -548,7 +548,7 @@ namespace AFMediaBar
             {
                 AppLogService.Current?.Warn(
                     "Lyrics",
-                    "WebView2 图形层故障已拦截，将重建歌词视图 / WebView2 graphics fault intercepted; rebuilding the lyrics view",
+                    "WebView2 图形层故障已拦截，将重建歌词视图",
                     e.Exception);
                 e.Handled = true;
                 WebLyricsGraphicsRecovery.Request();

@@ -147,7 +147,7 @@ public sealed class PowerStateMonitor : IDisposable
 
         _log?.Info(
             "Prune",
-            $"电源状态监听已启动 / power state monitor started（显示器通知 display notifications=" +
+            $"电源状态监听已启动（显示器通知 display notifications=" +
             $"{(SupportsDisplayStateNotifications ? "on" : "off")}）");
     }
 
@@ -209,13 +209,13 @@ public sealed class PowerStateMonitor : IDisposable
             {
                 _log?.Warn(
                     "Prune",
-                    "注册显示器状态通知失败，只能依赖睡眠与锁屏信号 / registering the display-state notification failed; only suspend and " +
+                    "注册显示器状态通知失败，只能依赖睡眠与锁屏信号" +
                     "lock signals remain");
             }
         }
         catch (Exception ex)
         {
-            _log?.Warn("Prune", $"创建电源消息窗口失败 / creating the power message window failed: {ex.Message}");
+            _log?.Warn("Prune", $"创建电源消息窗口失败: {ex.Message}");
         }
     }
 
@@ -230,7 +230,7 @@ public sealed class PowerStateMonitor : IDisposable
         {
             // 无消息泵的环境（例如部分测试宿主）会在这里失败；此时只保留窗口消息一路。
             // Environments without a message pump fail here; the window-message path stays available.
-            _log?.Warn("Prune", $"订阅系统电源事件失败 / subscribing to system power events failed: {ex.Message}");
+            _log?.Warn("Prune", $"订阅系统电源事件失败: {ex.Message}");
         }
     }
 
@@ -243,7 +243,7 @@ public sealed class PowerStateMonitor : IDisposable
         }
         catch (Exception ex)
         {
-            _log?.Warn("Prune", $"退订系统电源事件失败 / unsubscribing from system power events failed: {ex.Message}");
+            _log?.Warn("Prune", $"退订系统电源事件失败: {ex.Message}");
         }
     }
 
@@ -302,7 +302,7 @@ public sealed class PowerStateMonitor : IDisposable
             _isDisplayOff = isOff;
         }
 
-        _log?.Info("Prune", isOff ? "显示器已关闭 / display off" : "显示器已打开 / display on");
+        _log?.Info("Prune", isOff ? "显示器已关闭" : "显示器已打开");
         RaiseStateChanged();
     }
 
@@ -350,7 +350,7 @@ public sealed class PowerStateMonitor : IDisposable
             _isSessionLocked = value;
         }
 
-        _log?.Info("Prune", value ? "会话已锁定 / session locked" : "会话已解锁 / session unlocked");
+        _log?.Info("Prune", value ? "会话已锁定" : "会话已解锁");
         RaiseStateChanged();
     }
 
@@ -366,7 +366,7 @@ public sealed class PowerStateMonitor : IDisposable
             _isSuspended = value;
         }
 
-        _log?.Info("Prune", value ? "系统即将睡眠 / system suspending" : "系统已唤醒 / system resumed");
+        _log?.Info("Prune", value ? "系统即将睡眠" : "系统已唤醒");
         RaiseStateChanged();
     }
 
@@ -395,7 +395,7 @@ public sealed class PowerStateMonitor : IDisposable
         }
         catch (Exception ex)
         {
-            _log?.Warn("Prune", $"投递电源状态变化失败 / dispatching the power state change failed: {ex.Message}");
+            _log?.Warn("Prune", $"投递电源状态变化失败: {ex.Message}");
         }
     }
 }

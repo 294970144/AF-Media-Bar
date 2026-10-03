@@ -31,7 +31,7 @@ internal static class LyricsSearch
             catch (OperationCanceledException) { throw; }
             catch (Exception exception)
             {
-                AppLogService.Current?.Warn("Lyrics", $"歌曲搜索异常 / search failed: {searcher.Name} {exception.GetType().Name}");
+                AppLogService.Current?.Warn("Lyrics", $"歌曲搜索异常: {searcher.Name} {exception.GetType().Name}");
                 continue;
             }
             token.ThrowIfCancellationRequested();
@@ -46,7 +46,7 @@ internal static class LyricsSearch
             // A low QQ candidate is kept for cross-source comparison, but must not stop later search queries.
             if (best is not null && best.Score >= minimumScore) break;
         }
-        AppLogService.Current?.Info("Lyrics", $"歌曲匹配 / match: source={searcher.Name} score={best?.Score.ToString() ?? "none"} " +
+        AppLogService.Current?.Info("Lyrics", $"歌曲匹配: source={searcher.Name} score={best?.Score.ToString() ?? "none"} " +
             $"bestCandidateScore={bestCandidateScore?.ToString() ?? "none"} minimum={minimumScore}");
         return best;
     }

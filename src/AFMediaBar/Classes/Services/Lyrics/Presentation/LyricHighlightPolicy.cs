@@ -130,7 +130,7 @@ public static class LyricHighlightPolicy
             break;
         }
 
-        return Math.Clamp(sungCharacters / totalCharacters, 0, 1);
+        return Math.Clamp(sungCharacters);
     }
 
 }

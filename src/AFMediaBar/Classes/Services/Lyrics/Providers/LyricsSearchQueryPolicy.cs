@@ -17,7 +17,7 @@ internal static partial class LyricsSearchQueryPolicy
     public static IReadOnlyList<string> Build(LyricsRequest request)
     {
         var title = WithoutTranslation(request.Title);
-        var artist = WithoutTranslation(request.Artist);
+        var artist = string.Join(" ", LyricsArtistPolicy.Split(request).Select(WithoutTranslation));
         return new[] { $"{title} {artist}".Trim(), $"{request.Title} {request.Artist}".Trim(), title }
             .Where(query => query.Length > 0).Distinct(StringComparer.Ordinal).ToArray();
     }

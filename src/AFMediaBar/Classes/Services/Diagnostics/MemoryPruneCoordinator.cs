@@ -155,7 +155,7 @@ public sealed class MemoryPruneCoordinator : IDisposable
 
         _log?.Info(
             "Prune",
-            $"后台剪枝已启动 / background pruning started（评估周期 period {MemoryPrunePolicy.EvaluationIntervalFor(_level).TotalSeconds:0} s；" +
+            $"后台剪枝已启动（评估周期 period {MemoryPrunePolicy.EvaluationIntervalFor(_level).TotalSeconds:0} s；" +
             $"参与者 participants: {string.Join(", ", ParticipantNames)}）");
         Evaluate();
     }
@@ -212,7 +212,7 @@ public sealed class MemoryPruneCoordinator : IDisposable
                 // 按需回收只是"顺手省一点"，它失败绝不能让关窗路径或用户点击抛出。
                 // An on-demand reclaim only saves a little on the side, so its failure must never escape into a window-close path or a user click.
                 if (!_disposed)
-                    _log?.Warn("Prune", $"按需回收失败 / on-demand reclaim failed ({trigger}): {ex.Message}");
+                    _log?.Warn("Prune", $"按需回收失败({trigger}): {ex.Message}");
             }
             finally
             {
@@ -243,7 +243,7 @@ public sealed class MemoryPruneCoordinator : IDisposable
 
         _log.Info(
             "Prune",
-            $"按需回收 / on-demand reclaim（{reason}，{strength}）：{result.Before.Describe()} → （{result.After.Describe()}；" +
+            $"按需回收（{reason}，{strength}）：{result.Before.Describe()} → （{result.After.Describe()}；" +
             $"工作集已交还 working set returned={result.ReturnedWorkingSet}）");
     }
 
@@ -319,7 +319,7 @@ public sealed class MemoryPruneCoordinator : IDisposable
             }
             catch (Exception ex)
             {
-                _log?.Warn("Prune", $"参与者剪枝失败 / participant '{participant.PruneParticipantName}' failed to prune: {ex.Message}");
+                _log?.Warn("Prune", $"参与者剪枝失败: {participant.PruneParticipantName}: {ex.Message}");
             }
         }
 
@@ -375,7 +375,7 @@ public sealed class MemoryPruneCoordinator : IDisposable
 
         if (level == MemoryPruneLevel.None)
         {
-            _log.Info("Prune", $"恢复到常规运行 / back to normal operation（{reason}）");
+            _log.Info("Prune", $"恢复到常规运行（{reason}）");
             return;
         }
 
@@ -409,15 +409,15 @@ public sealed class MemoryPruneCoordinator : IDisposable
         {
             // 界面只是跟着降频，它失败不该让剪枝链断掉。
             // The interface only follows along by slowing down, so its failure must not break the prune chain.
-            _log?.Warn("Prune", $"通知界面剪枝档位失败 / notifying the interface about the prune level failed: {ex.Message}");
+            _log?.Warn("Prune", $"通知界面剪枝档位失败: {ex.Message}");
         }
     }
 
     private static string DescribeLevel(MemoryPruneLevel level) => level switch
     {
-        MemoryPruneLevel.Idle => "空闲剪枝 L1 / idle prune L1",
-        MemoryPruneLevel.DisplayOff => "显示关闭剪枝 L2 / display-off prune L2",
-        _ => "睡眠剪枝 L3 / suspend prune L3"
+        MemoryPruneLevel.Idle => "空闲剪枝 L1",
+        MemoryPruneLevel.DisplayOff => "显示关闭剪枝 L2",
+        _ => "睡眠剪枝 L3"
     };
 
     private static string DescribeReason(MemoryPruneLevel level, MemoryPruneSignals signals)
@@ -480,7 +480,7 @@ public sealed class MemoryPruneCoordinator : IDisposable
             {
                 // 会话在读取过程中关闭是正常竞态，忽略即可；只有其他异常值得记一笔。
                 // A session closing mid-read is a normal race and is ignored; anything else is worth a line.
-                _log?.Warn("Prune", $"读取播放状态失败 / reading the playback status failed: {ex.Message}");
+                _log?.Warn("Prune", $"读取播放状态失败: {ex.Message}");
             }
         }
 
@@ -560,7 +560,7 @@ public sealed class MemoryPruneCoordinator : IDisposable
         catch (Exception ex)
         {
             _evaluationScheduled = false;
-            _log?.Warn("Prune", $"投递媒体事件评估失败 / dispatching the media-triggered evaluation failed: {ex.Message}");
+            _log?.Warn("Prune", $"投递媒体事件评估失败: {ex.Message}");
         }
     }
 }
