@@ -16,6 +16,16 @@ public sealed class StartupRegistrationService
 
     private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
 
+    /// <summary>最近一次 <see cref="Apply"/> 的失败原因；成功时为 null，取走后即为空。/ The failure from the most recent <see cref="Apply"/>, or null on success; cleared once taken.</summary>
+    public string? TakeLastFailure()
+    {
+        var failure = LastFailure;
+        LastFailure = null;
+        return failure;
+    }
+
+    private string? LastFailure;
+
     /// <summary>
     /// 登记或取消登记开机自动启动。
     /// Registers or unregisters run-at-startup.
@@ -23,6 +33,16 @@ public sealed class StartupRegistrationService
     /// <param name="enabled">是否随登录启动。/ Whether the application should start with the session.</param>
     /// <returns>失败原因；成功时为 null。/ The failure reason, or null on success.</returns>
     public string? Apply(bool enabled)
+    {
+        // 失败先留在这里再返回：启动时的核对发生在托盘图标建立之前，那一刻没有界面能承载提示，
+        // 而开机自启动没登记上、用户不问就永远不会知道。由图标就绪后的那一步取走。
+        // The failure is kept before returning: the startup reconciliation runs before the tray icon exists, when no surface
+        // can carry a message, yet an unregistered item would go unnoticed. The ready tray takes it from here.
+        LastFailure = ApplyCore(enabled);
+        return LastFailure;
+    }
+
+    private string? ApplyCore(bool enabled)
     {
         var executable = ResolveExecutablePath();
         if (executable is null)

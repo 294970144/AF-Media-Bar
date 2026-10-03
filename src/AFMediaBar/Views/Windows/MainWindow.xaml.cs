@@ -636,6 +636,23 @@ namespace AFMediaBar.Views.Windows
             _effectiveTaskbarTargetSignature = ResolveEffectiveTaskbarTargetSignature();
             ActivateTaskbarMode();
             _taskbarTopologyTimer.Start();
+
+            NotifyStartupRegistrationFailure();
+        }
+
+        // 托盘图标到这一刻才装好，因此是启动时那次核对失败后最早能承载提示的时刻：核对本身发生在宿主启动之前，
+        // 那会儿既没有托盘图标也没有设置页，失败只进了日志。取走而非读取，保证同一次失败不会在打开设置页时又冒出来。
+        // The tray icon only exists now, which is the earliest moment that can carry a failed startup reconciliation: that
+        // reconciliation runs before the host starts, when there is neither a tray icon nor the settings page, so the failure
+        // reached the log alone. Taking the reason keeps the same failure from surfacing again on the settings page.
+        private void NotifyStartupRegistrationFailure()
+        {
+            if (App.Services.GetRequiredService<StartupRegistrationService>().TakeLastFailure() is not { } failure)
+                return;
+
+            _trayIconService.TryShowNotification(
+                Translations.Get("About.Row.Startup.Title"),
+                Translations.Format("About.Status.StartupFailed", failure));
         }
 
         private void TrackChangeNotificationCoordinator_OnNotificationRequested(
