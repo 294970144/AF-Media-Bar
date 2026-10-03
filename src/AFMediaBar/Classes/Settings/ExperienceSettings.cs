@@ -264,7 +264,7 @@ public readonly record struct SpectrumComponentSettings(int BandCount, int Refre
             return DefaultContentHeightDip;
         }
 
-        var snapped = Math.Round(dip.AwayFromZero) * ContentHeightStepDip;
+        var snapped = Math.Round(dip / ContentHeightStepDip, MidpointRounding.AwayFromZero) * ContentHeightStepDip;
         return Math.Clamp(snapped, MinimumContentHeightDip, MaximumContentHeightDip);
     }
 

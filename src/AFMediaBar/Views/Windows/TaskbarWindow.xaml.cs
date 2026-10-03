@@ -813,7 +813,7 @@ public partial class TaskbarWindow : Window
             dpiScale,
             (int)Math.Round((orientation == LayoutOrientation.Horizontal ? barWidth : barHeight) * dpiScale),
             out var safePlacementResolved);
-        var maximumPrimary = preferredRange.Length
+        var maximumPrimary = preferredRange.Length / dpiScale;
         if (orientation == LayoutOrientation.Horizontal)
             _lengthConstraints.Update(this, MediaControl.MinimumPrimaryLength, maximumPrimary);
         else
@@ -869,10 +869,10 @@ public partial class TaskbarWindow : Window
         var crossPos = placement.Cross;
 
         // Canvas coordinates and control size are DIPs, hence the dpiScale conversion
-        Canvas.SetLeft(MediaControl, (isVertical ? crossPos : primaryPos));
-        Canvas.SetTop(MediaControl, (isVertical ? primaryPos : crossPos));
-        MediaControl.Width = physicalWidth
-        MediaControl.Height = physicalHeight
+        Canvas.SetLeft(MediaControl, (isVertical ? crossPos : primaryPos) / dpiScale);
+        Canvas.SetTop(MediaControl, (isVertical ? primaryPos : crossPos) / dpiScale);
+        MediaControl.Width = physicalWidth / dpiScale;
+        MediaControl.Height = physicalHeight / dpiScale;
         // 只有实际画布坐标与尺寸都写入后，安全区间才算真正落地；单纯查询最大长度不能提前放行窗口显示。
         // A safe range counts as applied only after the actual canvas coordinates and size have landed; a maximum-length query must not reveal the window early.
         _hasSafePlacement = !SettingsManager.Current.TaskbarBarAvoidIcons || safePlacementResolved;
@@ -1064,11 +1064,11 @@ public partial class TaskbarWindow : Window
         var physicalCrossSize = orientation == LayoutOrientation.Vertical
             ? taskbarRect.Right - taskbarRect.Left
             : taskbarRect.Bottom - taskbarRect.Top;
-        var availableCrossSizeDip = physicalCrossSize
+        var availableCrossSizeDip = physicalCrossSize / dpiScale;
 
         // 任务栏宿主会裁剪超出横轴的内容，因此仅限制实际渲染值，保留用户设置值。
         // The taskbar host clips cross-axis overflow, so cap only the rendered value and preserve the user's setting.
-        var maximumPercent = Math.Max(70, availableCrossSizeDip* 100);
+        var maximumPercent = Math.Max(70, availableCrossSizeDip / baseCrossSize * 100);
         return Math.Min(requestedPercent, maximumPercent);
     }
 
@@ -1122,8 +1122,8 @@ public partial class TaskbarWindow : Window
         var point = active.PointToScreen(new Point(0, 0));
         var dpi = VisualTreeHelper.GetDpi(active);
         return new Rect(
-            point.X.DpiScaleX,
-            point.Y.DpiScaleY,
+            point.X / dpi.DpiScaleX,
+            point.Y / dpi.DpiScaleY,
             active.ActualWidth,
             active.ActualHeight);
     }
@@ -1560,7 +1560,7 @@ public partial class TaskbarWindow : Window
             return;
         }
 
-        var steps = Math.Max(1, Math.Abs(delta).MouseWheelDeltaForOneLine) * (delta > 0 ? 1 : -1);
+        var steps = Math.Max(1, Math.Abs(delta) / Mouse.MouseWheelDeltaForOneLine) * (delta > 0 ? 1 : -1);
         var value = Math.Clamp((_pendingVolume ?? _currentVolume.VolumePercent) + steps * 2, 0, 100);
         QueueVolume(value);
         MediaControl.SetVolumePreview(value);
@@ -1666,7 +1666,7 @@ public partial class TaskbarWindow : Window
     private void ApplyExtraFeaturesSettings()
     {
         var spectrum = SettingsManager.Current.SpectrumComponent.Normalize();
-        _spectrumTimer.Interval = TimeSpan.FromMilliseconds(1000d.RefreshRateHz);
+        _spectrumTimer.Interval = TimeSpan.FromMilliseconds(1000d / spectrum.RefreshRateHz);
         var performance = SettingsManager.Current.PerformanceComponent.Normalize();
         MediaControl.ApplyQuickLaunchEntries(SettingsManager.Current.QuickLaunch.Entries ?? []);
         MediaControl.ApplyTaskbarExperienceSettings();
@@ -2046,7 +2046,7 @@ public partial class TaskbarWindow : Window
             ? (int)Math.Round(currentPrimary * dpi)
             : (int)Math.Round(MediaControl.MinimumPrimaryLength * dpi);
         var range = GetPreferredSafeRange(rect, orientation, dpi, requiredPixels, out _);
-        return Math.Max(1, range.Length);
+        return Math.Max(1, range.Length / dpi);
     }
 
     private TaskbarPrimaryRange GetPreferredSafeRange(
